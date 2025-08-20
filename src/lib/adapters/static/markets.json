@@ -1,0 +1,152 @@
+{
+  "BINANCE": {
+    "BTCUSDT": {
+      "spot": {
+        "symbol": "BTCUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.00001",
+        "minQty": "0.00001",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "BTCUSDT",
+        "tickSize": "0.1",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 125,
+        "mmr": "0.004"
+      }
+    },
+    "ETHUSDT": {
+      "spot": {
+        "symbol": "ETHUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.0001",
+        "minQty": "0.0001",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "ETHUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 100,
+        "mmr": "0.005"
+      }
+    }
+  },
+  "BYBIT": {
+    "BTCUSDT": {
+      "linear": {
+        "symbol": "BTCUSDT",
+        "tickSize": "0.1",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 100,
+        "mmr": "0.006"
+      }
+    },
+    "ETHUSDT": {
+      "linear": {
+        "symbol": "ETHUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "5",
+        "leverageMax": 100,
+        "mmr": "0.01"
+      }
+    }
+  },
+  "BITGET": {
+    "BTCUSDT": {
+      "spot": {
+        "symbol": "BTCUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.00001",
+        "minQty": "0.00001",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "BTCUSDT",
+        "tickSize": "0.1",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 125,
+        "mmr": "0.004"
+      }
+    },
+    "ETHUSDT": {
+      "spot": {
+        "symbol": "ETHUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.0001",
+        "minQty": "0.0001",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "ETHUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 100,
+        "mmr": "0.005"
+      }
+    }
+  },
+  "OKX": {
+    "BTC-USDT": {
+      "spot": {
+        "symbol": "BTC-USDT",
+        "tickSize": "0.1",
+        "stepSize": "0.00001",
+        "minQty": "0.00001",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "BTC-USDT-SWAP",
+        "tickSize": "0.1",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "1",
+        "leverageMax": 100,
+        "mmr": "0.004"
+      }
+    },
+    "ETH-USDT": {
+      "spot": {
+        "symbol": "ETH-USDT",
+        "tickSize": "0.01",
+        "stepSize": "0.0001",
+        "minQty": "0.0001",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "ETH-USDT-SWAP",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "1",
+        "leverageMax": 75,
+        "mmr": "0.005"
+      }
+    }
+  }
+}
