@@ -52,6 +52,17 @@ export const settingsSchema = z.object({
   defaultSymbol: z.string().default('BTCUSDT'),
   defaultContractMode: z.enum(['SPOT', 'USDT_PERP', 'INVERSE']).default('USDT_PERP'),
   
+  // Default modes
+  defaultStopMode: z.enum(['PRICE', 'ATR']).default('PRICE'),
+  defaultRiskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
+  defaultOrderType: z.enum(['MARKET', 'LIMIT']).default('MARKET'),
+  defaultLeverage: z.number().min(1).max(200).default(10),
+  
+  // Default risk settings
+  defaultAccountEquity: z.string().default('10000'),
+  defaultRiskPercent: z.string().default('1'),
+  defaultRiskAmount: z.string().default('100'),
+  
   // Default fees
   defaultFeeOpen: z.string().default('0.0004'),
   defaultFeeClose: z.string().default('0.0004'),

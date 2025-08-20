@@ -83,7 +83,7 @@ const resources = {
       results: 'Results',
       positionResults: 'Position Results',
       rawQuantity: 'Raw Quantity',
-      roundedQuantity: 'Rounded Quantity',
+      roundedQuantity: 'Opening Size',
       notionalValue: 'Notional Value',
       initialMargin: 'Initial Margin',
       estLiquidation: 'Est. Liquidation',
@@ -118,11 +118,24 @@ const resources = {
       defaultExchange: 'Default Exchange',
       defaultSymbol: 'Default Symbol',
       defaultContractMode: 'Default Contract Mode',
+      defaultModeSettings: 'Default Mode Settings',
+      defaultStopMode: 'Default Stop Mode',
+      defaultRiskMode: 'Default Risk Mode',
+      defaultOrderType: 'Default Order Type',
+      defaultLeverage: 'Default Leverage',
+      defaultRiskSettings: 'Default Risk Settings',
+      defaultAccountEquity: 'Default Account Equity',
+      defaultRiskPercent: 'Default Risk Percentage',
+      defaultRiskAmount: 'Default Risk Amount',
       defaultFeeSettings: 'Default Fee Settings',
       defaultAtrSettings: 'Default ATR Settings',
       rrSettings: 'Risk/Reward Settings',
       rrRatios: 'R/R Ratios (comma separated)',
       rrRatiosHelp: 'Enter target ratios like: 1, 1.5, 2, 3',
+      rrRatiosList: 'Risk/Reward Ratios',
+      addRatio: 'Add Ratio',
+      removeRatio: 'Remove',
+      ratioPlaceholder: 'Enter ratio (e.g., 2.0)',
       uiPreferences: 'UI Preferences',
       theme: 'Theme',
       language: 'Language',
@@ -137,6 +150,7 @@ const resources = {
       resetToDefaults: 'Reset to Defaults',
       resetConfirm: 'Are you sure you want to reset all settings to defaults?',
       settingsSaved: 'Settings saved successfully',
+      settingsError: 'Failed to save settings',
       
       // Presets
       presetsTitle: 'Presets Manager',
@@ -179,6 +193,12 @@ const resources = {
       
       // Buttons & Actions
       fetchATRButton: 'Fetch ATR',
+      fetchMetadata: 'Fetch Metadata',
+      fetchingMetadata: 'Fetching Meta...',
+      metadataLoaded: 'Loaded',
+      riskAmountUSDT: 'Risk Amount (USDT)',
+      autoSuggestLeverage: 'Auto-suggest',
+      rawQuantityPrefix: 'Raw',
       calculate: 'Calculate',
       ok: 'OK',
       
@@ -191,7 +211,34 @@ const resources = {
       // Header Features
       riskManagement: 'Risk Management',
       exchanges: 'Exchanges',
-      realTimeCalc: 'Real-time Calculation'
+      realTimeCalc: 'Real-time Calculation',
+      
+      // Warning Messages
+      warningExchangeRule: 'EXCHANGE RULE',
+      warningTightStop: 'TIGHT STOP: Stop distance <0.5% - high chance of premature stop-out',
+      warningWideStop: 'WIDE STOP: Stop distance >10% - consider reducing risk amount',
+      warningHighRiskPercent: 'HIGH RISK %: Risking >5% of account on single trade',
+      warningElevatedRiskPercent: 'ELEVATED RISK %: Risking >2% of account on single trade',
+      warningCriticalLiquidation: 'CRITICAL: Stop price is beyond liquidation price - position will be liquidated before stop trigger',
+      warningHighRiskLiquidation: 'HIGH RISK: Liquidation price is within 1% of stop price',
+      warningModerateRiskLiquidation: 'MODERATE RISK: Liquidation price is within 2% of stop price',
+      warningExtremeLeverage: 'EXTREME LEVERAGE: Consider reducing leverage for better risk management',
+      warningHighLeverage: 'HIGH LEVERAGE: Monitor position closely for rapid price movements',
+      warningHighMarginUsage: 'HIGH MARGIN USAGE: Using >80% of account equity as margin',
+      warningModerateMarginUsage: 'MODERATE MARGIN USAGE: Using >50% of account equity as margin',
+      warningLeverageNotSpecified: 'Leverage not specified for contract trading',
+      
+      // Order Summary
+      orderSummaryEntry: 'Entry',
+      orderSummaryStop: 'Stop',
+      orderSummaryQty: 'Qty',
+      orderSummaryNotional: 'Notional',
+      orderSummaryLeverage: 'Leverage',
+      orderSummaryMargin: 'Margin',
+      orderSummaryEstLiquidation: 'Est. Liquidation',
+      orderSummaryCompliance: 'Compliance',
+      orderSummaryWarnings: 'Warnings',
+      orderSummaryNote: 'Note: Estimates only. Exchange rules prevail.'
     }
   },
   zh: {
@@ -274,7 +321,7 @@ const resources = {
       results: '结果',
       positionResults: '仓位结果',
       rawQuantity: '原始数量',
-      roundedQuantity: '舍入数量',
+      roundedQuantity: '开仓数量',
       notionalValue: '名义价值',
       initialMargin: '初始保证金',
       estLiquidation: '预估清算价',
@@ -310,11 +357,24 @@ const resources = {
       defaultExchange: '默认交易所',
       defaultSymbol: '默认交易对',
       defaultContractMode: '默认合约模式',
+      defaultModeSettings: '默认模式设置',
+      defaultStopMode: '默认止损模式',
+      defaultRiskMode: '默认风险模式',
+      defaultOrderType: '默认订单类型',
+      defaultLeverage: '默认杠杆倍数',
+      defaultRiskSettings: '默认风险设置',
+      defaultAccountEquity: '默认账户权益',
+      defaultRiskPercent: '默认风险百分比',
+      defaultRiskAmount: '默认风险金额',
       defaultFeeSettings: '默认费率设置',
       defaultAtrSettings: '默认ATR设置',
       rrSettings: '风险收益比设置',
       rrRatios: '风险收益比率 (逗号分隔)',
       rrRatiosHelp: '输入目标比率，如：1, 1.5, 2, 3',
+      rrRatiosList: '风险收益比率',
+      addRatio: '添加比率',
+      removeRatio: '删除',
+      ratioPlaceholder: '输入比率 (例如: 2.0)',
       uiPreferences: '界面偏好',
       theme: '主题',
       language: '语言',
@@ -329,6 +389,7 @@ const resources = {
       resetToDefaults: '重置为默认值',
       resetConfirm: '确定要将所有设置重置为默认值吗？',
       settingsSaved: '设置保存成功',
+      settingsError: '设置保存失败',
       
       // Presets
       presetsTitle: '预设管理器',
@@ -371,6 +432,12 @@ const resources = {
       
       // Buttons & Actions
       fetchATRButton: '获取ATR',
+      fetchMetadata: '获取市场信息',
+      fetchingMetadata: '获取中...',
+      metadataLoaded: '已加载',
+      riskAmountUSDT: '风险金额 (USDT)',
+      autoSuggestLeverage: '自动建议',
+      rawQuantityPrefix: '原始数量',
       calculate: '计算',
       ok: '确定',
       
@@ -383,7 +450,34 @@ const resources = {
       // Header Features
       riskManagement: '风险管理',
       exchanges: '交易所',
-      realTimeCalc: '实时计算'
+      realTimeCalc: '实时计算',
+      
+      // Warning Messages
+      warningExchangeRule: '交易所规则',
+      warningTightStop: '止损过紧：止损距离 <0.5% - 容易被提前止损',
+      warningWideStop: '止损过宽：止损距离 >10% - 建议减少风险金额',
+      warningHighRiskPercent: '高风险%：单笔交易风险超过账户的5%',
+      warningElevatedRiskPercent: '风险偏高%：单笔交易风险超过账户的2%',
+      warningCriticalLiquidation: '严重警告：止损价格超出强平价格 - 将在止损触发前被强制平仓',
+      warningHighRiskLiquidation: '高风险：强平价格在止损价格1%范围内',
+      warningModerateRiskLiquidation: '中等风险：强平价格在止损价格2%范围内',
+      warningExtremeLeverage: '极高杠杆：建议降低杠杆以改善风险管理',
+      warningHighLeverage: '高杠杆：密切监控仓位以应对快速价格变动',
+      warningHighMarginUsage: '高保证金使用率：使用了超过80%的账户权益作为保证金',
+      warningModerateMarginUsage: '中等保证金使用率：使用了超过50%的账户权益作为保证金',
+      warningLeverageNotSpecified: '合约交易未指定杠杆倍数',
+      
+      // Order Summary
+      orderSummaryEntry: '入场',
+      orderSummaryStop: '止损',
+      orderSummaryQty: '数量',
+      orderSummaryNotional: '名义价值',
+      orderSummaryLeverage: '杠杆',
+      orderSummaryMargin: '保证金',
+      orderSummaryEstLiquidation: '预估强平价',
+      orderSummaryCompliance: '合规检查',
+      orderSummaryWarnings: '警告',
+      orderSummaryNote: '注意：仅为估算值，以交易所规则为准。'
     }
   }
 };

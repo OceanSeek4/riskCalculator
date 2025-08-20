@@ -1,5 +1,5 @@
 import { SafeDecimal, roundDownToStep, roundToTick, validateMinRequirements } from './math.js';
-import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode } from './types.js';
+import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode, WarningKey } from './types.js';
 
 /**
  * Calculate stop price based on ATR
@@ -221,6 +221,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
   } = input;
 
   const warnings: string[] = [];
+  const warningKeys: WarningKey[] = [];
   
   try {
     // Convert inputs to SafeDecimal
@@ -284,6 +285,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
     const validation = validateMinRequirements(qtyRounded, entryPrice, minQty, minNotional);
     if (!validation.valid) {
       warnings.push(`❌ EXCHANGE RULE: ${validation.reason!}`);
+      warningKeys.push('warningExchangeRule');
     }
     
     // Risk-to-stop distance analysis
@@ -293,8 +295,10 @@ export function calculatePosition(input: CalcInput): CalcResult {
     
     if (stopDistancePercent.lt(0.5)) {
       warnings.push('🎯 TIGHT STOP: Stop distance <0.5% - high chance of premature stop-out');
+      warningKeys.push('warningTightStop');
     } else if (stopDistancePercent.gt(10)) {
       warnings.push('📏 WIDE STOP: Stop distance >10% - consider reducing risk amount');
+      warningKeys.push('warningWideStop');
     }
     
     // Position size warnings
@@ -302,8 +306,10 @@ export function calculatePosition(input: CalcInput): CalcResult {
       const riskPercent = SafeDecimal.from(riskPercentStr!);
       if (riskPercent.gt(5)) {
         warnings.push('🚨 HIGH RISK %: Risking >5% of account on single trade');
+        warningKeys.push('warningHighRiskPercent');
       } else if (riskPercent.gt(2)) {
         warnings.push('⚡ ELEVATED RISK %: Risking >2% of account on single trade');
+        warningKeys.push('warningElevatedRiskPercent');
       }
     }
     
@@ -311,7 +317,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
     const notional = qtyRounded.safeMul(entryPrice);
     
     // Calculate targets
-    const targets = calculateTargets(entryPrice, stopPrice, [1, 1.5, 2], side);
+    const targets = calculateTargets(entryPrice, stopPrice, input.rrRatios, side);
     
     let initialMargin: SafeDecimal | undefined;
     let liquidationPrice: SafeDecimal | undefined;
@@ -324,25 +330,47 @@ export function calculatePosition(input: CalcInput): CalcResult {
         liquidationPrice = calculateLiquidationPrice(entryPrice, leverageDecimal, mmr, side);
         
         // Advanced liquidation risk analysis
-        const liqStopDistance = side === 'LONG'
-          ? liquidationPrice.safeSub(stopPrice)
-          : stopPrice.safeSub(liquidationPrice);
+        // For LONG: stop should be above liquidation price
+        // For SHORT: stop should be below liquidation price
+        let isCritical = false;
+        let distancePercent = SafeDecimal.from('0');
         
-        const liqStopDistancePercent = liqStopDistance.safeDiv(entryPrice).safeMul(100);
+        if (side === 'LONG') {
+          // For LONG: critical if stop price <= liquidation price
+          isCritical = stopPrice.lte(liquidationPrice);
+          if (!isCritical) {
+            // Distance from liquidation to stop (positive means safe)
+            const distance = stopPrice.safeSub(liquidationPrice);
+            distancePercent = distance.safeDiv(entryPrice).safeMul(100);
+          }
+        } else {
+          // For SHORT: critical if stop price >= liquidation price  
+          isCritical = stopPrice.gte(liquidationPrice);
+          if (!isCritical) {
+            // Distance from stop to liquidation (positive means safe)
+            const distance = liquidationPrice.safeSub(stopPrice);
+            distancePercent = distance.safeDiv(entryPrice).safeMul(100);
+          }
+        }
         
-        if (liqStopDistance.isNegative()) {
+        if (isCritical) {
           warnings.push('⚠️ CRITICAL: Stop price is beyond liquidation price - position will be liquidated before stop trigger');
-        } else if (liqStopDistancePercent.lt(1)) {
+          warningKeys.push('warningCriticalLiquidation');
+        } else if (distancePercent.lt(1)) {
           warnings.push('🚨 HIGH RISK: Liquidation price is within 1% of stop price');
-        } else if (liqStopDistancePercent.lt(2)) {
+          warningKeys.push('warningHighRiskLiquidation');
+        } else if (distancePercent.lt(2)) {
           warnings.push('⚡ MODERATE RISK: Liquidation price is within 2% of stop price');
+          warningKeys.push('warningModerateRiskLiquidation');
         }
         
         // Leverage warnings
         if (leverage > 50) {
           warnings.push('🎯 EXTREME LEVERAGE: Consider reducing leverage for better risk management');
+          warningKeys.push('warningExtremeLeverage');
         } else if (leverage > 20) {
           warnings.push('📈 HIGH LEVERAGE: Monitor position closely for rapid price movements');
+          warningKeys.push('warningHighLeverage');
         }
         
         // Margin utilization check
@@ -352,12 +380,15 @@ export function calculatePosition(input: CalcInput): CalcResult {
           
           if (marginRatio.gt(80)) {
             warnings.push('💰 HIGH MARGIN USAGE: Using >80% of account equity as margin');
+            warningKeys.push('warningHighMarginUsage');
           } else if (marginRatio.gt(50)) {
             warnings.push('📊 MODERATE MARGIN USAGE: Using >50% of account equity as margin');
+            warningKeys.push('warningModerateMarginUsage');
           }
         }
       } else {
         warnings.push('Leverage not specified for contract trading');
+        warningKeys.push('warningLeverageNotSpecified');
       }
     }
     
@@ -385,6 +416,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
       liquidationPrice: liquidationPrice?.toString(),
       targets,
       warnings,
+      warningKeys,
       orderSummary
     };
     

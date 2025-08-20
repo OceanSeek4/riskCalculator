@@ -13,6 +13,13 @@ export default defineConfig(async () => ({
     postcss: './postcss.config.cjs',
   },
 
+  // Build configuration for Tauri
+  build: {
+    rollupOptions: {
+      // No external dependencies needed for Tauri v2
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

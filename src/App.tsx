@@ -84,9 +84,13 @@ function App() {
             </div>
 
             <TabsContent value="calculator" className="space-y-6">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 max-w-7xl mx-auto">
-                <CalculatorForm />
-                <ResultCard />
+              <div className="flex flex-col xl:flex-row xl:gap-8 items-start justify-center max-w-6xl mx-auto px-4">
+                <div className="w-full flex justify-center mb-6 xl:mb-0">
+                  <CalculatorForm />
+                </div>
+                <div className="w-full flex justify-center">
+                  <ResultCard />
+                </div>
               </div>
             </TabsContent>
 
@@ -108,9 +112,14 @@ function App() {
                   {t('educationalOnly')}
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mb-3">
                 {t('verifyCalculations')}
               </p>
+              <div className="border-t border-muted-foreground/20 pt-3">
+                <p className="text-xs text-muted-foreground/80">
+                  © Crypto Ocean Pty Ltd, 2025
+                </p>
+              </div>
             </div>
           </footer>
         </div>

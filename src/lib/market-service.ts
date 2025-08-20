@@ -1,193 +1,155 @@
-import ccxt from 'ccxt';
+import { binance, bybit, okx, bitget, type Exchange, type InstType } from './adapters'
+import { calculateATR, type KlineData } from '@/lib/core'
 
-// 支持的交易所映射
-const EXCHANGE_MAP: Record<string, any> = {
-  'BINANCE': ccxt.binance,
-  'BYBIT': ccxt.bybit,
-  'BITGET': ccxt.bitget,
-  'OKX': ccxt.okx,
-};
-
-// 缓存实例
-const exchangeInstances: Record<string, any> = {};
-
-// 获取交易所实例
-function getExchangeInstance(exchangeId: string) {
-  if (!exchangeInstances[exchangeId]) {
-    const ExchangeClass = EXCHANGE_MAP[exchangeId];
-    if (!ExchangeClass) {
-      throw new Error(`Unsupported exchange: ${exchangeId}`);
-    }
-    
-    exchangeInstances[exchangeId] = new ExchangeClass({
-      sandbox: false,
-      enableRateLimit: true,
-      options: {
-        defaultType: 'spot', // 默认现货
-      },
-    });
-  }
-  return exchangeInstances[exchangeId];
-}
+const ADAPTERS: Record<Exchange, any> = { BINANCE: binance, BYBIT: bybit, OKX: okx, BITGET: bitget }
 
 // 获取当前市价
 export async function getCurrentPrice(
-  exchange: string,
+  exchange: Exchange,
   symbol: string,
-  contractMode: string = 'SPOT'
+  instType: InstType = 'SPOT'
 ): Promise<number> {
   try {
-    const exchangeInstance = getExchangeInstance(exchange);
-    
-    // 设置市场类型
-    if (contractMode !== 'SPOT') {
-      exchangeInstance.options.defaultType = contractMode === 'USDT_PERP' ? 'swap' : 'future';
-    } else {
-      exchangeInstance.options.defaultType = 'spot';
+    const adapter = ADAPTERS[exchange]
+    if (!adapter) {
+      throw new Error(`Unsupported exchange: ${exchange}`)
     }
     
-    // 获取ticker数据
-    const ticker = await exchangeInstance.fetchTicker(symbol);
+    const ticker = await adapter.fetchTicker(symbol, instType)
     
-    if (!ticker || !ticker.last) {
-      throw new Error('Failed to fetch current price');
+    if (!ticker || typeof ticker.last !== 'number') {
+      throw new Error('Failed to fetch current price')
     }
     
-    return ticker.last;
+    return ticker.last
   } catch (error) {
-    console.error('Error fetching current price:', error);
-    throw new Error(`Failed to fetch price for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('Error fetching current price:', error)
+    throw new Error(`Failed to fetch price for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
-// 获取OHLCV数据用于ATR计算
+// 获取K线数据用于ATR计算
 export async function getOHLCVData(
-  exchange: string,
+  exchange: Exchange,
   symbol: string,
   timeframe: string,
   limit: number = 100,
-  contractMode: string = 'SPOT'
-): Promise<number[][]> {
+  instType: InstType = 'SPOT'
+): Promise<Array<{ t:number,o:number,h:number,l:number,c:number,v:number }>> {
   try {
-    const exchangeInstance = getExchangeInstance(exchange);
-    
-    // 设置市场类型
-    if (contractMode !== 'SPOT') {
-      exchangeInstance.options.defaultType = contractMode === 'USDT_PERP' ? 'swap' : 'future';
-    } else {
-      exchangeInstance.options.defaultType = 'spot';
+    const adapter = ADAPTERS[exchange]
+    if (!adapter) {
+      throw new Error(`Unsupported exchange: ${exchange}`)
     }
     
-    // 获取OHLCV数据
-    const ohlcv = await exchangeInstance.fetchOHLCV(symbol, timeframe, undefined, limit);
+    const klines = await adapter.fetchKlines(symbol, instType, timeframe, limit)
     
-    if (!ohlcv || ohlcv.length === 0) {
-      throw new Error('No OHLCV data available');
+    if (!klines || klines.length === 0) {
+      throw new Error('No OHLCV data available')
     }
     
-    return ohlcv;
+    return klines
   } catch (error) {
-    console.error('Error fetching OHLCV data:', error);
-    throw new Error(`Failed to fetch OHLCV data for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('Error fetching OHLCV data:', error)
+    throw new Error(`Failed to fetch OHLCV data for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
-}
-
-// 计算ATR
-export function calculateATR(ohlcvData: number[][], period: number = 14): number {
-  if (ohlcvData.length < period + 1) {
-    throw new Error(`Insufficient data for ATR calculation. Need at least ${period + 1} candles, got ${ohlcvData.length}`);
-  }
-
-  const trueRanges: number[] = [];
-  
-  // 计算True Range
-  for (let i = 1; i < ohlcvData.length; i++) {
-    const current = ohlcvData[i];
-    const previous = ohlcvData[i - 1];
-    
-    const high = current[2]; // High
-    const low = current[3];  // Low
-    const prevClose = previous[4]; // Previous Close
-    
-    const tr1 = high - low;
-    const tr2 = Math.abs(high - prevClose);
-    const tr3 = Math.abs(low - prevClose);
-    
-    const trueRange = Math.max(tr1, tr2, tr3);
-    trueRanges.push(trueRange);
-  }
-  
-  // 计算ATR (简单移动平均)
-  const recentTrueRanges = trueRanges.slice(-period);
-  const atr = recentTrueRanges.reduce((sum, tr) => sum + tr, 0) / period;
-  
-  return atr;
 }
 
 // 获取ATR值
 export async function getATRValue(
-  exchange: string,
+  exchange: Exchange,
   symbol: string,
   timeframe: string,
   period: number = 14,
-  contractMode: string = 'SPOT'
+  instType: InstType = 'SPOT'
 ): Promise<number> {
   try {
     // 获取足够的历史数据
-    const ohlcvData = await getOHLCVData(exchange, symbol, timeframe, period + 20, contractMode);
+    const klineData = await getOHLCVData(exchange, symbol, timeframe, period + 20, instType)
+    
+    // 转换为ATR计算所需的格式
+    const klines: KlineData[] = klineData.map(k => ({
+      openTime: k.t,
+      open: k.o.toString(),
+      high: k.h.toString(),
+      low: k.l.toString(),
+      close: k.c.toString(),
+      volume: k.v.toString(),
+      closeTime: k.t + 60000 // Approximate close time
+    }))
+    
+    if (klines.length < period + 1) {
+      throw new Error(`Insufficient data for ATR calculation. Need at least ${period + 1} candles, got ${klines.length}`)
+    }
     
     // 计算ATR
-    const atr = calculateATR(ohlcvData, period);
+    const atr = calculateATR(klines, period)
     
-    return atr;
+    return parseFloat(atr.toString())
   } catch (error) {
-    console.error('Error calculating ATR:', error);
-    throw new Error(`Failed to calculate ATR for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('Error calculating ATR:', error)
+    throw new Error(`Failed to calculate ATR for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
-// 检查交易所是否支持指定的交易对
-export async function checkSymbolSupport(
-  exchange: string,
+// 获取市场元数据
+export async function getMarketMeta(
+  exchange: Exchange,
   symbol: string,
-  contractMode: string = 'SPOT'
-): Promise<boolean> {
+  instType: InstType = 'SPOT'
+) {
   try {
-    const exchangeInstance = getExchangeInstance(exchange);
-    
-    // 设置市场类型
-    if (contractMode !== 'SPOT') {
-      exchangeInstance.options.defaultType = contractMode === 'USDT_PERP' ? 'swap' : 'future';
-    } else {
-      exchangeInstance.options.defaultType = 'spot';
+    const adapter = ADAPTERS[exchange]
+    if (!adapter) {
+      throw new Error(`Unsupported exchange: ${exchange}`)
     }
     
-    // 加载市场数据
-    await exchangeInstance.loadMarkets();
-    
-    // 检查交易对是否存在
-    return symbol in exchangeInstance.markets;
+    const meta = await adapter.fetchMarketMeta(symbol, instType)
+    return meta
   } catch (error) {
-    console.error('Error checking symbol support:', error);
-    return false;
+    console.error('Error fetching market meta:', error)
+    throw new Error(`Failed to fetch market metadata for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
 // 获取支持的时间框架
-export function getSupportedTimeframes(exchange: string): string[] {
-  const defaultTimeframes = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d'];
+export function getSupportedTimeframes(exchange: Exchange): string[] {
+  // 通用的时间框架，各交易所基本都支持
+  const defaultTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
   
+  // 根据交易所返回支持的时间框架
+  switch (exchange) {
+    case 'BINANCE':
+      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+    case 'BYBIT':
+      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w', '1M']
+    case 'BITGET':
+      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+    case 'OKX':
+      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+    default:
+      return defaultTimeframes
+  }
+}
+
+// 检查交易对是否受支持（简单实现，尝试获取ticker）
+export async function checkSymbolSupport(
+  exchange: Exchange,
+  symbol: string,
+  instType: InstType = 'SPOT'
+): Promise<boolean> {
   try {
-    const exchangeInstance = getExchangeInstance(exchange);
-    
-    if (exchangeInstance.timeframes) {
-      return Object.keys(exchangeInstance.timeframes);
+    const adapter = ADAPTERS[exchange]
+    if (!adapter) {
+      return false
     }
     
-    return defaultTimeframes;
+    // 尝试获取ticker数据来验证交易对是否存在
+    await adapter.fetchTicker(symbol, instType)
+    return true
   } catch (error) {
-    console.error('Error getting supported timeframes:', error);
-    return defaultTimeframes;
+    console.error('Error checking symbol support:', error)
+    return false
   }
 }
 
@@ -195,18 +157,67 @@ export function getSupportedTimeframes(exchange: string): string[] {
 export function formatPrice(price: number, symbol: string): string {
   // 根据交易对决定小数位数
   if (symbol.includes('USDT') || symbol.includes('USD')) {
-    if (price >= 1000) return price.toFixed(2);
-    if (price >= 100) return price.toFixed(3);
-    if (price >= 10) return price.toFixed(4);
-    if (price >= 1) return price.toFixed(5);
-    return price.toFixed(8);
+    if (price >= 1000) return price.toFixed(2)
+    if (price >= 100) return price.toFixed(3)
+    if (price >= 10) return price.toFixed(4)
+    if (price >= 1) return price.toFixed(5)
+    return price.toFixed(8)
   }
   
   // BTC对等高价值交易对
   if (symbol.includes('BTC')) {
-    return price.toFixed(8);
+    return price.toFixed(8)
   }
   
   // 默认格式
-  return price.toFixed(6);
+  return price.toFixed(6)
 }
+
+// WebSocket 价格订阅管理
+export class PriceSubscriptionManager {
+  private subscriptions: Map<string, () => void> = new Map()
+  
+  subscribe(
+    exchange: Exchange,
+    symbol: string,
+    instType: InstType,
+    onPriceUpdate: (price: number) => void
+  ): string {
+    const key = `${exchange}-${symbol}-${instType}`
+    
+    // 如果已经有订阅，先取消
+    if (this.subscriptions.has(key)) {
+      this.unsubscribe(key)
+    }
+    
+    const adapter = ADAPTERS[exchange]
+    if (!adapter || !adapter.subscribeTicker) {
+      throw new Error(`Exchange ${exchange} does not support WebSocket subscriptions`)
+    }
+    
+    const unsubscribe = adapter.subscribeTicker(symbol, instType, (ticker: any) => {
+      onPriceUpdate(ticker.last)
+    })
+    
+    this.subscriptions.set(key, unsubscribe)
+    return key
+  }
+  
+  unsubscribe(key: string) {
+    const unsubscribe = this.subscriptions.get(key)
+    if (unsubscribe) {
+      unsubscribe()
+      this.subscriptions.delete(key)
+    }
+  }
+  
+  unsubscribeAll() {
+    for (const [key, unsubscribe] of this.subscriptions) {
+      unsubscribe()
+    }
+    this.subscriptions.clear()
+  }
+}
+
+// 创建全局实例
+export const priceSubscriptionManager = new PriceSubscriptionManager()

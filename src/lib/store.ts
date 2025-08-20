@@ -42,6 +42,13 @@ interface SettingsState {
   settings: SettingsData;
   setSettings: (settings: Partial<SettingsData>) => void;
   resetSettings: () => void;
+  
+  // Notification state
+  showNotification: boolean;
+  notificationMessage: string;
+  notificationType: 'success' | 'error' | 'info';
+  setNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  clearNotification: () => void;
 }
 
 interface PresetState {
@@ -63,6 +70,9 @@ const defaultFormData: Partial<CalculatorFormData> = {
   contractMode: 'USDT_PERP',
   side: 'LONG',
   stopMode: 'PRICE',
+  riskMode: 'FIXED_USDT',
+  orderType: 'MARKET',
+  leverage: 10,
   atrPeriod: 14,
   atrTimeframe: '1h',
   includeFees: false,
@@ -78,6 +88,13 @@ const defaultSettings: SettingsData = {
   defaultExchange: 'BINANCE',
   defaultSymbol: 'BTCUSDT',
   defaultContractMode: 'USDT_PERP',
+  defaultStopMode: 'PRICE',
+  defaultRiskMode: 'FIXED_USDT',
+  defaultOrderType: 'MARKET',
+  defaultLeverage: 10,
+  defaultAccountEquity: '10000',
+  defaultRiskPercent: '1',
+  defaultRiskAmount: '100',
   defaultFeeOpen: '0.0004',
   defaultFeeClose: '0.0004',
   defaultSlippage: '0.0005',
@@ -138,6 +155,21 @@ export const useSettingsStore = create<SettingsState>()(
         settings: { ...state.settings, ...newSettings }
       })),
       resetSettings: () => set({ settings: defaultSettings }),
+      
+      // Notification state
+      showNotification: false,
+      notificationMessage: '',
+      notificationType: 'info' as const,
+      setNotification: (message, type) => set({
+        showNotification: true,
+        notificationMessage: message,
+        notificationType: type
+      }),
+      clearNotification: () => set({
+        showNotification: false,
+        notificationMessage: '',
+        notificationType: 'info' as const
+      }),
     }),
     {
       name: 'settings-storage',

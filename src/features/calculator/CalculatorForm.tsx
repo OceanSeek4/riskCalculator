@@ -7,9 +7,9 @@ import { Select } from '@/components/ui/select';
 import { RefreshCw, AlertCircle, Bookmark, Calculator } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
-import { fetchMarketMeta } from '@/lib/adapters';
 import { validateNumberString, validateStopPrice } from '@/lib/validation';
-import { getCurrentPrice, getATRValue, formatPrice, checkSymbolSupport, getSupportedTimeframes } from '@/lib/market-service';
+import { getCurrentPrice, getATRValue, formatPrice, checkSymbolSupport, getSupportedTimeframes, getMarketMeta } from '@/lib/market-service';
+import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
 export function CalculatorForm() {
   const {
@@ -46,7 +46,13 @@ export function CalculatorForm() {
         symbol: settings.defaultSymbol,
         contractMode: settings.defaultContractMode,
         side: 'LONG',
-        stopMode: 'PRICE',
+        stopMode: settings.defaultStopMode,
+        riskMode: settings.defaultRiskMode,
+        orderType: settings.defaultOrderType,
+        leverage: settings.defaultLeverage,
+        accountEquity: settings.defaultAccountEquity,
+        riskPercent: settings.defaultRiskPercent,
+        riskAmount: settings.defaultRiskAmount,
         atrPeriod: settings.defaultAtrPeriod,
         atrTimeframe: settings.defaultAtrTimeframe,
         atrMultiplier: settings.defaultAtrMultiplier,
@@ -64,19 +70,15 @@ export function CalculatorForm() {
       if (!formData.exchange || !formData.symbol || !formData.contractMode) return;
       
       try {
-        const marketType = formData.contractMode === 'SPOT' ? 'spot' 
-          : formData.contractMode === 'USDT_PERP' ? 'usdm' 
-          : 'linear';
+        const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
         
-        const response = await fetchMarketMeta(
-          formData.exchange,
+        const meta = await getMarketMeta(
+          formData.exchange as Exchange,
           formData.symbol,
-          marketType
+          instType
         );
         
-        if (response.success && response.data) {
-          setMarketMeta(response.data);
-        }
+        setMarketMeta(meta);
       } catch (error) {
         console.error('Failed to fetch market data:', error);
       }
@@ -172,16 +174,16 @@ export function CalculatorForm() {
     setATRError(null);
     
     try {
-      // 使用新的市场服务获取ATR
+      const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
       const atr = await getATRValue(
-        formData.exchange,
+        formData.exchange as Exchange,
         formData.symbol,
         formData.atrTimeframe,
         formData.atrPeriod || 14,
-        formData.contractMode || 'SPOT'
+        instType
       );
 
-      setCurrentATR(atr);
+      setCurrentATR(atr.toString());
     } catch (error) {
       console.error('Failed to fetch ATR:', error);
       setATRError(error instanceof Error ? error.message : t('failedToFetchATR'));
@@ -198,23 +200,44 @@ export function CalculatorForm() {
     setPriceError('');
 
     try {
+      const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
       const price = await getCurrentPrice(
-        formData.exchange,
+        formData.exchange as Exchange,
         formData.symbol,
-        formData.contractMode || 'SPOT'
+        instType
       );
 
-      setFormData({
-        ...formData,
-        entryPrice: price.toString()
-      });
-
+      handleInputChange('entryPrice', price.toString());
       setPriceError('');
     } catch (error) {
       console.error('Failed to fetch current price:', error);
       setPriceError(error instanceof Error ? error.message : t('failedToFetchPrice'));
     } finally {
       setIsFetchingPrice(false);
+    }
+  };
+
+  // 拉取市场元数据
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  const fetchMarketMetadata = async () => {
+    if (!formData.exchange || !formData.symbol || !formData.contractMode) return;
+
+    setIsFetchingMeta(true);
+
+    try {
+      const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+      const meta = await getMarketMeta(
+        formData.exchange as Exchange,
+        formData.symbol,
+        instType
+      );
+
+      setMarketMeta(meta);
+    } catch (error) {
+      console.error('Failed to fetch market metadata:', error);
+      setPriceError(error instanceof Error ? error.message : 'Failed to fetch market metadata');
+    } finally {
+      setIsFetchingMeta(false);
     }
   };
 
@@ -243,6 +266,7 @@ export function CalculatorForm() {
         leverage: formData.leverage,
         contractMode: formData.contractMode!,
         marketMeta,
+        rrRatios: settings.rrRatios,
       };
       
       const result = calculatePosition(input);
@@ -257,7 +281,7 @@ export function CalculatorForm() {
   // 获取支持的时间框架
   useEffect(() => {
     if (formData.exchange) {
-      const intervals = getSupportedTimeframes(formData.exchange);
+      const intervals = getSupportedTimeframes(formData.exchange as Exchange);
       setSupportedIntervals(intervals);
     } else {
       setSupportedIntervals([]);
@@ -265,7 +289,7 @@ export function CalculatorForm() {
   }, [formData.exchange]);
 
   return (
-    <Card className="w-full max-w-md modern-card fade-in">
+    <Card className="w-full max-w-md sm:max-w-lg lg:max-w-xl modern-card fade-in">
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-white">
@@ -295,7 +319,9 @@ export function CalculatorForm() {
 
         {/* Market Selection */}
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('marketSettings')}</h3>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>{t('exchange')}</Label>
               <Select
@@ -313,12 +339,12 @@ export function CalculatorForm() {
               <Input
                 value={formData.symbol || ''}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('symbol', e.target.value)}
-                placeholder="BTCUSDT"
+                placeholder="BTC/USDT"
               />
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>{t('contractMode')}</Label>
               <Select
@@ -327,7 +353,6 @@ export function CalculatorForm() {
               >
                 <option value="SPOT">{t('spot')}</option>
                 <option value="USDT_PERP">{t('usdtPerp')}</option>
-                <option value="INVERSE">{t('inverse')}</option>
               </Select>
             </div>
             <div>
@@ -341,10 +366,37 @@ export function CalculatorForm() {
               </Select>
             </div>
           </div>
+          
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={fetchMarketMetadata}
+              disabled={isFetchingMeta || !formData.exchange || !formData.symbol || !formData.contractMode}
+              className="flex-1"
+            >
+              {isFetchingMeta ? (
+                <>
+                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                  {t('fetchingMetadata')}
+                </>
+              ) : (
+                t('fetchMetadata')
+              )}
+            </Button>
+            {marketMeta && (
+              <div className="text-xs text-muted-foreground px-3 py-2 bg-green-50 rounded border border-green-200 whitespace-nowrap">
+                ✓ {t('metadataLoaded')}: {marketMeta.tickSize}/{marketMeta.stepSize}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Entry Settings */}
         <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('entrySettings')}</h3>
+          
           <div>
             <Label>{t('orderType')}</Label>
             <Select
@@ -401,6 +453,8 @@ export function CalculatorForm() {
 
         {/* Stop Loss Settings */}
         <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('stopLossSettings')}</h3>
+          
           <div>
             <Label>{t('stopMode')}</Label>
             <Select
@@ -431,7 +485,7 @@ export function CalculatorForm() {
 
           {formData.stopMode === 'ATR' && (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>{t('atrPeriod')}</Label>
                   <Input
@@ -480,7 +534,7 @@ export function CalculatorForm() {
                   className="flex-1"
                 >
                   <RefreshCw className={`w-4 h-4 mr-1 ${isFetchingATR ? 'animate-spin' : ''}`} />
-                  Fetch ATR
+                  {t('fetchATRButton')}
                 </Button>
                 {currentATR && (
                   <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
@@ -501,6 +555,8 @@ export function CalculatorForm() {
 
         {/* Risk Settings */}
         <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('riskSettings')}</h3>
+          
           <div>
             <Label>{t('riskMode')}</Label>
             <Select
@@ -514,7 +570,7 @@ export function CalculatorForm() {
 
           {formData.riskMode === 'FIXED_USDT' ? (
             <div>
-              <Label>Risk Amount (USDT)</Label>
+              <Label>{t('riskAmountUSDT')}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -528,7 +584,7 @@ export function CalculatorForm() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>{t('accountEquity')}</Label>
                 <Input
@@ -573,7 +629,7 @@ export function CalculatorForm() {
               max="200"
               value={formData.leverage || ''}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('leverage', parseInt(e.target.value))}
-              placeholder="Auto-suggest"
+              placeholder={t('autoSuggestLeverage')}
             />
           </div>
         )}
@@ -596,9 +652,9 @@ export function CalculatorForm() {
             </label>
 
             {formData.includeFees && (
-              <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                 <div>
-                  <Label className="text-xs">Open Fee (%)</Label>
+                  <Label className="text-xs">{t('openFee')}</Label>
                   <Input
                     type="number"
                     step="0.0001"
@@ -610,7 +666,7 @@ export function CalculatorForm() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Close Fee (%)</Label>
+                  <Label className="text-xs">{t('closeFee')}</Label>
                   <Input
                     type="number"
                     step="0.0001"
@@ -622,7 +678,7 @@ export function CalculatorForm() {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Slippage (%)</Label>
+                  <Label className="text-xs">{t('slippage')}</Label>
                   <Input
                     type="number"
                     step="0.0001"

@@ -17,6 +17,21 @@ export interface MarketMeta {
 export type RiskMode = 'FIXED_USDT' | 'ACCOUNT_PERCENT';
 export type OrderType = 'MARKET' | 'LIMIT';
 
+export type WarningKey = 
+  | 'warningExchangeRule'
+  | 'warningTightStop'
+  | 'warningWideStop'
+  | 'warningHighRiskPercent'
+  | 'warningElevatedRiskPercent'
+  | 'warningCriticalLiquidation'
+  | 'warningHighRiskLiquidation'
+  | 'warningModerateRiskLiquidation'
+  | 'warningExtremeLeverage'
+  | 'warningHighLeverage'
+  | 'warningHighMarginUsage'
+  | 'warningModerateMarginUsage'
+  | 'warningLeverageNotSpecified';
+
 export interface CalcInput {
   side: Side;
   entryPrice: string;
@@ -36,6 +51,7 @@ export interface CalcInput {
   contractMode: ContractMode;
   marketMeta: MarketMeta;
   orderType?: OrderType;
+  rrRatios: number[];
 }
 
 export interface CalcResult {
@@ -47,6 +63,7 @@ export interface CalcResult {
   liquidationPrice?: string;
   targets: Array<{ rr: number; price: string }>;
   warnings: string[];
+  warningKeys: WarningKey[];
   orderSummary: string;
 }
 
