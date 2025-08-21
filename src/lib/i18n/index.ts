@@ -55,6 +55,23 @@ const resources = {
       atrMultiplier: 'ATR Multiplier',
       fetchATR: 'Fetch ATR',
       
+      // Take Profit
+      takeProfitSettings: 'Take Profit Settings',
+      useTakeProfit: 'Enable Take Profit',
+      takeProfitMode: 'Take Profit Mode',
+      priceTakeProfit: 'Price Target',
+      atrTakeProfit: 'ATR Target',
+      maTakeProfit: 'MA Target',
+      emaTakeProfit: 'EMA Target',
+      takeProfitPrice: 'Take Profit Price',
+      takeProfitATRMultiplier: 'ATR Multiplier',
+      takeProfitMAPeriod: 'MA Period',
+      takeProfitMATimeframe: 'MA Timeframe',
+      expectedTakeProfit: 'Expected Take Profit',
+      usesCurrentATRValue: 'Uses current ATR value from stop loss settings',
+      movingAverageExplanation: 'Take profit when price reaches the moving average level',
+      emaExplanation: 'Take profit when price reaches the exponential moving average level',
+      
       // Risk Settings
       riskMode: 'Risk Mode',
       fixedUSDTAmount: 'Fixed USDT Amount',
@@ -210,6 +227,10 @@ const resources = {
       stopLoss: 'Stop Loss',
       riskReward: 'Risk:Reward Targets',
       tradingFees: 'Trading Fees',
+      riskRewardRatio: 'Risk:Reward Ratio',
+      includesFees: 'Includes Fees',
+      yes: 'Yes',
+      no: 'No',
       
       // Header Features
       riskManagement: 'Risk Management',
@@ -300,6 +321,23 @@ const resources = {
       atrTimeframe: '时间框架',
       atrMultiplier: 'ATR倍数',
       fetchATR: '获取ATR',
+      
+      // Take Profit
+      takeProfitSettings: '止盈设置',
+      useTakeProfit: '启用止盈',
+      takeProfitMode: '止盈模式',
+      priceTakeProfit: '价格目标',
+      atrTakeProfit: 'ATR目标',
+      maTakeProfit: '均线目标',
+      emaTakeProfit: 'EMA目标',
+      takeProfitPrice: '止盈价格',
+      takeProfitATRMultiplier: 'ATR倍数',
+      takeProfitMAPeriod: '均线周期',
+      takeProfitMATimeframe: '均线时间框架',
+      expectedTakeProfit: '预期止盈',
+      usesCurrentATRValue: '使用止损设置中的当前ATR值',
+      movingAverageExplanation: '价格达到移动平均线水平时止盈',
+      emaExplanation: '价格达到指数移动平均线水平时止盈',
       
       // Risk Settings
       riskMode: '风险模式',
@@ -457,6 +495,10 @@ const resources = {
       stopLoss: '止损',
       riskReward: '风险收益目标',
       tradingFees: '交易手续费',
+      riskRewardRatio: '风险收益比',
+      includesFees: '包含手续费',
+      yes: '是',
+      no: '否',
       
       // Header Features
       riskManagement: '风险管理',

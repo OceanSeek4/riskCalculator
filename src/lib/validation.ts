@@ -21,6 +21,14 @@ export const calculatorFormSchema = z.object({
   atrTimeframe: z.string().default('1h'),
   atrMultiplier: z.string().optional(),
   
+  // Take profit settings
+  useTakeProfit: z.boolean().default(false),
+  takeProfitMode: z.enum(['PRICE', 'ATR', 'MA', 'EMA']).optional(),
+  takeProfitPrice: z.string().optional(),
+  takeProfitATRMultiplier: z.string().optional(),
+  takeProfitMAPeriod: z.string().optional(),
+  takeProfitMATimeframe: z.string().optional(),
+  
   // Risk settings
   riskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
   riskAmount: z.string().optional(),
@@ -54,6 +62,8 @@ export const settingsSchema = z.object({
   
   // Default modes
   defaultStopMode: z.enum(['PRICE', 'ATR']).default('PRICE'),
+  defaultTakeProfitMode: z.enum(['PRICE', 'ATR', 'MA', 'EMA']).default('PRICE'),
+  defaultUseTakeProfit: z.boolean().default(false),
   defaultRiskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
   defaultOrderType: z.enum(['MARKET', 'LIMIT']).default('MARKET'),
   defaultLeverage: z.number().min(1).max(200).default(10),
@@ -72,6 +82,11 @@ export const settingsSchema = z.object({
   defaultAtrPeriod: z.number().default(14),
   defaultAtrTimeframe: z.string().default('1h'),
   defaultAtrMultiplier: z.string().default('2'),
+  
+  // Take profit defaults
+  defaultTakeProfitATRMultiplier: z.string().default('2'),
+  defaultTakeProfitMAPeriod: z.string().default('20'),
+  defaultTakeProfitMATimeframe: z.string().default('1h'),
   
   // Risk/Reward ratios
   rrRatios: z.array(z.number()).default([1, 1.5, 2]),

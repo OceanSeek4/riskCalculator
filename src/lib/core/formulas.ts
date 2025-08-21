@@ -1,5 +1,5 @@
 import { SafeDecimal, roundDownToStep, roundToTick, validateMinRequirements, formatPriceByTickSize, formatQuantityByStepSize } from './math.js';
-import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode, WarningKey } from './types.js';
+import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode, WarningKey, TakeProfitMode } from './types.js';
 
 /**
  * Calculate stop price based on ATR
@@ -21,6 +21,54 @@ export function calculateATRStopPrice(
     return entryPrice.safeSub(atrDistance);
   } else {
     return entryPrice.safeAdd(atrDistance);
+  }
+}
+
+/**
+ * Calculate take profit price based on different modes
+ * @param entryPrice Entry price
+ * @param takeProfitMode Take profit mode
+ * @param side Trading side
+ * @param takeProfitPrice Fixed price (for PRICE mode)
+ * @param atr ATR value (for ATR mode)
+ * @param atrMultiplier ATR multiplier (for ATR mode)
+ * @returns Take profit price
+ */
+export function calculateTakeProfitPrice(
+  entryPrice: SafeDecimal,
+  takeProfitMode: TakeProfitMode,
+  side: Side,
+  takeProfitPrice?: string,
+  atr?: SafeDecimal,
+  atrMultiplier?: string
+): SafeDecimal {
+  switch (takeProfitMode) {
+    case 'PRICE':
+      if (!takeProfitPrice) {
+        throw new ValidationError('Take profit price is required for PRICE mode');
+      }
+      return SafeDecimal.from(takeProfitPrice);
+      
+    case 'ATR':
+      if (!atr || !atrMultiplier) {
+        throw new ValidationError('ATR and multiplier are required for ATR take profit mode');
+      }
+      const atrDistance = atr.safeMul(SafeDecimal.from(atrMultiplier));
+      
+      if (side === 'LONG') {
+        return entryPrice.safeAdd(atrDistance);
+      } else {
+        return entryPrice.safeSub(atrDistance);
+      }
+      
+    case 'MA':
+    case 'EMA':
+      // For now, return a placeholder - in a real implementation, you would fetch MA/EMA data
+      // This would require additional market data fetching
+      throw new ValidationError('MA/EMA take profit modes require market data implementation');
+      
+    default:
+      throw new ValidationError(`Unsupported take profit mode: ${takeProfitMode}`);
   }
 }
 
@@ -289,6 +337,13 @@ export function calculatePosition(input: CalcInput): CalcResult {
     atr: atrStr,
     atrMultiplier: atrMultiplierStr,
     stopMode,
+    // Take profit settings
+    useTakeProfit,
+    takeProfitMode,
+    takeProfitPrice,
+    takeProfitATRMultiplier,
+    takeProfitMAPeriod,
+    takeProfitMATimeframe,
     riskMode,
     riskUSDT: riskUSDTStr,
     accountEquity: accountEquityStr,
@@ -344,6 +399,40 @@ export function calculatePosition(input: CalcInput): CalcResult {
     }
     if (side === 'SHORT' && stopPrice.lte(entryPrice)) {
       throw new ValidationError('Stop price must be above entry price for SHORT positions');
+    }
+    
+    // Calculate take profit price if enabled
+    let takeProfitPriceCalculated: SafeDecimal | undefined;
+    let takeProfitRR: number | undefined;
+    
+    if (useTakeProfit && takeProfitMode) {
+      try {
+        const atr = atrStr ? SafeDecimal.from(atrStr) : undefined;
+        takeProfitPriceCalculated = calculateTakeProfitPrice(
+          entryPrice,
+          takeProfitMode,
+          side,
+          takeProfitPrice,
+          atr,
+          takeProfitATRMultiplier
+        );
+        
+        // Round take profit price to tick size
+        takeProfitPriceCalculated = roundToTick(takeProfitPriceCalculated, tickSize);
+        
+        // Validate take profit direction
+        if (side === 'LONG' && takeProfitPriceCalculated.lte(entryPrice)) {
+          throw new ValidationError('Take profit price must be above entry price for LONG positions');
+        }
+        if (side === 'SHORT' && takeProfitPriceCalculated.gte(entryPrice)) {
+          throw new ValidationError('Take profit price must be below entry price for SHORT positions');
+        }
+        
+      } catch (error) {
+        // If take profit calculation fails, add warning but continue
+        warnings.push(`Take profit calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        takeProfitPriceCalculated = undefined;
+      }
     }
     
     // Calculate risk per unit
@@ -411,6 +500,36 @@ export function calculatePosition(input: CalcInput): CalcResult {
       totalFees = openFee.safeAdd(closeFee);
     }
     
+    // Calculate take profit risk/reward ratio if enabled
+    if (takeProfitPriceCalculated) {
+      // Calculate total risk (stop loss distance + fees)
+      const stopDistance = side === 'LONG' 
+        ? entryPrice.safeSub(stopPrice)
+        : stopPrice.safeSub(entryPrice);
+      
+      let totalRisk = stopDistance;
+      if (includeFees && openFee && closeFee) {
+        const stopCloseFee = qtyRounded.safeMul(stopPrice).safeMul(feeClose);
+        totalRisk = stopDistance.safeAdd(openFee).safeAdd(stopCloseFee);
+      }
+      
+      // Calculate reward (take profit distance - take profit close fee)
+      const takeProfitDistance = side === 'LONG'
+        ? takeProfitPriceCalculated.safeSub(entryPrice)
+        : entryPrice.safeSub(takeProfitPriceCalculated);
+      
+      let totalReward = takeProfitDistance;
+      if (includeFees && openFee) {
+        const takeProfitCloseFee = qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(feeClose);
+        totalReward = takeProfitDistance.safeSub(takeProfitCloseFee);
+      }
+      
+      // Calculate risk/reward ratio
+      if (!totalRisk.isZero()) {
+        takeProfitRR = parseFloat(totalReward.safeDiv(totalRisk).toString());
+      }
+    }
+
     // Calculate targets
     const targets = calculateTargets(entryPrice, stopPrice, input.rrRatios, side, feeOpen, feeClose, includeFees, tickSize);
     
@@ -514,6 +633,10 @@ export function calculatePosition(input: CalcInput): CalcResult {
       initialMargin: initialMargin?.toString(),
       stopPrice: stopPrice.toString(),
       liquidationPrice: liquidationPrice?.toString(),
+      // Take profit result
+      takeProfitPrice: takeProfitPriceCalculated?.toString(),
+      takeProfitPriceFormatted: takeProfitPriceCalculated ? formatPriceByTickSize(takeProfitPriceCalculated, tickSize) : undefined,
+      takeProfitRR,
       targets,
       warnings,
       warningKeys,

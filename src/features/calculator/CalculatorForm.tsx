@@ -128,6 +128,35 @@ export function CalculatorForm() {
       if (multiplierError) errors.atrMultiplier = multiplierError;
     }
     
+    // Take profit validation
+    if (formData.useTakeProfit) {
+      if (formData.takeProfitMode === 'PRICE') {
+        const takeProfitError = validateNumberString(formData.takeProfitPrice || '', 'Take profit price');
+        if (takeProfitError) {
+          errors.takeProfitPrice = takeProfitError;
+        } else if (formData.entryPrice && formData.takeProfitPrice) {
+          // Validate take profit direction
+          const entry = parseFloat(formData.entryPrice);
+          const takeProfit = parseFloat(formData.takeProfitPrice);
+          if (formData.side === 'LONG' && takeProfit <= entry) {
+            errors.takeProfitPrice = 'Take profit must be above entry price for LONG positions';
+          } else if (formData.side === 'SHORT' && takeProfit >= entry) {
+            errors.takeProfitPrice = 'Take profit must be below entry price for SHORT positions';
+          }
+        }
+      } else if (formData.takeProfitMode === 'ATR') {
+        if (!currentATR) {
+          errors.takeProfitATRMultiplier = 'ATR must be fetched first';
+        } else {
+          const atrMultiplierError = validateNumberString(formData.takeProfitATRMultiplier || '', 'Take profit ATR multiplier');
+          if (atrMultiplierError) errors.takeProfitATRMultiplier = atrMultiplierError;
+        }
+      } else if (formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') {
+        const periodError = validateNumberString(formData.takeProfitMAPeriod || '', 'MA period');
+        if (periodError) errors.takeProfitMAPeriod = periodError;
+      }
+    }
+    
     // Risk validation
     if (formData.riskMode === 'FIXED_USDT') {
       const riskError = validateNumberString(formData.riskAmount || '', 'Risk amount');
@@ -235,6 +264,13 @@ export function CalculatorForm() {
         atr: formData.stopMode === 'ATR' ? currentATR || undefined : undefined,
         atrMultiplier: formData.stopMode === 'ATR' ? formData.atrMultiplier : undefined,
         stopMode: formData.stopMode!,
+        // Take profit settings
+        useTakeProfit: formData.useTakeProfit || false,
+        takeProfitMode: formData.takeProfitMode,
+        takeProfitPrice: formData.takeProfitMode === 'PRICE' ? formData.takeProfitPrice : undefined,
+        takeProfitATRMultiplier: formData.takeProfitMode === 'ATR' ? formData.takeProfitATRMultiplier : undefined,
+        takeProfitMAPeriod: (formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') ? formData.takeProfitMAPeriod : undefined,
+        takeProfitMATimeframe: (formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') ? formData.takeProfitMATimeframe : undefined,
         riskMode: formData.riskMode || 'FIXED_USDT',
         riskUSDT: formData.riskMode === 'FIXED_USDT' ? formData.riskAmount : undefined,
         accountEquity: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.accountEquity : undefined,
@@ -527,6 +563,110 @@ export function CalculatorForm() {
                 <div className="flex items-center gap-1 text-sm text-red-500">
                   <AlertCircle className="w-4 h-4" />
                   {atrError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Take Profit Settings */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="useTakeProfit"
+              checked={formData.useTakeProfit || false}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('useTakeProfit', e.target.checked)}
+              className="w-4 h-4"
+            />
+            <Label htmlFor="useTakeProfit" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              {t('takeProfitSettings')}
+            </Label>
+          </div>
+          
+          {formData.useTakeProfit && (
+            <div className="space-y-4 pl-6 border-l-2 border-green-200 dark:border-green-800">
+              <div>
+                <Label>{t('takeProfitMode')}</Label>
+                <Select
+                  value={formData.takeProfitMode || 'PRICE'}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('takeProfitMode', e.target.value)}
+                >
+                  <option value="PRICE">{t('priceTakeProfit')}</option>
+                  <option value="ATR">{t('atrTakeProfit')}</option>
+                  <option value="MA">{t('maTakeProfit')}</option>
+                  <option value="EMA">{t('emaTakeProfit')}</option>
+                </Select>
+              </div>
+
+              {formData.takeProfitMode === 'PRICE' && (
+                <div>
+                  <Label>{t('takeProfitPrice')}</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.takeProfitPrice || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('takeProfitPrice', e.target.value)}
+                    placeholder={t('takeProfitPrice')}
+                    className={formErrors.takeProfitPrice ? 'border-red-500' : ''}
+                  />
+                  {formErrors.takeProfitPrice && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.takeProfitPrice}</p>
+                  )}
+                </div>
+              )}
+
+              {formData.takeProfitMode === 'ATR' && (
+                <div>
+                  <Label>{t('takeProfitATRMultiplier')}</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={formData.takeProfitATRMultiplier || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('takeProfitATRMultiplier', e.target.value)}
+                    placeholder="2.0"
+                    className={formErrors.takeProfitATRMultiplier ? 'border-red-500' : ''}
+                  />
+                  {formErrors.takeProfitATRMultiplier && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.takeProfitATRMultiplier}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('usesCurrentATRValue')}
+                  </p>
+                </div>
+              )}
+
+              {(formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>{t('takeProfitMAPeriod')}</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={formData.takeProfitMAPeriod || 20}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('takeProfitMAPeriod', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>{t('takeProfitMATimeframe')}</Label>
+                      <Select
+                        value={formData.takeProfitMATimeframe || '1h'}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('takeProfitMATimeframe', e.target.value)}
+                      >
+                        {supportedIntervals.map((interval: string) => (
+                          <option key={interval} value={interval}>{interval}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.takeProfitMode === 'MA' 
+                      ? t('movingAverageExplanation')
+                      : t('emaExplanation')
+                    }
+                  </p>
                 </div>
               )}
             </div>

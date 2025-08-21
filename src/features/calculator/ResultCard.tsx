@@ -210,6 +210,44 @@ export function ResultCard() {
         </CardContent>
       </Card>
 
+      {/* Expected Take Profit */}
+      {result.takeProfitPrice && (
+        <Card className="animate-in slide-in-from-top-3 duration-400 hover:shadow-lg transition-shadow duration-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+              {t('expectedTakeProfit')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div 
+              className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900 transition-colors duration-200 cursor-pointer"
+              onClick={() => handleCopyValue(result.takeProfitPriceFormatted || result.takeProfitPrice, 'Take Profit Price')}
+              title={t('clickToCopy')}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-4 h-4 text-green-600">🎯</div>
+                <p className="text-sm font-medium text-green-900 dark:text-green-100">{t('takeProfitPrice')}</p>
+              </div>
+              <p className="text-xl font-bold font-mono text-green-600 mb-2">
+                ${result.takeProfitPriceFormatted || parseFloat(result.takeProfitPrice).toLocaleString()}
+              </p>
+              {result.takeProfitRR && (
+                <div className="text-xs text-green-700 dark:text-green-300">
+                  <div className="flex justify-between">
+                    <span>{t('riskRewardRatio')}:</span>
+                    <span className="font-mono">1:{result.takeProfitRR.toFixed(2)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t('includesFees')}: {result.includeFees ? t('yes') : t('no')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Profit Targets */}
       {result.targets.length > 0 && (
         <Card className="animate-in slide-in-from-top-4 duration-500 hover:shadow-lg transition-shadow duration-200">
