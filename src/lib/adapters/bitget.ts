@@ -44,10 +44,18 @@ export const bitget: ExchangeAdapter = {
       if (!s) {
         throw new Error(`Symbol ${sym} not found on Bitget USDT-FUTURES`)
       }
+      // Convert pricePlace (decimal places) to tickSize value
+      const pricePlaces = s.pricePlace != null ? +s.pricePlace : 1
+      const tick = Math.pow(10, -pricePlaces).toString()
+      
+      // Convert sizePlace (decimal places) to stepSize value  
+      const sizePlaces = s.sizePlace != null ? +s.sizePlace : 3
+      const step = Math.pow(10, -sizePlaces).toString()
+      
       return { 
         symbol: sym,
-        tickSize: s.pricePlace ?? '0.1', 
-        stepSize: s.sizePlace ?? '0.001', 
+        tickSize: tick, 
+        stepSize: step, 
         minQty: s.minTradeNum ?? '0.001', 
         minNotional: '5', 
         leverageMax: s.maxLeverage ? +s.maxLeverage : 100,

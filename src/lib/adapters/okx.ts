@@ -3,8 +3,34 @@ import type { ExchangeAdapter, InstType, Ticker, MarketMeta } from './types'
 
 export const okx: ExchangeAdapter = {
   toExchangeSymbol(s, type) {
-    const base = s.replace('/', '-').toUpperCase()
-    return type==='USDT_PERP' ? `${base}-SWAP` : base
+    // Handle both "BTCUSDT" and "BTC/USDT" formats
+    let base: string;
+    if (s.includes('/')) {
+      base = s.replace('/', '-').toUpperCase();
+    } else {
+      // Convert "BTCUSDT" to "BTC-USDT"
+      // Assume the quote currency is the last 3 or 4 characters (USDT, USDC, etc.)
+      const symbol = s.toUpperCase();
+      if (symbol.endsWith('USDT')) {
+        const baseCurrency = symbol.slice(0, -4);
+        base = `${baseCurrency}-USDT`;
+      } else if (symbol.endsWith('USDC')) {
+        const baseCurrency = symbol.slice(0, -4);
+        base = `${baseCurrency}-USDC`;
+      } else if (symbol.endsWith('BTC')) {
+        const baseCurrency = symbol.slice(0, -3);
+        base = `${baseCurrency}-BTC`;
+      } else if (symbol.endsWith('ETH')) {
+        const baseCurrency = symbol.slice(0, -3);
+        base = `${baseCurrency}-ETH`;
+      } else {
+        // Default fallback - assume last 4 chars are quote currency
+        const baseCurrency = symbol.slice(0, -4);
+        const quoteCurrency = symbol.slice(-4);
+        base = `${baseCurrency}-${quoteCurrency}`;
+      }
+    }
+    return type==='USDT_PERP' ? `${base}-SWAP` : base;
   },
 
   async fetchTicker(symbol, type): Promise<Ticker> {
@@ -25,10 +51,35 @@ export const okx: ExchangeAdapter = {
 
   async fetchMarketMeta(symbol, type): Promise<MarketMeta> {
     const instType = type==='USDT_PERP' ? 'SWAP' : 'SPOT'
-    const base = symbol.split('/')[0].toUpperCase()
-    const quote = symbol.split('/')[1].toUpperCase()
-    const data = await httpGet(`https://www.okx.com/api/v5/public/instruments?instType=${instType}&uly=${base}-${quote}`)
     const instId = this.toExchangeSymbol(symbol, type)
+    
+    // Extract base and quote from the converted symbol format
+    let base: string, quote: string;
+    if (symbol.includes('/')) {
+      base = symbol.split('/')[0].toUpperCase();
+      quote = symbol.split('/')[1].toUpperCase();
+    } else {
+      // Parse from "BTCUSDT" format
+      const s = symbol.toUpperCase();
+      if (s.endsWith('USDT')) {
+        base = s.slice(0, -4);
+        quote = 'USDT';
+      } else if (s.endsWith('USDC')) {
+        base = s.slice(0, -4);
+        quote = 'USDC';
+      } else if (s.endsWith('BTC')) {
+        base = s.slice(0, -3);
+        quote = 'BTC';
+      } else if (s.endsWith('ETH')) {
+        base = s.slice(0, -3);
+        quote = 'ETH';
+      } else {
+        base = s.slice(0, -4);
+        quote = s.slice(-4);
+      }
+    }
+    
+    const data = await httpGet(`https://www.okx.com/api/v5/public/instruments?instType=${instType}&uly=${base}-${quote}`)
     const s = data.data.find((x:any)=> x.instId === instId) ?? data.data[0]
     if (!s) {
       throw new Error(`Symbol ${instId} not found on OKX ${instType}`)

@@ -141,6 +141,38 @@ export function formatDecimal(value: SafeDecimal, precision: number): string {
 }
 
 /**
+ * Format a price based on tickSize with fallback to 3 decimal places
+ * @param price The price to format
+ * @param tickSize The tick size (optional)
+ * @returns Formatted price string
+ */
+export function formatPriceByTickSize(price: SafeDecimal, tickSize?: SafeDecimal): string {
+  if (!tickSize || tickSize.isZero()) {
+    // Fallback to 3 decimal places when tickSize is unavailable
+    return price.toFixed(3);
+  }
+  
+  const decimalPlaces = getDecimalPlaces(tickSize);
+  return price.toFixed(decimalPlaces);
+}
+
+/**
+ * Format quantity based on stepSize with fallback to 3 decimal places
+ * @param quantity The quantity to format
+ * @param stepSize The step size (optional)
+ * @returns Formatted quantity string
+ */
+export function formatQuantityByStepSize(quantity: SafeDecimal, stepSize?: SafeDecimal): string {
+  if (!stepSize || stepSize.isZero()) {
+    // Fallback to 3 decimal places when stepSize is unavailable
+    return quantity.toFixed(3);
+  }
+  
+  const decimalPlaces = getDecimalPlaces(stepSize);
+  return quantity.toFixed(decimalPlaces);
+}
+
+/**
  * Check if a value satisfies minimum quantity and notional requirements
  * @param qty Quantity
  * @param price Price

@@ -1,4 +1,4 @@
-import { SafeDecimal, roundDownToStep, roundToTick, validateMinRequirements } from './math.js';
+import { SafeDecimal, roundDownToStep, roundToTick, validateMinRequirements, formatPriceByTickSize, formatQuantityByStepSize } from './math.js';
 import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode, WarningKey } from './types.js';
 
 /**
@@ -110,34 +110,116 @@ export function calculateLiquidationPrice(
 }
 
 /**
- * Calculate target prices for different Risk/Reward ratios
+ * Calculate target prices for different Risk/Reward ratios including fees
  * @param entryPrice Entry price
  * @param stopPrice Stop price
  * @param ratios Array of R:R ratios to calculate
  * @param side Trading side
+ * @param feeOpen Opening fee rate
+ * @param feeClose Closing fee rate
+ * @param includeFees Whether to include fees in calculation
  * @returns Array of target prices
  */
 export function calculateTargets(
   entryPrice: SafeDecimal,
   stopPrice: SafeDecimal,
   ratios: number[],
-  side: Side
-): Array<{ rr: number; price: string }> {
-  const riskDistance = side === 'LONG' 
+  side: Side,
+  feeOpen: SafeDecimal = SafeDecimal.from('0'),
+  feeClose: SafeDecimal = SafeDecimal.from('0'),
+  includeFees: boolean = false,
+  tickSize?: SafeDecimal
+): Array<{ rr: number; price: string; priceFormatted: string; isBreakeven?: boolean }> {
+  // Calculate total risk per unit including fees
+  const priceRisk = side === 'LONG' 
     ? entryPrice.safeSub(stopPrice)
     : stopPrice.safeSub(entryPrice);
   
-  return ratios.map(ratio => {
-    const rewardDistance = riskDistance.safeMul(ratio);
-    const targetPrice = side === 'LONG'
-      ? entryPrice.safeAdd(rewardDistance)
-      : entryPrice.safeSub(rewardDistance);
+  let totalRisk = priceRisk;
+  if (includeFees) {
+    // Add entry and exit fees to the risk
+    const entryFeePerUnit = entryPrice.safeMul(feeOpen);
+    const exitFeePerUnit = stopPrice.safeMul(feeClose);
+    totalRisk = priceRisk.safeAdd(entryFeePerUnit).safeAdd(exitFeePerUnit);
+  }
+  
+  const targets: Array<{ rr: number; price: string; priceFormatted: string; isBreakeven?: boolean }> = [];
+  
+  // Add breakeven target (0 risk) as first target when fees are included
+  if (includeFees && !feeOpen.isZero() && !feeClose.isZero()) {
+    let breakevenPrice: SafeDecimal;
+    
+    if (side === 'LONG') {
+      // For LONG: breakeven = entry * (1 + fee_open) / (1 - fee_close)
+      const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen));
+      const denominator = SafeDecimal.one().safeSub(feeClose);
+      breakevenPrice = numerator.safeDiv(denominator);
+    } else {
+      // For SHORT: breakeven = entry * (1 - fee_open) / (1 + fee_close)
+      const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen));
+      const denominator = SafeDecimal.one().safeAdd(feeClose);
+      breakevenPrice = numerator.safeDiv(denominator);
+    }
+    
+    targets.push({
+      rr: 0,
+      price: breakevenPrice.toString(),
+      priceFormatted: formatPriceByTickSize(breakevenPrice, tickSize),
+      isBreakeven: true
+    });
+  }
+  
+  // Add regular R:R targets
+  targets.push(...ratios.map(ratio => {
+    // Calculate required reward distance to achieve the R:R ratio
+    const requiredReward = totalRisk.safeMul(ratio);
+    
+    if (!includeFees) {
+      // Simple calculation without fees
+      const targetPrice = side === 'LONG'
+        ? entryPrice.safeAdd(requiredReward)
+        : entryPrice.safeSub(requiredReward);
+      
+      return {
+        rr: ratio,
+        price: targetPrice.toString(),
+        priceFormatted: formatPriceByTickSize(targetPrice, tickSize)
+      };
+    }
+    
+    // Calculate target price accounting for fees
+    // For the target, we need: net_profit = target_price_diff - target_exit_fee = required_reward
+    // So: target_price_diff = required_reward + target_exit_fee
+    
+    let targetPrice: SafeDecimal;
+    if (side === 'LONG') {
+      // For LONG: target_price = entry_price + required_reward + target_exit_fee
+      // Since target_exit_fee = target_price * fee_close, we need to solve:
+      // target_price = entry_price + required_reward + target_price * fee_close
+      // target_price * (1 - fee_close) = entry_price + required_reward
+      // target_price = (entry_price + required_reward) / (1 - fee_close)
+      const numerator = entryPrice.safeAdd(requiredReward);
+      const denominator = SafeDecimal.one().safeSub(feeClose);
+      targetPrice = numerator.safeDiv(denominator);
+    } else {
+      // For SHORT: target_price = entry_price - required_reward - target_exit_fee
+      // Since target_exit_fee = target_price * fee_close, we need to solve:
+      // target_price = entry_price - required_reward - target_price * fee_close
+      // target_price * (1 + fee_close) = entry_price - required_reward
+      // target_price = (entry_price - required_reward) / (1 + fee_close)
+      const numerator = entryPrice.safeSub(requiredReward);
+      const denominator = SafeDecimal.one().safeAdd(feeClose);
+      targetPrice = numerator.safeDiv(denominator);
+    }
     
     return {
       rr: ratio,
-      price: targetPrice.toString()
+      price: targetPrice.toString(),
+      priceFormatted: formatPriceByTickSize(targetPrice, tickSize)
     };
-  });
+  }));
+  
+  return targets;
 }
 
 /**
@@ -316,8 +398,21 @@ export function calculatePosition(input: CalcInput): CalcResult {
     // Calculate notional value
     const notional = qtyRounded.safeMul(entryPrice);
     
+    // Calculate fees if included
+    let openFee: SafeDecimal | undefined;
+    let closeFee: SafeDecimal | undefined; 
+    let totalFees: SafeDecimal | undefined;
+    
+    if (includeFees) {
+      // Opening fee = position size × entry price × fee rate
+      openFee = qtyRounded.safeMul(entryPrice).safeMul(feeOpen);
+      // Closing fee = position size × stop price × fee rate
+      closeFee = qtyRounded.safeMul(stopPrice).safeMul(feeClose);
+      totalFees = openFee.safeAdd(closeFee);
+    }
+    
     // Calculate targets
-    const targets = calculateTargets(entryPrice, stopPrice, input.rrRatios, side);
+    const targets = calculateTargets(entryPrice, stopPrice, input.rrRatios, side, feeOpen, feeClose, includeFees, tickSize);
     
     let initialMargin: SafeDecimal | undefined;
     let liquidationPrice: SafeDecimal | undefined;
@@ -404,7 +499,12 @@ export function calculatePosition(input: CalcInput): CalcResult {
       leverage,
       marketMeta,
       contractMode,
-      warnings
+      warnings,
+      targets,
+      totalFees,
+      openFee,
+      closeFee,
+      includeFees
     });
     
     return {
@@ -417,7 +517,15 @@ export function calculatePosition(input: CalcInput): CalcResult {
       targets,
       warnings,
       warningKeys,
-      orderSummary
+      orderSummary,
+      totalFees: totalFees?.toString(),
+      openFee: openFee?.toString(),
+      closeFee: closeFee?.toString(),
+      includeFees,
+      // Formatted values based on market metadata
+      qtyRoundedFormatted: formatQuantityByStepSize(qtyRounded, stepSize),
+      stopPriceFormatted: formatPriceByTickSize(stopPrice, tickSize),
+      liquidationPriceFormatted: liquidationPrice ? formatPriceByTickSize(liquidationPrice, tickSize) : undefined
     };
     
   } catch (error) {
@@ -440,6 +548,11 @@ function generateOrderSummary(params: {
   marketMeta: any;
   contractMode: ContractMode;
   warnings: string[];
+  targets: Array<{ rr: number; price: string; isBreakeven?: boolean }>;
+  totalFees?: SafeDecimal;
+  openFee?: SafeDecimal;
+  closeFee?: SafeDecimal;
+  includeFees: boolean;
 }): string {
   const {
     side,
@@ -452,7 +565,12 @@ function generateOrderSummary(params: {
     leverage,
     marketMeta,
     contractMode,
-    warnings
+    warnings,
+    targets,
+    totalFees,
+    openFee,
+    closeFee,
+    includeFees
   } = params;
   
   let summary = `${side} ${marketMeta.symbol}\n`;
@@ -465,6 +583,23 @@ function generateOrderSummary(params: {
   
   if (liquidationPrice) {
     summary += `Est. Liquidation: ${liquidationPrice}\n`;
+  }
+  
+  // Add trading fees if included
+  if (includeFees && totalFees && openFee && closeFee) {
+    summary += `Fees: Open ${openFee} + Close ${closeFee} = ${totalFees} USDT\n`;
+  }
+  
+  // Add breakeven target if available
+  const breakevenTarget = targets.find(t => t.isBreakeven);
+  if (breakevenTarget) {
+    summary += `Breakeven: ${breakevenTarget.price}\n`;
+  }
+  
+  // Add first profit target if available
+  const firstProfitTarget = targets.find(t => !t.isBreakeven && t.rr > 0);
+  if (firstProfitTarget) {
+    summary += `Target 1:${firstProfitTarget.rr}: ${firstProfitTarget.price}\n`;
   }
   
   summary += `Compliance: stepSize=${marketMeta.stepSize}, tickSize=${marketMeta.tickSize}\n`;

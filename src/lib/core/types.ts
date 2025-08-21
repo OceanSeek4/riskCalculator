@@ -61,10 +61,18 @@ export interface CalcResult {
   initialMargin?: string;
   stopPrice: string;
   liquidationPrice?: string;
-  targets: Array<{ rr: number; price: string }>;
+  targets: Array<{ rr: number; price: string; priceFormatted: string; isBreakeven?: boolean }>;
   warnings: string[];
   warningKeys: WarningKey[];
   orderSummary: string;
+  totalFees?: string;
+  openFee?: string;
+  closeFee?: string;
+  includeFees: boolean;
+  // Formatted values based on market metadata
+  qtyRoundedFormatted: string;
+  stopPriceFormatted: string;
+  liquidationPriceFormatted?: string;
 }
 
 export interface KlineData {

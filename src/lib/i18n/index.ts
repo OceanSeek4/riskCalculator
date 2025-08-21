@@ -88,6 +88,7 @@ const resources = {
       initialMargin: 'Initial Margin',
       estLiquidation: 'Est. Liquidation',
       targets: 'Targets (Risk:Reward)',
+      breakeven: 'Breakeven',
       warnings: 'Warnings',
       orderSummary: 'Order Summary:',
       enterAndCalculate: 'Enter parameters and calculate to see results',
@@ -180,6 +181,7 @@ const resources = {
       atrMustBeFetched: 'ATR must be fetched or manually entered',
       failedToFetchATR: 'Failed to fetch ATR data',
       copiedToClipboard: 'Copied to clipboard',
+      clickToCopy: 'Click to copy value',
       
       // Market Data
       fetchingPrice: 'Fetching current price...',
@@ -207,6 +209,7 @@ const resources = {
       positionSize: 'Position Size',
       stopLoss: 'Stop Loss',
       riskReward: 'Risk:Reward Targets',
+      tradingFees: 'Trading Fees',
       
       // Header Features
       riskManagement: 'Risk Management',
@@ -236,6 +239,11 @@ const resources = {
       orderSummaryLeverage: 'Leverage',
       orderSummaryMargin: 'Margin',
       orderSummaryEstLiquidation: 'Est. Liquidation',
+      orderSummaryFees: 'Fees',
+      orderSummaryOpen: 'Open',
+      orderSummaryClose: 'Close',
+      orderSummaryBreakeven: 'Breakeven',
+      orderSummaryTarget: 'Target',
       orderSummaryCompliance: 'Compliance',
       orderSummaryWarnings: 'Warnings',
       orderSummaryNote: 'Note: Estimates only. Exchange rules prevail.'
@@ -326,6 +334,7 @@ const resources = {
       initialMargin: '初始保证金',
       estLiquidation: '预估清算价',
       targets: '目标位（风险：收益）',
+      breakeven: '保本位',
       warnings: '警告',
       orderSummary: '订单摘要：',
       enterAndCalculate: '输入参数并计算以查看结果',
@@ -419,6 +428,7 @@ const resources = {
       atrMustBeFetched: 'ATR必须获取或手动输入',
       failedToFetchATR: '获取ATR数据失败',
       copiedToClipboard: '已复制到剪贴板',
+      clickToCopy: '点击复制数值',
       
       // Market Data
       fetchingPrice: '正在获取当前价格...',
@@ -446,6 +456,7 @@ const resources = {
       positionSize: '仓位大小',
       stopLoss: '止损',
       riskReward: '风险收益目标',
+      tradingFees: '交易手续费',
       
       // Header Features
       riskManagement: '风险管理',
@@ -475,6 +486,11 @@ const resources = {
       orderSummaryLeverage: '杠杆',
       orderSummaryMargin: '保证金',
       orderSummaryEstLiquidation: '预估强平价',
+      orderSummaryFees: '手续费',
+      orderSummaryOpen: '开仓',
+      orderSummaryClose: '平仓',
+      orderSummaryBreakeven: '保本位',
+      orderSummaryTarget: '目标位',
       orderSummaryCompliance: '合规检查',
       orderSummaryWarnings: '警告',
       orderSummaryNote: '注意：仅为估算值，以交易所规则为准。'

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { CalculatorForm } from '@/features/calculator/CalculatorForm';
 import { ResultCard } from '@/features/calculator/ResultCard';
 import { SettingsForm } from '@/features/settings/SettingsForm';
@@ -7,9 +8,17 @@ import { Calculator, Bookmark, Settings, TrendingUp, Shield, Globe2 } from 'luci
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { LanguageToggle } from '@/components/ui/language-toggle';
+import { useCalculatorStore, useSettingsStore } from '@/lib/store';
 
 function App() {
   const { t } = useTranslation();
+  const { syncWithSettings } = useCalculatorStore();
+  const { settings } = useSettingsStore();
+
+  // Ensure calculator is always synced with current settings on app startup
+  useEffect(() => {
+    syncWithSettings(settings);
+  }, [settings, syncWithSettings]);
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">

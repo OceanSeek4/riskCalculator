@@ -39,6 +39,26 @@
         "leverageMax": 100,
         "mmr": "0.005"
       }
+    },
+    "SUIUSDT": {
+      "spot": {
+        "symbol": "SUIUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "SUIUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
     }
   },
   "BYBIT": {
@@ -62,6 +82,17 @@
         "minNotional": "5",
         "leverageMax": 100,
         "mmr": "0.01"
+      }
+    },
+    "SUIUSDT": {
+      "linear": {
+        "symbol": "SUIUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 50,
+        "mmr": "0.02"
       }
     }
   },
@@ -105,6 +136,26 @@
         "leverageMax": 100,
         "mmr": "0.005"
       }
+    },
+    "SUIUSDT": {
+      "spot": {
+        "symbol": "SUIUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "SUIUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
     }
   },
   "OKX": {
@@ -146,6 +197,26 @@
         "minNotional": "1",
         "leverageMax": 75,
         "mmr": "0.005"
+      }
+    },
+    "SUI-USDT": {
+      "spot": {
+        "symbol": "SUI-USDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "SUI-USDT-SWAP",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "1",
+        "leverageMax": 50,
+        "mmr": "0.02"
       }
     }
   }

@@ -16,6 +16,7 @@ export function CalculatorForm() {
     formData,
     setFormData,
     setResult,
+    syncWithSettings,
     currentATR,
     setCurrentATR,
     isCalculating,
@@ -38,31 +39,10 @@ export function CalculatorForm() {
   const [priceError, setPriceError] = useState<string>('');
   const [supportedIntervals, setSupportedIntervals] = useState<string[]>([]);
 
-  // Initialize form with default values
+  // Sync calculator with settings on component mount and settings changes
   useEffect(() => {
-    if (Object.keys(formData).length === 0) {
-      setFormData({
-        exchange: settings.defaultExchange,
-        symbol: settings.defaultSymbol,
-        contractMode: settings.defaultContractMode,
-        side: 'LONG',
-        stopMode: settings.defaultStopMode,
-        riskMode: settings.defaultRiskMode,
-        orderType: settings.defaultOrderType,
-        leverage: settings.defaultLeverage,
-        accountEquity: settings.defaultAccountEquity,
-        riskPercent: settings.defaultRiskPercent,
-        riskAmount: settings.defaultRiskAmount,
-        atrPeriod: settings.defaultAtrPeriod,
-        atrTimeframe: settings.defaultAtrTimeframe,
-        atrMultiplier: settings.defaultAtrMultiplier,
-        includeFees: false,
-        feeOpen: settings.defaultFeeOpen,
-        feeClose: settings.defaultFeeClose,
-        slippage: settings.defaultSlippage,
-      });
-    }
-  }, [settings, formData, setFormData]);
+    syncWithSettings(settings);
+  }, [settings, syncWithSettings]);
 
   // Fetch market metadata when exchange/symbol changes
   useEffect(() => {

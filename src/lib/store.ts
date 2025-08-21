@@ -8,6 +8,7 @@ interface CalculatorState {
   formData: Partial<CalculatorFormData>;
   setFormData: (data: Partial<CalculatorFormData>) => void;
   resetFormData: () => void;
+  syncWithSettings: (settings: SettingsData) => void;
   
   // Calculation result
   result: CalcResult | null;
@@ -116,6 +117,27 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
     formData: { ...state.formData, ...data }
   })),
   resetFormData: () => set({ formData: defaultFormData }),
+  syncWithSettings: (settings) => set((state) => ({
+    formData: {
+      ...state.formData,
+      exchange: settings.defaultExchange,
+      symbol: settings.defaultSymbol,
+      contractMode: settings.defaultContractMode,
+      stopMode: settings.defaultStopMode,
+      riskMode: settings.defaultRiskMode,
+      orderType: settings.defaultOrderType,
+      leverage: settings.defaultLeverage,
+      accountEquity: settings.defaultAccountEquity,
+      riskPercent: settings.defaultRiskPercent,
+      riskAmount: settings.defaultRiskAmount,
+      atrPeriod: settings.defaultAtrPeriod,
+      atrTimeframe: settings.defaultAtrTimeframe,
+      atrMultiplier: settings.defaultAtrMultiplier,
+      feeOpen: settings.defaultFeeOpen,
+      feeClose: settings.defaultFeeClose,
+      slippage: settings.defaultSlippage,
+    }
+  })),
   
   // Calculation result
   result: null,
