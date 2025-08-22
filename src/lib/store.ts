@@ -3,6 +3,12 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { CalculatorFormData, SettingsData } from './validation';
 import { CalcResult } from './core';
 import type { TrailingConfig, TrailingState } from './core/trailing';
+// 步骤4.2：导入Tauri Store工具（追加）
+import { loadJSON, saveJSON, cleanupExpiredStates } from './tauri-store';
+
+// 步骤4.2：防抖工具（追加）
+let saveTrailingTimer: NodeJS.Timeout | null = null;
+const SAVE_DEBOUNCE_MS = 400;
 
 interface CalculatorState {
   // Form data
@@ -55,6 +61,12 @@ interface CalculatorState {
   updateTrailingConfig: (config: Partial<TrailingConfig>) => void;
   trailingState: TrailingState;
   setTrailingState: (state: TrailingState) => void;
+  
+  // 步骤4.2：持久化方法（追加）
+  hydrate: () => Promise<void>;
+  saveTrailing: () => void;
+  saveTrailingState: (exchange: string, symbol: string, tfMs: number, state: TrailingState) => Promise<void>;
+  loadTrailingState: (exchange: string, symbol: string, tfMs: number) => Promise<TrailingState | null>;
 }
 
 interface SettingsState {
@@ -234,6 +246,91 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   })),
   trailingState: defaultTrailingState,
   setTrailingState: (state) => set({ trailingState: state }),
+  
+  // 步骤4.2：持久化方法实现（追加）
+  hydrate: async () => {
+    try {
+      // 清理过期的trailingState数据
+      await cleanupExpiredStates('trailingState:');
+      
+      // 加载trailing配置
+      const savedTrailing = await loadJSON<{
+        enabled: boolean;
+        config: TrailingConfig;
+      }>('trailing');
+      
+      if (savedTrailing) {
+        set({
+          trailingEnabled: savedTrailing.enabled,
+          trailingConfig: { ...defaultTrailingConfig, ...savedTrailing.config }
+        });
+        console.log('Hydrated trailing config:', savedTrailing);
+      }
+    } catch (error) {
+      console.warn('Failed to hydrate trailing config:', error);
+    }
+  },
+  
+  saveTrailing: () => {
+    if (saveTrailingTimer) {
+      clearTimeout(saveTrailingTimer);
+    }
+    
+    saveTrailingTimer = setTimeout(async () => {
+      const state = useCalculatorStore.getState();
+      try {
+        await saveJSON('trailing', {
+          enabled: state.trailingEnabled,
+          config: state.trailingConfig
+        });
+        console.log('Saved trailing config');
+      } catch (error) {
+        console.error('Failed to save trailing config:', error);
+      }
+    }, SAVE_DEBOUNCE_MS);
+  },
+  
+  saveTrailingState: async (exchange: string, symbol: string, tfMs: number, state: TrailingState) => {
+    try {
+      const key = `trailingState:${exchange}:${symbol}:${tfMs}`;
+      const data = {
+        ...state,
+        ts: Date.now() // 添加时间戳
+      };
+      await saveJSON(key, data);
+      console.log(`Saved trailing state for ${key}`);
+    } catch (error) {
+      console.error(`Failed to save trailing state for ${exchange}:${symbol}:${tfMs}:`, error);
+    }
+  },
+  
+  // 步骤4.2：加载特定市场的trailing状态（追加）
+  loadTrailingState: async (exchange: string, symbol: string, tfMs: number): Promise<TrailingState | null> => {
+    try {
+      const key = `trailingState:${exchange}:${symbol}:${tfMs}`;
+      const data = await loadJSON<TrailingState & { ts?: number }>(key);
+      
+      if (data) {
+        // 检查是否过期（>12小时）
+        const now = Date.now();
+        const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+        
+        if (data.ts && (now - data.ts) > TWELVE_HOURS) {
+          console.log(`Trailing state expired for ${key}`);
+          return null;
+        }
+        
+        // 移除时间戳，返回纯净的TrailingState
+        const { ts, ...cleanState } = data;
+        return cleanState;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn(`Failed to load trailing state for ${exchange}:${symbol}:${tfMs}:`, error);
+      return null;
+    }
+  },
 }));
 
 // Settings store with persistence
