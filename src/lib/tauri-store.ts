@@ -3,16 +3,44 @@
  * 步骤 4.1：通用 Store 工具
  */
 
-import { Store } from '@tauri-apps/plugin-store';
-
-let settingsStore: Store | null = null;
+let settingsStore: any | null = null;
 
 /**
- * 获取设置存储实例
+ * 获取设置存储实例（支持浏览器回退）
  */
-export async function getSettingsStore(): Promise<Store> {
+export async function getSettingsStore(): Promise<any> {
   if (!settingsStore) {
-    settingsStore = await Store.load('settings.json');
+    try {
+      // 尝试使用 Tauri Store
+      const { Store } = await import('@tauri-apps/plugin-store');
+      settingsStore = await Store.load('settings.json');
+    } catch (error) {
+      // 在浏览器环境中回退到 localStorage
+      console.warn('Tauri Store not available, falling back to localStorage');
+      settingsStore = {
+        get: (key: string) => {
+          const value = localStorage.getItem(key);
+          return Promise.resolve(value);
+        },
+        set: (key: string, value: string) => {
+          localStorage.setItem(key, value);
+          return Promise.resolve();
+        },
+        delete: (key: string) => {
+          localStorage.removeItem(key);
+          return Promise.resolve();
+        },
+        save: () => Promise.resolve(),
+        keys: () => {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) keys.push(key);
+          }
+          return Promise.resolve(keys);
+        }
+      };
+    }
   }
   return settingsStore;
 }
@@ -82,12 +110,12 @@ export async function cleanupExpiredStates(keyPrefix: string): Promise<void> {
             const data = JSON.parse(value as string);
             if (data.ts && (now - data.ts) > TWELVE_HOURS) {
               await store.delete(key);
-              console.log(`Cleaned up expired state: ${key}`);
+
             }
           } catch (parseError) {
             // 如果解析失败，删除损坏的数据
             await store.delete(key);
-            console.warn(`Cleaned up corrupted state: ${key}`);
+
           }
         }
       }

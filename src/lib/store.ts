@@ -128,6 +128,42 @@ const defaultTrailingConfig: TrailingConfig = {
   rrTargets: [1, 1.5, 2],
 };
 
+// Create trailing config from settings
+function createTrailingConfigFromSettings(settings: SettingsData, side: 'LONG' | 'SHORT' = 'LONG'): TrailingConfig {
+  // Convert timeframe string to milliseconds
+  const timeframeToMs = (tf: string): number => {
+    const timeframes: Record<string, number> = {
+      '1m': 60 * 1000,
+      '5m': 5 * 60 * 1000,
+      '15m': 15 * 60 * 1000,
+      '30m': 30 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '2h': 2 * 60 * 60 * 1000,
+      '4h': 4 * 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '12h': 12 * 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+    };
+    return timeframes[tf] || 60 * 60 * 1000; // Default to 1h
+  };
+
+  return {
+    side,
+    strategy: settings.defaultTrailingStrategy,
+    maType: settings.defaultTrailingMaType,
+    maLen: settings.defaultTrailingMaPeriod,
+    atrLen: settings.defaultTrailingAtrPeriod,
+    tfMs: timeframeToMs(settings.defaultTrailingTimeframe),
+    offsetType: settings.defaultTrailingOffsetType,
+    k: settings.defaultTrailingAtrMultiplier,
+    pct: settings.defaultTrailingPercentage / 100, // Convert percentage to decimal
+    abs: settings.defaultTrailingAbsolute,
+    roundTick: 0.01, // Will be updated from market metadata
+    onCloseOnly: settings.defaultTrailingOnCloseOnly,
+    rrTargets: settings.rrRatios,
+  };
+}
+
 // Default trailing state
 const defaultTrailingState: TrailingState = {
   indicators: {},
@@ -157,6 +193,20 @@ const defaultSettings: SettingsData = {
   defaultTakeProfitPrice: '',
   defaultTakeProfitATRMultiplier: '2',
   defaultTakeProfitRRRatio: '2',
+  // Trailing stop defaults
+  defaultTrailingEnabled: false,
+  defaultTrailingStrategy: 'MA_BAND_STOP',
+  defaultTrailingMaType: 'EMA',
+  defaultTrailingMaPeriod: 20,
+  defaultTrailingAtrPeriod: 14,
+  defaultTrailingTimeframe: '1h',
+  defaultTrailingOffsetType: 'ATRx',
+  defaultTrailingAtrMultiplier: 2,
+  defaultTrailingPercentage: 0.5,
+  defaultTrailingAbsolute: 10,
+  defaultTrailingOnCloseOnly: true,
+  // Symbol list for dropdown
+  symbolList: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT'],
   rrRatios: [1, 1.5, 2],
   theme: 'system',
   language: 'en',
@@ -172,33 +222,47 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
     formData: { ...state.formData, ...data }
   })),
   resetFormData: () => set({ formData: defaultFormData }),
-  syncWithSettings: (settings) => set((state) => ({
-    formData: {
-      ...state.formData,
-      exchange: settings.defaultExchange,
-      symbol: settings.defaultSymbol,
-      contractMode: settings.defaultContractMode,
-      stopMode: settings.defaultStopMode,
-      useTakeProfit: settings.defaultUseTakeProfit,
-      takeProfitMode: settings.defaultTakeProfitMode,
-      takeProfitPrice: settings.defaultTakeProfitPrice,
-      takeProfitATRMultiplier: settings.defaultTakeProfitATRMultiplier,
-      takeProfitRRRatio: settings.defaultTakeProfitRRRatio,
-      riskMode: settings.defaultRiskMode,
-      orderType: settings.defaultOrderType,
-      leverage: settings.defaultLeverage,
-      accountEquity: settings.defaultAccountEquity,
-      riskPercent: settings.defaultRiskPercent,
-      riskAmount: settings.defaultRiskAmount,
-      atrPeriod: settings.defaultAtrPeriod,
-      atrTimeframe: settings.defaultAtrTimeframe,
-      atrMultiplier: settings.defaultAtrMultiplier,
-      includeFees: settings.defaultIncludeFees,
-      feeOpen: settings.defaultFeeOpen,
-      feeClose: settings.defaultFeeClose,
-      slippage: settings.defaultSlippage,
-    }
-  })),
+  syncWithSettings: (settings) => set((state) => {
+    // Create trailing config from settings using current side or default to LONG
+    const currentSide = state.formData.side || 'LONG';
+    const trailingConfigFromSettings = createTrailingConfigFromSettings(settings, currentSide);
+    
+    return {
+      formData: {
+        ...state.formData,
+        exchange: settings.defaultExchange,
+        symbol: settings.defaultSymbol,
+        contractMode: settings.defaultContractMode,
+        stopMode: settings.defaultStopMode,
+        useTakeProfit: settings.defaultUseTakeProfit,
+        takeProfitMode: settings.defaultTakeProfitMode,
+        takeProfitPrice: settings.defaultTakeProfitPrice,
+        takeProfitATRMultiplier: settings.defaultTakeProfitATRMultiplier,
+        takeProfitRRRatio: settings.defaultTakeProfitRRRatio,
+        riskMode: settings.defaultRiskMode,
+        orderType: settings.defaultOrderType,
+        leverage: settings.defaultLeverage,
+        accountEquity: settings.defaultAccountEquity,
+        riskPercent: settings.defaultRiskPercent,
+        riskAmount: settings.defaultRiskAmount,
+        atrPeriod: settings.defaultAtrPeriod,
+        atrTimeframe: settings.defaultAtrTimeframe,
+        atrMultiplier: settings.defaultAtrMultiplier,
+        includeFees: settings.defaultIncludeFees,
+        feeOpen: settings.defaultFeeOpen,
+        feeClose: settings.defaultFeeClose,
+        slippage: settings.defaultSlippage,
+      },
+      // Apply trailing stop defaults
+      trailingEnabled: settings.defaultTrailingEnabled,
+      trailingConfig: {
+        ...state.trailingConfig,
+        ...trailingConfigFromSettings,
+        // Preserve current roundTick if already set from market metadata
+        roundTick: state.trailingConfig.roundTick || trailingConfigFromSettings.roundTick,
+      }
+    };
+  }),
   
   // Calculation result
   result: null,
@@ -264,7 +328,6 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
           trailingEnabled: savedTrailing.enabled,
           trailingConfig: { ...defaultTrailingConfig, ...savedTrailing.config }
         });
-        console.log('Hydrated trailing config:', savedTrailing);
       }
     } catch (error) {
       console.warn('Failed to hydrate trailing config:', error);
@@ -283,7 +346,6 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
           enabled: state.trailingEnabled,
           config: state.trailingConfig
         });
-        console.log('Saved trailing config');
       } catch (error) {
         console.error('Failed to save trailing config:', error);
       }
@@ -298,7 +360,6 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         ts: Date.now() // 添加时间戳
       };
       await saveJSON(key, data);
-      console.log(`Saved trailing state for ${key}`);
     } catch (error) {
       console.error(`Failed to save trailing state for ${exchange}:${symbol}:${tfMs}:`, error);
     }
@@ -316,7 +377,6 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         const TWELVE_HOURS = 12 * 60 * 60 * 1000;
         
         if (data.ts && (now - data.ts) > TWELVE_HOURS) {
-          console.log(`Trailing state expired for ${key}`);
           return null;
         }
         

@@ -63,6 +63,7 @@ export function SettingsForm() {
         feeOpen: settings.defaultFeeOpen,
         feeClose: settings.defaultFeeClose,
         slippage: settings.defaultSlippage,
+        includeFees: settings.defaultIncludeFees,
       });
       
       setNotification(t('settingsSaved') || 'Settings saved successfully!', 'success');
@@ -94,18 +95,18 @@ export function SettingsForm() {
   };
 
   const handleAddRatio = () => {
-    setSettings({ rrRatios: [...settings.rrRatios, 1] });
+    setSettings({ rrRatios: [...(settings.rrRatios || []), 1] });
   };
 
   const handleRemoveRatio = (index: number) => {
-    const newRatios = settings.rrRatios.filter((_, i) => i !== index);
+    const newRatios = (settings.rrRatios || []).filter((_, i) => i !== index);
     setSettings({ rrRatios: newRatios });
   };
 
   const handleRatioChange = (index: number, value: string) => {
     const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue > 0) {
-      const newRatios = [...settings.rrRatios];
+      const newRatios = [...(settings.rrRatios || [])];
       newRatios[index] = numValue;
       setSettings({ rrRatios: newRatios });
     }
@@ -491,7 +492,7 @@ export function SettingsForm() {
             </div>
             
             <div className="space-y-2">
-              {settings.rrRatios.map((ratio, index) => (
+              {(settings.rrRatios || []).map((ratio, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <div className="flex-1">
                     <Input
@@ -564,6 +565,256 @@ export function SettingsForm() {
                 <option value="zh">{t('chinese')}</option>
               </Select>
             </div>
+          </div>
+        </div>
+
+        {/* Symbol List Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+            {t('symbolListSettings')}
+          </h3>
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>{t('symbolList')}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newSymbol = prompt(t('enterSymbolPrompt'));
+                  if (newSymbol && newSymbol.trim()) {
+                    const trimmedSymbol = newSymbol.trim().toUpperCase();
+                    const currentList = settings.symbolList || [];
+                    if (!currentList.includes(trimmedSymbol)) {
+                      handleInputChange('symbolList', [...currentList, trimmedSymbol]);
+                    }
+                  }
+                }}
+                className="flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" />
+                {t('addSymbol')}
+              </Button>
+            </div>
+            
+            <div className="space-y-2">
+              {(settings.symbolList || []).map((symbol, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Input
+                      type="text"
+                      value={symbol}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const newList = [...(settings.symbolList || [])];
+                        newList[index] = e.target.value.toUpperCase();
+                        handleInputChange('symbolList', newList);
+                      }}
+                      placeholder={t('symbolPlaceholder')}
+                      className="text-center"
+                    />
+                  </div>
+                  {(settings.symbolList || []).length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newList = (settings.symbolList || []).filter((_, i) => i !== index);
+                        handleInputChange('symbolList', newList);
+                      }}
+                      className="px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              {t('symbolListHelp')}
+            </p>
+          </div>
+        </div>
+
+        {/* Trailing Stop Defaults */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
+            {t('defaultTrailingSettings')}
+          </h3>
+          
+          <div className="space-y-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultTrailingEnabled}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultTrailingEnabled', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">{t('defaultTrailingEnabled')}</span>
+            </label>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>{t('defaultTrailingStrategy')}</Label>
+                <Select
+                  value={settings.defaultTrailingStrategy}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                    handleInputChange('defaultTrailingStrategy', e.target.value as 'MA_CROSS_EXIT' | 'MA_BAND_STOP' | 'MA_CHANDELIER')
+                  }
+                >
+                  <option value="MA_CROSS_EXIT">{t('trailingStrategies.maCrossExit', 'MA Cross Exit')}</option>
+                  <option value="MA_BAND_STOP">{t('trailingStrategies.maBandStop', 'MA Band Stop')}</option>
+                  <option value="MA_CHANDELIER">{t('trailingStrategies.maChandelier', 'MA Chandelier')}</option>
+                </Select>
+              </div>
+              
+              <div>
+                <Label>{t('defaultTrailingMaType')}</Label>
+                <Select
+                  value={settings.defaultTrailingMaType}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                    handleInputChange('defaultTrailingMaType', e.target.value as 'EMA' | 'SMA')
+                  }
+                >
+                  <option value="EMA">{t('trailingParams.ema', 'EMA')}</option>
+                  <option value="SMA">{t('trailingParams.sma', 'SMA')}</option>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>{t('defaultTrailingMaPeriod')}</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={settings.defaultTrailingMaPeriod}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultTrailingMaPeriod', parseInt(e.target.value) || 20)
+                  }
+                  placeholder="20"
+                />
+              </div>
+              
+              <div>
+                <Label>{t('defaultTrailingAtrPeriod')}</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={settings.defaultTrailingAtrPeriod}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultTrailingAtrPeriod', parseInt(e.target.value) || 14)
+                  }
+                  placeholder="14"
+                />
+              </div>
+              
+              <div>
+                <Label>{t('defaultTrailingTimeframe')}</Label>
+                <Select
+                  value={settings.defaultTrailingTimeframe}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                    handleInputChange('defaultTrailingTimeframe', e.target.value)
+                  }
+                >
+                  {supportedIntervals.map((interval: string) => (
+                    <option key={interval} value={interval}>{interval}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            
+            {(settings.defaultTrailingStrategy === 'MA_BAND_STOP' || settings.defaultTrailingStrategy === 'MA_CHANDELIER') && (
+              <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <Label className="text-sm font-medium">{t('defaultTrailingOffsetSettings')}</Label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t('defaultTrailingOffsetType')}</Label>
+                    <Select
+                      value={settings.defaultTrailingOffsetType}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                        handleInputChange('defaultTrailingOffsetType', e.target.value as 'ATRx' | 'PCT' | 'ABS')
+                      }
+                    >
+                      <option value="ATRx">{t('trailingParams.atrMultiplier', 'ATR x')}</option>
+                      <option value="PCT">{t('trailingParams.percentage', 'Percentage')}</option>
+                      <option value="ABS">{t('trailingParams.absolute', 'Absolute')}</option>
+                    </Select>
+                  </div>
+                  
+                  {settings.defaultTrailingOffsetType === 'ATRx' && (
+                    <div>
+                      <Label>{t('defaultTrailingAtrMultiplier')}</Label>
+                      <Input
+                        type="number"
+                        min="0.1"
+                        max="10"
+                        step="0.1"
+                        value={settings.defaultTrailingAtrMultiplier}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('defaultTrailingAtrMultiplier', parseFloat(e.target.value) || 2)
+                        }
+                        placeholder="2.0"
+                      />
+                    </div>
+                  )}
+                  
+                  {settings.defaultTrailingOffsetType === 'PCT' && (
+                    <div>
+                      <Label>{t('defaultTrailingPercentage')}</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        max="10"
+                        step="0.01"
+                        value={settings.defaultTrailingPercentage}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('defaultTrailingPercentage', parseFloat(e.target.value) || 0.5)
+                        }
+                        placeholder="0.5"
+                      />
+                    </div>
+                  )}
+                  
+                  {settings.defaultTrailingOffsetType === 'ABS' && (
+                    <div>
+                      <Label>{t('defaultTrailingAbsolute')}</Label>
+                      <Input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={settings.defaultTrailingAbsolute}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('defaultTrailingAbsolute', parseFloat(e.target.value) || 10)
+                        }
+                        placeholder="10"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultTrailingOnCloseOnly}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultTrailingOnCloseOnly', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">{t('defaultTrailingOnCloseOnly')}</span>
+            </label>
           </div>
         </div>
 

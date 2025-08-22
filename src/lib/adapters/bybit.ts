@@ -28,14 +28,23 @@ export const bybit: ExchangeAdapter = {
         throw new Error(`No kline data returned for ${sym} on Bybit ${category} with interval ${interval}`)
       }
       
-      return data.result.list.map((r:any)=>({ 
+      // Bybit返回的数据是按时间戳降序排列的，需要反转为升序
+      const klines = data.result.list.map((r:any)=>({ 
         t: +r[0], 
         o: +r[1], 
         h: +r[2], 
         l: +r[3], 
         c: +r[4], 
         v: +r[5] 
-      }))
+      }));
+      
+      // 反转数组使其按时间升序排列（最老的数据在前）
+      const sortedKlines = klines.reverse();
+      
+      // 添加调试信息（仅在大时间框架时）
+
+      
+      return sortedKlines;
     } catch (error) {
       console.error(`Bybit fetchKlines error for ${sym} ${interval}:`, error)
       throw error
@@ -92,7 +101,7 @@ export const bybit: ExchangeAdapter = {
       ws.onclose = () => {
         if (reconnectCount < maxReconnects) {
           reconnectCount++
-          console.log(`Bybit WebSocket disconnected, reconnecting... (${reconnectCount}/${maxReconnects})`)
+
           setTimeout(connect, 1000 * reconnectCount)
         } else {
           console.error('Bybit WebSocket max reconnection attempts reached')

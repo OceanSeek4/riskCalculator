@@ -1,17 +1,37 @@
-// Tauri v2 HTTP client
-export async function httpGet(url: string) {
+// Universal HTTP client with Tauri and browser support
+let tauriHttpAvailable = false;
+let tauriHttpMod: any = null;
+
+// Try to initialize Tauri HTTP plugin once
+const initTauriHttp = async () => {
+  if (tauriHttpMod !== null) return; // Already initialized
+  
   try {
-    // @ts-ignore - Tauri plugin may not be available in some environments
-    const mod = await import('@tauri-apps/plugin-http').catch(() => null);
-    if (mod?.fetch) {
-      const r = await mod.fetch(url, { method: 'GET' });
-      return await r.json();
-    }
+    tauriHttpMod = await import('@tauri-apps/plugin-http').catch(() => false);
+    tauriHttpAvailable = !!(tauriHttpMod && tauriHttpMod.fetch);
   } catch (error) {
-    console.warn('Tauri HTTP plugin not available, falling back to browser fetch:', error);
+    tauriHttpMod = false;
+    tauriHttpAvailable = false;
+  }
+};
+
+export async function httpGet(url: string) {
+  // Initialize Tauri HTTP if not done yet
+  if (tauriHttpMod === null) {
+    await initTauriHttp();
   }
   
-  // Browser fallback for development
+  // Try Tauri HTTP first if available
+  if (tauriHttpAvailable && tauriHttpMod?.fetch) {
+    try {
+      const r = await tauriHttpMod.fetch(url, { method: 'GET' });
+      return await r.json();
+    } catch (error) {
+      console.warn('Tauri HTTP request failed, falling back to browser fetch:', error);
+    }
+  }
+  
+  // Browser fallback
   try {
     const r = await fetch(url, { method: 'GET' });
     if (!r.ok) {

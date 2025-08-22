@@ -2,6 +2,70 @@ import { Candle } from './core/trailing.js';
 import { getOHLCVData } from './market-service.js';
 import type { Exchange, InstType } from './adapters';
 
+// 转换时间框架格式以适配不同交易所
+function convertTimeframeForExchange(exchange: Exchange, timeframe: string): string {
+  // Bybit需要特殊格式转换
+  if (exchange === 'BYBIT') {
+    const timeframeMap: Record<string, string> = {
+      '1m': '1',
+      '3m': '3', 
+      '5m': '5',
+      '15m': '15',
+      '30m': '30',
+      '1h': '60',
+      '2h': '120',
+      '4h': '240',
+      '6h': '360',
+      '12h': '720',
+      '1d': 'D',
+      '1w': 'W',
+      '1M': 'M'
+    }
+    return timeframeMap[timeframe] || timeframe
+  }
+  
+  // Bitget需要特定格式转换（使用分钟数表示）
+  if (exchange === 'BITGET') {
+    const timeframeMap: Record<string, string> = {
+      '1m': '1m',
+      '5m': '5m', 
+      '15m': '15m',
+      '30m': '30m',
+      '1h': '1H',
+      '2h': '2H',
+      '4h': '4H',
+      '6h': '6H',
+      '12h': '12H',
+      '1d': '1D',
+      '1w': '1W'
+    }
+    return timeframeMap[timeframe] || timeframe
+  }
+  
+  // OKX使用不同的格式，日线使用UTC时间以确保一致性
+  if (exchange === 'OKX') {
+    const timeframeMap: Record<string, string> = {
+      '1m': '1m',
+      '3m': '3m',
+      '5m': '5m',
+      '15m': '15m',
+      '30m': '30m',
+      '1h': '1H',
+      '2h': '2H',
+      '4h': '4H',
+      '6h': '6Hutc',   // 使用UTC时间
+      '12h': '12Hutc', // 使用UTC时间
+      '1d': '1Dutc',   // 使用UTC时间，确保与其他交易所一致
+      '1w': '1Wutc',   // 使用UTC时间
+      '1M': '1Mutc'    // 使用UTC时间
+    }
+    return timeframeMap[timeframe] || timeframe
+  }
+  
+  // Binance和其他交易所使用标准格式
+  return timeframe
+}
+
 /**
  * Ring buffer for storing candles efficiently
  */
@@ -261,10 +325,14 @@ export class CandleManager {
    */
   async preheatWithRest(requiredCandles: number = 200): Promise<void> {
     try {
+      // 转换时间框架格式
+      const convertedTimeframe = convertTimeframeForExchange(this.exchange, this.timeframe);
+      
+
       const klineData = await getOHLCVData(
         this.exchange,
         this.symbol,
-        this.timeframe,
+        convertedTimeframe,
         requiredCandles,
         this.instType
       );
@@ -282,9 +350,48 @@ export class CandleManager {
         this.ring.push(candle);
       }
 
-      console.log(`Preheated with ${klineData.length} candles for ${this.symbol}`);
     } catch (error) {
-      const message = `Failed to preheat candles: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error(`Error preheating ${this.exchange} ${this.symbol} ${this.timeframe}:`, error);
+      
+      // 对于特定错误尝试回退到较短时间框架
+      if (error instanceof Error && error.message.includes('data')) {
+        const fallbackTimeframes = ['1h', '30m', '15m', '5m', '1m'];
+        const currentIndex = fallbackTimeframes.indexOf(this.timeframe);
+        
+        if (currentIndex < fallbackTimeframes.length - 1) {
+          const fallbackTf = fallbackTimeframes[currentIndex + 1];
+          
+          try {
+            const convertedFallback = convertTimeframeForExchange(this.exchange, fallbackTf);
+            const fallbackData = await getOHLCVData(
+              this.exchange,
+              this.symbol,
+              convertedFallback,
+              requiredCandles,
+              this.instType
+            );
+            
+            // Convert to Candle format and push to ring
+            for (const kline of fallbackData) {
+              const candle: Candle = {
+                t: kline.t,
+                o: kline.o,
+                h: kline.h,
+                l: kline.l,
+                c: kline.c,
+                v: kline.v,
+              };
+              this.ring.push(candle);
+            }
+            
+            return; // 成功时直接返回
+          } catch (fallbackError) {
+            console.error(`Fallback also failed:`, fallbackError);
+          }
+        }
+      }
+      
+      const message = `Failed to preheat candles for ${this.symbol} on ${this.exchange} (${this.timeframe}): ${error instanceof Error ? error.message : 'Unknown error'}`;
       console.error(message);
       if (this.onError) {
         this.onError(message);
@@ -299,7 +406,6 @@ export class CandleManager {
   async startWebSocket(): Promise<void> {
     // Note: This is a placeholder for WebSocket implementation
     // In a real implementation, you would use the exchange's WebSocket API
-    console.log(`Starting WebSocket for ${this.exchange} ${this.symbol} ${this.timeframe}`);
     
     // Simulate WebSocket connection
     this.isConnected = true;
@@ -315,7 +421,6 @@ export class CandleManager {
       this.wsConnection = null;
     }
     this.isConnected = false;
-    console.log(`Stopped WebSocket for ${this.exchange} ${this.symbol}`);
   }
 
   /**
@@ -334,8 +439,7 @@ export class CandleManager {
     const timeout = this.reconnectTimeouts[this.reconnectAttempts] || 16000;
     this.reconnectAttempts++;
 
-    console.log(`Reconnecting attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${timeout}ms`);
-
+    
     setTimeout(async () => {
       try {
         await this.startWebSocket();

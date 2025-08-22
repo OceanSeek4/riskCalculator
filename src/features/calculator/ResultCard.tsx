@@ -34,7 +34,9 @@ export function ResultCard() {
         const price = await getCurrentPrice(formData.exchange as Exchange, formData.symbol!, instType);
         setCurrentPrice(price);
       } catch (error) {
-        console.error('Failed to fetch current price for trailing results:', error);
+        if (!String(error).includes('invoke')) {
+          console.error('Failed to fetch current price for trailing results:', error);
+        }
       }
     };
 
@@ -118,7 +120,6 @@ export function ResultCard() {
       const localizedSummary = generateLocalizedOrderSummary(result);
       await navigator.clipboard.writeText(localizedSummary);
       // You could add a toast notification here
-      console.log(t('copiedToClipboard'));
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
     }
@@ -127,7 +128,6 @@ export function ResultCard() {
   const handleCopyValue = async (value: string, type: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      console.log(`${type} copied: ${value}`);
       // TODO: Add toast notification for better UX
     } catch (error) {
       console.error('Failed to copy value:', error);

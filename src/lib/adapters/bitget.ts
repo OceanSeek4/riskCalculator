@@ -40,14 +40,18 @@ export const bitget: ExchangeAdapter = {
         throw new Error(`No kline data returned for ${sym} on Bitget ${type} with granularity ${interval}`)
       }
       
-      return data.data.map((r:any)=>({ 
+      // 映射数据并按时间戳升序排序（确保最老的数据在前）
+      const klines = data.data.map((r:any)=>({ 
         t: +r[0], 
         o: +r[1], 
         h: +r[2], 
         l: +r[3], 
         c: +r[4], 
         v: +r[5] 
-      }))
+      }));
+      
+      // 按时间戳升序排序，确保时间序列正确
+      return klines.sort((a: any, b: any) => a.t - b.t);
     } catch (error) {
       console.error(`Bitget fetchKlines error for ${sym} ${interval}:`, error)
       throw error
@@ -139,7 +143,7 @@ export const bitget: ExchangeAdapter = {
       ws.onclose = () => {
         if (reconnectCount < maxReconnects) {
           reconnectCount++
-          console.log(`Bitget WebSocket disconnected, reconnecting... (${reconnectCount}/${maxReconnects})`)
+
           setTimeout(connect, 1000 * reconnectCount)
         } else {
           console.error('Bitget WebSocket max reconnection attempts reached')

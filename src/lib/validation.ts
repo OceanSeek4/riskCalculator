@@ -97,6 +97,22 @@ export const settingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).default('system'),
   language: z.enum(['en', 'zh']).default('en'),
   
+  // Trailing stop defaults
+  defaultTrailingEnabled: z.boolean().default(false),
+  defaultTrailingStrategy: z.enum(['MA_CROSS_EXIT', 'MA_BAND_STOP', 'MA_CHANDELIER']).default('MA_BAND_STOP'),
+  defaultTrailingMaType: z.enum(['EMA', 'SMA']).default('EMA'),
+  defaultTrailingMaPeriod: z.number().min(1).max(200).default(20),
+  defaultTrailingAtrPeriod: z.number().min(1).max(100).default(14),
+  defaultTrailingTimeframe: z.string().default('1h'),
+  defaultTrailingOffsetType: z.enum(['ATRx', 'PCT', 'ABS']).default('ATRx'),
+  defaultTrailingAtrMultiplier: z.number().min(0.1).max(10).default(2),
+  defaultTrailingPercentage: z.number().min(0.01).max(10).default(0.5),
+  defaultTrailingAbsolute: z.number().min(0.01).default(10),
+  defaultTrailingOnCloseOnly: z.boolean().default(true),
+
+  // Symbol list for dropdown
+  symbolList: z.array(z.string()).default(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT']),
+
   // Advanced
   autoFetchATR: z.boolean().default(true),
   showAdvancedOptions: z.boolean().default(false),

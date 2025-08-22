@@ -23,8 +23,11 @@ export async function getCurrentPrice(
     
     return ticker.last
   } catch (error) {
-    console.error('Error fetching current price:', error)
-    throw new Error(`Failed to fetch price for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    // Only log non-HTTP plugin errors to reduce noise
+    if (!error || !String(error).includes('invoke')) {
+      console.error('Error fetching current price:', error)
+    }
+    throw new Error(`Failed to fetch price for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Network error'}`)
   }
 }
 
@@ -51,8 +54,11 @@ export async function getOHLCVData(
     
     return klines
   } catch (error) {
-    console.error('Error fetching OHLCV data:', error)
-    throw new Error(`Failed to fetch OHLCV data for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    // Only log non-HTTP plugin errors to reduce noise
+    if (!error || !String(error).includes('invoke')) {
+      console.error('Error fetching OHLCV data:', error)
+    }
+    throw new Error(`Failed to fetch OHLCV data for ${symbol} on ${exchange}: ${error instanceof Error ? error.message : 'Network error'}`)
   }
 }
 
@@ -96,7 +102,7 @@ function convertTimeframeForExchange(exchange: Exchange, timeframe: string): str
     return timeframeMap[timeframe] || timeframe
   }
   
-  // OKX使用不同的格式
+  // OKX使用不同的格式，日线使用UTC时间以确保一致性
   if (exchange === 'OKX') {
     const timeframeMap: Record<string, string> = {
       '1m': '1m',
@@ -107,11 +113,11 @@ function convertTimeframeForExchange(exchange: Exchange, timeframe: string): str
       '1h': '1H',
       '2h': '2H',
       '4h': '4H',
-      '6h': '6H',
-      '12h': '12H',
-      '1d': '1D',
-      '1w': '1W',
-      '1M': '1M'
+      '6h': '6Hutc',   // 使用UTC时间
+      '12h': '12Hutc', // 使用UTC时间
+      '1d': '1Dutc',   // 使用UTC时间，确保与其他交易所一致
+      '1w': '1Wutc',   // 使用UTC时间
+      '1M': '1Mutc'    // 使用UTC时间
     }
     return timeframeMap[timeframe] || timeframe
   }
@@ -132,9 +138,7 @@ export async function getATRValue(
     // 转换时间框架格式
     const convertedTimeframe = convertTimeframeForExchange(exchange, timeframe)
     
-    // 添加调试日志
-    console.log(`Fetching ATR for ${exchange} ${symbol} ${timeframe} -> ${convertedTimeframe}`)
-    
+
     // 获取足够的历史数据
     const klineData = await getOHLCVData(exchange, symbol, convertedTimeframe, period + 20, instType)
     
@@ -166,7 +170,6 @@ export async function getATRValue(
       const currentIndex = fallbackTimeframes.indexOf(timeframe)
       
       if (currentIndex < fallbackTimeframes.length - 1) {
-        console.log(`Trying fallback timeframe: ${fallbackTimeframes[currentIndex + 1]}`)
         return await getATRValue(exchange, symbol, fallbackTimeframes[currentIndex + 1], period, instType)
       }
     }
@@ -203,8 +206,12 @@ export async function getMAValue(
   instType: InstType = 'SPOT'
 ): Promise<number> {
   try {
+    // 转换时间框架格式
+    const convertedTimeframe = convertTimeframeForExchange(exchange, timeframe)
+    
+
     // 获取足够的历史数据
-    const klineData = await getOHLCVData(exchange, symbol, timeframe, period + 20, instType);
+    const klineData = await getOHLCVData(exchange, symbol, convertedTimeframe, period + 20, instType);
     
     if (klineData.length < period) {
       throw new Error(`Insufficient data for MA calculation. Need at least ${period} candles, got ${klineData.length}`);
@@ -223,8 +230,19 @@ export async function getMAValue(
     
     return ma;
   } catch (error) {
-    console.error('Error calculating MA:', error);
-    throw new Error(`Failed to calculate ${maType} for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(`Error calculating MA for ${exchange} ${symbol} ${timeframe}:`, error);
+    
+    // 对于特定错误尝试回退到较短时间框架
+    if (error instanceof Error && error.message.includes('data')) {
+      const fallbackTimeframes = ['1h', '30m', '15m', '5m', '1m']
+      const currentIndex = fallbackTimeframes.indexOf(timeframe)
+      
+      if (currentIndex < fallbackTimeframes.length - 1) {
+        return await getMAValue(exchange, symbol, fallbackTimeframes[currentIndex + 1], period, maType, instType)
+      }
+    }
+    
+    throw new Error(`Failed to calculate ${maType} for ${symbol} on ${exchange} (${timeframe}): ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

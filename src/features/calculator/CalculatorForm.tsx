@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { ComboInput } from '@/components/ui/combo-input';
 import { RefreshCw, AlertCircle, Bookmark, Calculator } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
@@ -12,7 +13,7 @@ import { getCurrentPrice, getATRValue, getMAValue, formatPrice, checkSymbolSuppo
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
 import { TrailingPanel } from './TrailingPanel';
-import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/core';
+import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/core/trailing';
 import { CandleManager, timeframeToMs } from '@/lib/candles';
 export function CalculatorForm() {
   const {
@@ -83,11 +84,11 @@ export function CalculatorForm() {
   // Sync calculator with settings on component mount and settings changes
   useEffect(() => {
     syncWithSettings(settings);
-    // Sync trailing config with settings RR ratios
-    updateTrailingConfig({ 
-      rrTargets: settings.rrRatios,
-      side: formData.side || 'LONG'
-    });
+    // The syncWithSettings now handles trailing config from settings,
+    // but we still need to update the side when it changes
+    if (formData.side) {
+      updateTrailingConfig({ side: formData.side });
+    }
   }, [settings, syncWithSettings, formData.side, updateTrailingConfig]);
 
   // 步骤4.3：初始化时水合持久化数据（追加）
@@ -111,7 +112,9 @@ export function CalculatorForm() {
         
         setMarketMeta(meta);
       } catch (error) {
-        console.error('Failed to fetch market data:', error);
+        if (!String(error).includes('invoke')) {
+          console.error('Failed to fetch market data:', error);
+        }
       }
     };
 
@@ -311,7 +314,6 @@ export function CalculatorForm() {
             console.error('Failed to fetch ATR for trailing:', error);
           }
           
-          console.log('Initialized trailing state:', state);
           setTrailingState(state);
         }
         
@@ -346,7 +348,9 @@ export function CalculatorForm() {
         const price = await getCurrentPrice(formData.exchange as Exchange, formData.symbol!, instType);
         setCurrentPrice(price);
       } catch (error) {
-        console.error('Failed to fetch current price for trailing:', error);
+        if (!String(error).includes('invoke')) {
+          console.error('Failed to fetch current price for trailing:', error);
+        }
       }
     };
 
@@ -568,7 +572,9 @@ export function CalculatorForm() {
       handleInputChange('entryPrice', price.toString());
       setPriceError('');
     } catch (error) {
-      console.error('Failed to fetch current price:', error);
+      if (!String(error).includes('invoke')) {
+        console.error('Failed to fetch current price:', error);
+      }
       setPriceError(error instanceof Error ? error.message : t('failedToFetchPrice'));
     } finally {
       setIsFetchingPrice(false);
@@ -611,7 +617,9 @@ export function CalculatorForm() {
       }
       setPriceError('');
     } catch (error) {
-      console.error('Failed to fetch real-time price:', error);
+      if (!String(error).includes('invoke')) {
+        console.error('Failed to fetch real-time price:', error);
+      }
       setPriceError(error instanceof Error ? error.message : t('failedToFetchPrice'));
     }
   };
@@ -658,9 +666,8 @@ export function CalculatorForm() {
           instType
         );
         lockedEntryPrice = latestPrice.toString();
-        console.log('Market order: Using locked entry price for calculation:', lockedEntryPrice);
       } catch (error) {
-        console.warn('Failed to fetch latest price before calculation, using current displayed price');
+        // Silently fall back to current displayed price
         lockedEntryPrice = formData.entryPrice!;
       }
     }
@@ -760,10 +767,11 @@ export function CalculatorForm() {
             </div>
             <div>
               <Label>{t('symbol')}</Label>
-              <Input
+              <ComboInput
                 value={formData.symbol || ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('symbol', e.target.value)}
-                placeholder="BTC/USDT"
+                onChange={(value) => handleInputChange('symbol', value)}
+                options={settings.symbolList || []}
+                placeholder="BTCUSDT"
               />
             </div>
           </div>

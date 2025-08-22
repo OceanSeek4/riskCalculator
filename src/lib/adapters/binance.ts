@@ -72,7 +72,7 @@ export const binance: ExchangeAdapter = {
       ws.onclose = () => {
         if (reconnectCount < maxReconnects) {
           reconnectCount++
-          console.log(`Binance WebSocket disconnected, reconnecting... (${reconnectCount}/${maxReconnects})`)
+
           setTimeout(connect, 1000 * reconnectCount)
         } else {
           console.error('Binance WebSocket max reconnection attempts reached')
