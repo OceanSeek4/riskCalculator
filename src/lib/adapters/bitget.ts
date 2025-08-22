@@ -27,12 +27,30 @@ export const bitget: ExchangeAdapter = {
 
   async fetchKlines(symbol, type, interval, limit) {
     const sym = this.toExchangeSymbol(symbol, type)
-    if (type === 'USDT_PERP') {
-      const d = await httpGet(`https://api.bitget.com/api/v2/mix/market/candles?productType=USDT-FUTURES&symbol=${sym}&granularity=${interval}&limit=${limit}`)
-      return d.data.map((r:any)=>({ t:+r[0], o:+r[1], h:+r[2], l:+r[3], c:+r[4], v:+r[5] }))
-    } else {
-      const d = await httpGet(`https://api.bitget.com/api/v2/spot/market/candles?symbol=${sym}&granularity=${interval}&limit=${limit}`)
-      return d.data.map((r:any)=>({ t:+r[0], o:+r[1], h:+r[2], l:+r[3], c:+r[4], v:+r[5] }))
+    
+    try {
+      let data;
+      if (type === 'USDT_PERP') {
+        data = await httpGet(`https://api.bitget.com/api/v2/mix/market/candles?productType=USDT-FUTURES&symbol=${sym}&granularity=${interval}&limit=${limit}`)
+      } else {
+        data = await httpGet(`https://api.bitget.com/api/v2/spot/market/candles?symbol=${sym}&granularity=${interval}&limit=${limit}`)
+      }
+      
+      if (!data.data || data.data.length === 0) {
+        throw new Error(`No kline data returned for ${sym} on Bitget ${type} with granularity ${interval}`)
+      }
+      
+      return data.data.map((r:any)=>({ 
+        t: +r[0], 
+        o: +r[1], 
+        h: +r[2], 
+        l: +r[3], 
+        c: +r[4], 
+        v: +r[5] 
+      }))
+    } catch (error) {
+      console.error(`Bitget fetchKlines error for ${sym} ${interval}:`, error)
+      throw error
     }
   },
 

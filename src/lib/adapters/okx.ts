@@ -45,8 +45,26 @@ export const okx: ExchangeAdapter = {
 
   async fetchKlines(symbol, type, interval, limit) {
     const instId = this.toExchangeSymbol(symbol, type)
-    const data = await httpGet(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=${interval}&limit=${limit}`)
-    return data.data.map((r:any)=>({ t:+r[0], o:+r[1], h:+r[2], l:+r[3], c:+r[4], v:+r[5] }))
+    
+    try {
+      const data = await httpGet(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=${interval}&limit=${limit}`)
+      
+      if (!data.data || data.data.length === 0) {
+        throw new Error(`No kline data returned for ${instId} on OKX with bar ${interval}`)
+      }
+      
+      return data.data.map((r:any)=>({ 
+        t: +r[0], 
+        o: +r[1], 
+        h: +r[2], 
+        l: +r[3], 
+        c: +r[4], 
+        v: +r[5] 
+      }))
+    } catch (error) {
+      console.error(`OKX fetchKlines error for ${instId} ${interval}:`, error)
+      throw error
+    }
   },
 
   async fetchMarketMeta(symbol, type): Promise<MarketMeta> {

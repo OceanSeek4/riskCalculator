@@ -42,6 +42,7 @@ export async function getOHLCVData(
       throw new Error(`Unsupported exchange: ${exchange}`)
     }
     
+    // 注意：这里的timeframe应该已经被上层函数转换过了，直接使用
     const klines = await adapter.fetchKlines(symbol, instType, timeframe, limit)
     
     if (!klines || klines.length === 0) {
@@ -55,6 +56,70 @@ export async function getOHLCVData(
   }
 }
 
+// 转换时间框架格式以适配不同交易所
+function convertTimeframeForExchange(exchange: Exchange, timeframe: string): string {
+  // Bybit需要特殊格式转换
+  if (exchange === 'BYBIT') {
+    const timeframeMap: Record<string, string> = {
+      '1m': '1',
+      '3m': '3', 
+      '5m': '5',
+      '15m': '15',
+      '30m': '30',
+      '1h': '60',
+      '2h': '120',
+      '4h': '240',
+      '6h': '360',
+      '12h': '720',
+      '1d': 'D',
+      '1w': 'W',
+      '1M': 'M'
+    }
+    return timeframeMap[timeframe] || timeframe
+  }
+  
+  // Bitget需要特定格式转换（使用分钟数表示）
+  if (exchange === 'BITGET') {
+    const timeframeMap: Record<string, string> = {
+      '1m': '1m',
+      '5m': '5m', 
+      '15m': '15m',
+      '30m': '30m',
+      '1h': '1H',
+      '2h': '2H',
+      '4h': '4H',
+      '6h': '6H',
+      '12h': '12H',
+      '1d': '1D',
+      '1w': '1W'
+    }
+    return timeframeMap[timeframe] || timeframe
+  }
+  
+  // OKX使用不同的格式
+  if (exchange === 'OKX') {
+    const timeframeMap: Record<string, string> = {
+      '1m': '1m',
+      '3m': '3m',
+      '5m': '5m',
+      '15m': '15m',
+      '30m': '30m',
+      '1h': '1H',
+      '2h': '2H',
+      '4h': '4H',
+      '6h': '6H',
+      '12h': '12H',
+      '1d': '1D',
+      '1w': '1W',
+      '1M': '1M'
+    }
+    return timeframeMap[timeframe] || timeframe
+  }
+  
+  // Binance和其他交易所使用标准格式
+  return timeframe
+}
+
 // 获取ATR值
 export async function getATRValue(
   exchange: Exchange,
@@ -64,8 +129,14 @@ export async function getATRValue(
   instType: InstType = 'SPOT'
 ): Promise<number> {
   try {
+    // 转换时间框架格式
+    const convertedTimeframe = convertTimeframeForExchange(exchange, timeframe)
+    
+    // 添加调试日志
+    console.log(`Fetching ATR for ${exchange} ${symbol} ${timeframe} -> ${convertedTimeframe}`)
+    
     // 获取足够的历史数据
-    const klineData = await getOHLCVData(exchange, symbol, timeframe, period + 20, instType)
+    const klineData = await getOHLCVData(exchange, symbol, convertedTimeframe, period + 20, instType)
     
     // 转换为ATR计算所需的格式
     const klines: KlineData[] = klineData.map(k => ({
@@ -87,8 +158,20 @@ export async function getATRValue(
     
     return parseFloat(atr.toString())
   } catch (error) {
-    console.error('Error calculating ATR:', error)
-    throw new Error(`Failed to calculate ATR for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    console.error(`Error calculating ATR for ${exchange} ${symbol} ${timeframe}:`, error)
+    
+    // 对于特定错误尝试回退到较短时间框架
+    if (error instanceof Error && error.message.includes('data')) {
+      const fallbackTimeframes = ['1h', '30m', '15m', '5m', '1m']
+      const currentIndex = fallbackTimeframes.indexOf(timeframe)
+      
+      if (currentIndex < fallbackTimeframes.length - 1) {
+        console.log(`Trying fallback timeframe: ${fallbackTimeframes[currentIndex + 1]}`)
+        return await getATRValue(exchange, symbol, fallbackTimeframes[currentIndex + 1], period, instType)
+      }
+    }
+    
+    throw new Error(`Failed to calculate ATR for ${symbol} on ${exchange} (${timeframe}): ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
@@ -170,16 +253,16 @@ export function getSupportedTimeframes(exchange: Exchange): string[] {
   // 通用的时间框架，各交易所基本都支持
   const defaultTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
   
-  // 根据交易所返回支持的时间框架
+  // 根据交易所返回支持的时间框架 - 移除有问题的高时间框架
   switch (exchange) {
     case 'BINANCE':
-      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
     case 'BYBIT':
-      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w', '1M']
+      return ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] // 简化支持列表，避免API错误
     case 'BITGET':
-      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+      return ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] // 限制到测试过的时间框架
     case 'OKX':
-      return ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d', '3d', '1w', '1M']
+      return ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] // 限制到测试过的时间框架
     default:
       return defaultTimeframes
   }

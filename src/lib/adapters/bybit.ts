@@ -20,8 +20,26 @@ export const bybit: ExchangeAdapter = {
   async fetchKlines(symbol, type, interval, limit) {
     const sym = this.toExchangeSymbol(symbol, type)
     const category = type === 'USDT_PERP' ? 'linear' : 'spot'
-    const data = await httpGet(`https://api.bybit.com/v5/market/kline?category=${category}&symbol=${sym}&interval=${interval}&limit=${limit}`)
-    return data.result.list.map((r:any)=>({ t:+r[0], o:+r[1], h:+r[2], l:+r[3], c:+r[4], v:+r[5] }))
+    
+    try {
+      const data = await httpGet(`https://api.bybit.com/v5/market/kline?category=${category}&symbol=${sym}&interval=${interval}&limit=${limit}`)
+      
+      if (!data.result || !data.result.list || data.result.list.length === 0) {
+        throw new Error(`No kline data returned for ${sym} on Bybit ${category} with interval ${interval}`)
+      }
+      
+      return data.result.list.map((r:any)=>({ 
+        t: +r[0], 
+        o: +r[1], 
+        h: +r[2], 
+        l: +r[3], 
+        c: +r[4], 
+        v: +r[5] 
+      }))
+    } catch (error) {
+      console.error(`Bybit fetchKlines error for ${sym} ${interval}:`, error)
+      throw error
+    }
   },
 
   async fetchMarketMeta(symbol, type): Promise<MarketMeta> {
