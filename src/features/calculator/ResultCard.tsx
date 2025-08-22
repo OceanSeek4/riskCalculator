@@ -222,7 +222,7 @@ export function ResultCard() {
           <CardContent>
             <div 
               className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900 transition-colors duration-200 cursor-pointer"
-              onClick={() => handleCopyValue(result.takeProfitPriceFormatted || result.takeProfitPrice, 'Take Profit Price')}
+              onClick={() => handleCopyValue(result.takeProfitPriceFormatted || result.takeProfitPrice || '', 'Take Profit Price')}
               title={t('clickToCopy')}
             >
               <div className="flex items-center gap-2 mb-2">
