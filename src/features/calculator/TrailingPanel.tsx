@@ -15,7 +15,7 @@ import type {
   MaType, 
   OffsetType,
   ExpectedPnL
-} from '@/lib/core/trailing';
+} from '@/lib/core';
 import { timeframeToMs } from '@/lib/candles';
 
 interface TrailingPanelProps {

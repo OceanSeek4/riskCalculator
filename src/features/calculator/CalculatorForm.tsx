@@ -11,10 +11,13 @@ import { validateNumberString, validateStopPrice } from '@/lib/validation';
 import { getCurrentPrice, getATRValue, formatPrice, checkSymbolSupport, getSupportedTimeframes, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
+import { TrailingPanel } from './TrailingPanel';
+import { calculateExpectedPnL } from '@/lib/core';
 export function CalculatorForm() {
   const {
     formData,
     setFormData,
+    result,
     setResult,
     syncWithSettings,
     currentATR,
@@ -27,6 +30,13 @@ export function CalculatorForm() {
     setCalculationError,
     atrError,
     setATRError,
+    // Trailing exits
+    trailingEnabled,
+    setTrailingEnabled,
+    trailingConfig,
+    updateTrailingConfig,
+    trailingState,
+    setTrailingState,
   } = useCalculatorStore();
 
   const { settings } = useSettingsStore();
@@ -813,6 +823,39 @@ export function CalculatorForm() {
             )}
           </div>
         )}
+
+        {/* Trailing Exits */}
+        <TrailingPanel
+          enabled={trailingEnabled}
+          config={trailingConfig}
+          state={trailingState}
+          currentPrice={parseFloat(formData.entryPrice || '0')}
+          entryPrice={parseFloat(formData.entryPrice || '0')}
+          quantity={result?.qtyRounded ? parseFloat(result.qtyRounded) : undefined}
+          tickSize={marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01}
+          fees={formData.includeFees ? {
+            open: parseFloat(formData.feeOpen || '0'),
+            close: parseFloat(formData.feeClose || '0')
+          } : undefined}
+          onConfigChange={(config) => {
+            updateTrailingConfig({
+              ...config,
+              side: formData.side || 'LONG',
+              roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
+            });
+          }}
+          onEnabledChange={setTrailingEnabled}
+          expectedPnL={trailingEnabled && trailingState.stop ? calculateExpectedPnL(
+            parseFloat(formData.entryPrice || '0'),
+            result?.qtyRounded ? parseFloat(result.qtyRounded) : 0,
+            trailingState.stop,
+            trailingConfig,
+            formData.includeFees ? {
+              open: parseFloat(formData.feeOpen || '0'),
+              close: parseFloat(formData.feeClose || '0')
+            } : undefined
+          ) : undefined}
+        />
 
         {/* Calculate Button */}
         <Button
