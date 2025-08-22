@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { CalculatorFormData, SettingsData } from './validation';
 import { CalcResult } from './core';
+import type { TrailingConfig, TrailingState } from './core/trailing';
 
 interface CalculatorState {
   // Form data
@@ -37,6 +38,14 @@ interface CalculatorState {
   
   atrError: string | null;
   setATRError: (error: string | null) => void;
+  
+  // Trailing exits state
+  trailingEnabled: boolean;
+  setTrailingEnabled: (enabled: boolean) => void;
+  trailingConfig: TrailingConfig;
+  updateTrailingConfig: (config: Partial<TrailingConfig>) => void;
+  trailingState: TrailingState;
+  setTrailingState: (state: TrailingState) => void;
 }
 
 interface SettingsState {
@@ -82,6 +91,26 @@ const defaultFormData: Partial<CalculatorFormData> = {
   slippage: '0.0005',
   autoLeverage: false,
   maxEquityUsage: '0.8',
+};
+
+// Default trailing configuration
+const defaultTrailingConfig: TrailingConfig = {
+  side: 'LONG',
+  strategy: 'MA_BAND_STOP',
+  maType: 'EMA',
+  maLen: 20,
+  atrLen: 14,
+  tfMs: 3600000, // 1 hour
+  offsetType: 'ATRx',
+  k: 2,
+  roundTick: 0.01,
+  onCloseOnly: true,
+  rrTargets: [1, 1.5, 2],
+};
+
+// Default trailing state
+const defaultTrailingState: TrailingState = {
+  indicators: {},
 };
 
 // Default settings
@@ -176,6 +205,16 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   
   atrError: null,
   setATRError: (error) => set({ atrError: error }),
+  
+  // Trailing exits state
+  trailingEnabled: false,
+  setTrailingEnabled: (enabled) => set({ trailingEnabled: enabled }),
+  trailingConfig: defaultTrailingConfig,
+  updateTrailingConfig: (config) => set((state) => ({
+    trailingConfig: { ...state.trailingConfig, ...config }
+  })),
+  trailingState: defaultTrailingState,
+  setTrailingState: (state) => set({ trailingState: state }),
 }));
 
 // Settings store with persistence

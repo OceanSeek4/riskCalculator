@@ -267,7 +267,59 @@ const resources = {
       orderSummaryTarget: 'Target',
       orderSummaryCompliance: 'Compliance',
       orderSummaryWarnings: 'Warnings',
-      orderSummaryNote: 'Note: Estimates only. Exchange rules prevail.'
+      orderSummaryNote: 'Note: Estimates only. Exchange rules prevail.',
+      
+      // Trailing Exits
+      trailingExits: {
+        title: 'Trailing Exits',
+        optional: 'Optional',
+        enable: 'Enable',
+      },
+      trailingStrategies: {
+        maCrossExit: 'MA Cross Exit',
+        maCrossExitDesc: 'Exit when price crosses moving average',
+        maBandStop: 'MA Band Stop',
+        maBandStopDesc: 'Trailing stop based on MA with offset',
+        maChandelier: 'MA Chandelier',
+        maChandelierDesc: 'Chandelier stop using MA and ATR',
+      },
+      trailingParams: {
+        strategy: 'Strategy',
+        maType: 'MA Type',
+        ema: 'EMA',
+        sma: 'SMA',
+        maPeriod: 'MA Period',
+        atrPeriod: 'ATR Period',
+        timeframe: 'Timeframe',
+        onCloseOnly: 'On Close Only',
+        offsetConfiguration: 'Offset Configuration',
+        offsetType: 'Offset Type',
+        atrMultiplier: 'ATR x',
+        percentage: 'Percentage',
+        absolute: 'Absolute',
+        multiplier: 'Multiplier',
+        absoluteValue: 'Absolute Value',
+      },
+      trailingReadings: {
+        title: 'Real-time Readings',
+        currentPrice: 'Current Price',
+        exitTrigger: 'Exit Trigger',
+        stopPrice: 'Stop Price',
+      },
+      trailingResults: {
+        targets: 'R:R Target Prices',
+        rrRatio: 'R:R',
+        targetPrice: 'Target Price',
+        expectedProfit: 'Expected Profit',
+        expectedLoss: 'Expected Loss',
+        bestTarget: 'Best Target ({{rr}}:1)',
+        basedOnQuantity: 'Based on {{qty}} units',
+        priceIncludesFees: 'Includes fees if enabled',
+      },
+      trailingNotices: {
+        roundingTitle: 'Price Rounding',
+        roundingDescription: 'Prices are rounded to tickSize={{tickSize}}. LONG stops round down, SHORT stops round up.',
+      }
     }
   },
   zh: {
@@ -535,7 +587,59 @@ const resources = {
       orderSummaryTarget: '目标位',
       orderSummaryCompliance: '合规检查',
       orderSummaryWarnings: '警告',
-      orderSummaryNote: '注意：仅为估算值，以交易所规则为准。'
+      orderSummaryNote: '注意：仅为估算值，以交易所规则为准。',
+      
+      // Trailing Exits
+      trailingExits: {
+        title: '移动止盈止损',
+        optional: '可选',
+        enable: '启用',
+      },
+      trailingStrategies: {
+        maCrossExit: '均线交叉退出',
+        maCrossExitDesc: '价格穿越移动平均线时退出',
+        maBandStop: '均线带状止损',
+        maBandStopDesc: '基于移动平均线加偏移的追踪止损',
+        maChandelier: '均线吊灯止损',
+        maChandelierDesc: '使用移动平均线和ATR的吊灯止损',
+      },
+      trailingParams: {
+        strategy: '策略',
+        maType: '均线类型',
+        ema: 'EMA',
+        sma: 'SMA',
+        maPeriod: '均线周期',
+        atrPeriod: 'ATR周期',
+        timeframe: '时间框架',
+        onCloseOnly: '仅收盘更新',
+        offsetConfiguration: '偏移配置',
+        offsetType: '偏移类型',
+        atrMultiplier: 'ATR倍数',
+        percentage: '百分比',
+        absolute: '绝对值',
+        multiplier: '倍数',
+        absoluteValue: '绝对值',
+      },
+      trailingReadings: {
+        title: '实时读数',
+        currentPrice: '当前价格',
+        exitTrigger: '退出触发线',
+        stopPrice: '止损价格',
+      },
+      trailingResults: {
+        targets: '风险收益比目标价',
+        rrRatio: '风险收益比',
+        targetPrice: '目标价格',
+        expectedProfit: '预期收益',
+        expectedLoss: '预期损失',
+        bestTarget: '最佳目标 ({{rr}}:1)',
+        basedOnQuantity: '基于 {{qty}} 单位',
+        priceIncludesFees: '如启用则包含手续费',
+      },
+      trailingNotices: {
+        roundingTitle: '价格舍入',
+        roundingDescription: '价格按tickSize={{tickSize}}舍入。多头止损向下舍入，空头止损向上舍入。',
+      }
     }
   }
 };
