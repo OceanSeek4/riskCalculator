@@ -12,7 +12,8 @@ import { getCurrentPrice, getATRValue, formatPrice, checkSymbolSupport, getSuppo
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
 import { TrailingPanel } from './TrailingPanel';
-import { calculateExpectedPnL } from '@/lib/core';
+import { calculateExpectedPnL, updateOnClose } from '@/lib/core';
+import { CandleManager, timeframeToMs } from '@/lib/candles';
 export function CalculatorForm() {
   const {
     formData,
@@ -48,6 +49,11 @@ export function CalculatorForm() {
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
   const [priceError, setPriceError] = useState<string>('');
   const [supportedIntervals, setSupportedIntervals] = useState<string[]>([]);
+  
+  // Candle management for trailing exits
+  const [candleManager, setCandleManager] = useState<CandleManager | null>(null);
+  const [isInitializingCandles, setIsInitializingCandles] = useState(false);
+  const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined);
 
   // Sync calculator with settings on component mount and settings changes
   useEffect(() => {
@@ -88,6 +94,119 @@ export function CalculatorForm() {
       handleFetchATR();
     }
   }, [formData.exchange, formData.symbol, formData.atrTimeframe, formData.stopMode, marketMeta, settings.autoFetchATR]);
+
+  // Initialize CandleManager for trailing exits when enabled
+  useEffect(() => {
+    if (!trailingEnabled || !formData.exchange || !formData.symbol) {
+      if (candleManager) {
+        candleManager.destroy();
+        setCandleManager(null);
+      }
+      return;
+    }
+
+    const initializeCandleManager = async () => {
+      if (candleManager) {
+        candleManager.destroy();
+      }
+      
+      setIsInitializingCandles(true);
+      
+      try {
+        const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+        // Convert milliseconds back to timeframe string
+        const getTimeframeString = (ms: number): string => {
+          if (ms === 60000) return '1m';
+          if (ms === 300000) return '5m';
+          if (ms === 900000) return '15m';
+          if (ms === 1800000) return '30m';
+          if (ms === 3600000) return '1h';
+          if (ms === 14400000) return '4h';
+          if (ms === 86400000) return '1d';
+          return '1h'; // Default
+        };
+        const timeframe = getTimeframeString(trailingConfig.tfMs);
+        
+        const newManager = new CandleManager(
+          formData.exchange as Exchange,
+          formData.symbol!,
+          instType,
+          timeframe,
+          (candle) => {
+            // Update trailing state when new candle closes
+            const newState = updateOnClose(trailingState, candle, {
+              ...trailingConfig,
+              side: formData.side || 'LONG',
+              roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
+            });
+            setTrailingState(newState);
+          },
+          (error) => {
+            console.error('CandleManager error:', error);
+          }
+        );
+        
+        // Preheat with historical data
+        const requiredCandles = Math.max(trailingConfig.maLen, trailingConfig.atrLen) + 50;
+        await newManager.preheatWithRest(requiredCandles);
+        
+        // Initialize trailing state with current data
+        const candles = newManager.getCandles(requiredCandles);
+        if (candles.length > 0) {
+          let state = { indicators: {} };
+          // Process candles sequentially to build up indicators
+          for (const candle of candles) {
+            state = updateOnClose(state, candle, {
+              ...trailingConfig,
+              side: formData.side || 'LONG',
+              roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
+            });
+          }
+          setTrailingState(state);
+        }
+        
+        setCandleManager(newManager);
+      } catch (error) {
+        console.error('Failed to initialize CandleManager:', error);
+      } finally {
+        setIsInitializingCandles(false);
+      }
+    };
+
+    initializeCandleManager();
+    
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (candleManager) {
+        candleManager.destroy();
+      }
+    };
+  }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode, trailingConfig.tfMs, marketMeta]);
+
+  // Get current price for trailing panel when enabled
+  useEffect(() => {
+    if (!trailingEnabled || !formData.exchange || !formData.symbol) {
+      setCurrentPrice(undefined);
+      return;
+    }
+
+    const fetchPrice = async () => {
+      try {
+        const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+        const price = await getCurrentPrice(formData.exchange as Exchange, formData.symbol!, instType);
+        setCurrentPrice(price);
+      } catch (error) {
+        console.error('Failed to fetch current price for trailing:', error);
+      }
+    };
+
+    fetchPrice();
+    
+    // Update price every 5 seconds when trailing is enabled
+    const interval = setInterval(fetchPrice, 5000);
+    
+    return () => clearInterval(interval);
+  }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData({ [field]: value });
@@ -829,7 +948,7 @@ export function CalculatorForm() {
           enabled={trailingEnabled}
           config={trailingConfig}
           state={trailingState}
-          currentPrice={parseFloat(formData.entryPrice || '0')}
+          currentPrice={currentPrice}
           entryPrice={parseFloat(formData.entryPrice || '0')}
           quantity={result?.qtyRounded ? parseFloat(result.qtyRounded) : undefined}
           tickSize={marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01}
