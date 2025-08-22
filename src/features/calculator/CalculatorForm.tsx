@@ -44,6 +44,11 @@ export function CalculatorForm() {
     updateTrailingConfig,
     trailingState,
     setTrailingState,
+    // 步骤4.3：持久化方法（追加）
+    hydrate,
+    saveTrailing,
+    saveTrailingState,
+    loadTrailingState,
   } = useCalculatorStore();
 
   const { settings } = useSettingsStore();
@@ -84,6 +89,11 @@ export function CalculatorForm() {
       side: formData.side || 'LONG'
     });
   }, [settings, syncWithSettings, formData.side, updateTrailingConfig]);
+
+  // 步骤4.3：初始化时水合持久化数据（追加）
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   // Fetch market metadata when exchange/symbol changes
   useEffect(() => {
@@ -211,6 +221,10 @@ export function CalculatorForm() {
               roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
             });
             setTrailingState(newState);
+            // 步骤4.3：保存trailing状态（追加）
+            if (formData.exchange && formData.symbol) {
+              saveTrailingState(formData.exchange, formData.symbol, trailingConfig.tfMs, newState);
+            }
           },
           (error) => {
             console.error('CandleManager error:', error);
@@ -382,6 +396,10 @@ export function CalculatorForm() {
           }
         };
         setTrailingState(updatedState);
+        // 步骤4.3：保存ATR更新后的trailing状态（追加）
+        if (formData.exchange && formData.symbol) {
+          saveTrailingState(formData.exchange, formData.symbol, trailingConfig.tfMs, updatedState);
+        }
       } catch (error) {
         console.error('Failed to update ATR for trailing:', error);
       }
@@ -1093,7 +1111,11 @@ export function CalculatorForm() {
               type="checkbox"
               id="trailingEnabled"
               checked={trailingEnabled || false}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTrailingEnabled(e.target.checked)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                setTrailingEnabled(e.target.checked);
+                // 步骤4.3：保存trailing配置（追加）
+                saveTrailing();
+              }}
               className="w-4 h-4"
             />
             <Label htmlFor="trailingEnabled" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -1108,7 +1130,10 @@ export function CalculatorForm() {
                   <Label>{t('trailingStrategy')}</Label>
                   <Select
                     value={trailingConfig.strategy}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateTrailingConfig({ strategy: e.target.value as any })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      updateTrailingConfig({ strategy: e.target.value as any });
+                      saveTrailing();
+                    }}
                   >
                     <option value="MA_CROSS_EXIT">{t('maCrossExit')}</option>
                     <option value="MA_BAND_STOP">{t('maBandStop')}</option>
@@ -1119,7 +1144,10 @@ export function CalculatorForm() {
                   <Label>{t('trailingTimeframe')}</Label>
                   <Select
                     value={trailingConfig.tfMs.toString()}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateTrailingConfig({ tfMs: parseInt(e.target.value) })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      updateTrailingConfig({ tfMs: parseInt(e.target.value) });
+                      saveTrailing();
+                    }}
                   >
                     <option value="60000">1m</option>
                     <option value="300000">5m</option>
@@ -1137,7 +1165,10 @@ export function CalculatorForm() {
                   <Label>{t('trailingMAType')}</Label>
                   <Select
                     value={trailingConfig.maType}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateTrailingConfig({ maType: e.target.value as any })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                      updateTrailingConfig({ maType: e.target.value as any });
+                      saveTrailing();
+                    }}
                   >
                     <option value="EMA">{t('ema')}</option>
                     <option value="SMA">{t('sma')}</option>
@@ -1150,7 +1181,10 @@ export function CalculatorForm() {
                     min="1"
                     max="200"
                     value={trailingConfig.maLen}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ maLen: parseInt(e.target.value) })}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      updateTrailingConfig({ maLen: parseInt(e.target.value) });
+                      saveTrailing();
+                    }}
                   />
                 </div>
               </div>
@@ -1164,7 +1198,10 @@ export function CalculatorForm() {
                       min="1"
                       max="50"
                       value={trailingConfig.atrLen}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ atrLen: parseInt(e.target.value) })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        updateTrailingConfig({ atrLen: parseInt(e.target.value) });
+                        saveTrailing();
+                      }}
                     />
                   </div>
                   <div>
@@ -1175,7 +1212,10 @@ export function CalculatorForm() {
                       min="0.1"
                       max="10"
                       value={trailingConfig.k || 2}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ k: parseFloat(e.target.value) })}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        updateTrailingConfig({ k: parseFloat(e.target.value) });
+                        saveTrailing();
+                      }}
                     />
                   </div>
                 </div>
@@ -1185,7 +1225,10 @@ export function CalculatorForm() {
                 <input
                   type="checkbox"
                   checked={trailingConfig.onCloseOnly}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ onCloseOnly: e.target.checked })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    updateTrailingConfig({ onCloseOnly: e.target.checked });
+                    saveTrailing();
+                  }}
                   className="rounded border-gray-300"
                 />
                 <span className="text-sm">{t('trailingOnCloseOnly')}</span>
