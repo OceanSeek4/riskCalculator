@@ -389,6 +389,85 @@ export function SettingsForm() {
           </div>
         </div>
 
+        {/* Take Profit Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+            {t('defaultTakeProfitSettings')}
+          </h3>
+          
+          <div className="space-y-3">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultUseTakeProfit}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultUseTakeProfit', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">{t('defaultUseTakeProfit')}</span>
+            </label>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>{t('defaultTakeProfitMode')}</Label>
+                <Select
+                  value={settings.defaultTakeProfitMode}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                    handleInputChange('defaultTakeProfitMode', e.target.value as 'PRICE' | 'ATR' | 'RR_RATIO')
+                  }
+                >
+                  <option value="PRICE">{t('priceTakeProfit')}</option>
+                  <option value="ATR">{t('atrTakeProfit')}</option>
+                  <option value="RR_RATIO">{t('rrRatioTakeProfit')}</option>
+                </Select>
+              </div>
+              
+              <div>
+                <Label>{t('defaultTakeProfitPrice')}</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={settings.defaultTakeProfitPrice}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultTakeProfitPrice', e.target.value)
+                  }
+                  placeholder={t('takeProfitPricePlaceholder')}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>{t('defaultTakeProfitATRMultiplier')}</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={settings.defaultTakeProfitATRMultiplier}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultTakeProfitATRMultiplier', e.target.value)
+                  }
+                  placeholder="2.0"
+                />
+              </div>
+              
+              <div>
+                <Label>{t('defaultTakeProfitRRRatio')}</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={settings.defaultTakeProfitRRRatio}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultTakeProfitRRRatio', e.target.value)
+                  }
+                  placeholder="2.0"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Risk/Reward Settings */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -518,6 +597,18 @@ export function SettingsForm() {
                 className="rounded border-gray-300"
               />
               <span className="text-sm">{t('showAdvancedOptions')}</span>
+            </label>
+            
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultIncludeFees}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultIncludeFees', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">{t('defaultIncludeFees')}</span>
             </label>
           </div>
         </div>

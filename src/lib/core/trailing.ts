@@ -87,6 +87,29 @@ function updateEmaIncremental(prevEma: number | undefined, newValue: number, mul
 }
 
 /**
+ * Initialize EMA with SMA for better accuracy
+ */
+function initializeEmaWithSma(prices: number[], period: number): number {
+  if (prices.length < period) {
+    return prices[prices.length - 1] || 0;
+  }
+  
+  // Use SMA of first 'period' values as EMA seed
+  const smaWindow = prices.slice(0, period);
+  const sma = smaWindow.reduce((sum, price) => sum + price, 0) / period;
+  
+  // Apply EMA to remaining values
+  const multiplier = 2 / (period + 1);
+  let ema = sma;
+  
+  for (let i = period; i < prices.length; i++) {
+    ema = updateEmaIncremental(ema, prices[i], multiplier);
+  }
+  
+  return ema;
+}
+
+/**
  * Incremental ATR calculation using rolling window
  */
 function updateAtrIncremental(trueRanges: number[], newTrueRange: number, period: number): number {
@@ -260,48 +283,51 @@ export interface ExpectedPnL {
 export function calculateExpectedPnL(
   entryPrice: number,
   qty: number,
-  stopPrice: number | undefined,
+  exitTriggerPrice: number | undefined,
   config: TrailingConfig,
-  fees?: { open: number; close: number }
+  fees?: { open: number; close: number },
+  slippage?: { open: number; close: number }
 ): ExpectedPnL {
   const result: ExpectedPnL = {
     expectedProfits: [],
   };
   
-  // Calculate expected loss
-  if (stopPrice !== undefined) {
-    const lossDiff = Math.abs(entryPrice - stopPrice);
-    result.expectedLoss = lossDiff * qty;
-    
-    if (fees) {
-      result.expectedLoss += (fees.open + fees.close) * entryPrice * qty;
+  // Calculate expected P&L when price reaches exit trigger price and trailing stop activates
+  // This shows the profit/loss when exiting at the exit trigger price with all costs included
+  if (exitTriggerPrice !== undefined) {
+    // Price difference based profit/loss
+    let priceDiff: number;
+    if (config.side === 'LONG') {
+      priceDiff = exitTriggerPrice - entryPrice; // Positive for profit, negative for loss
+    } else {
+      priceDiff = entryPrice - exitTriggerPrice; // Positive for profit, negative for loss
     }
-  }
-  
-  // Calculate expected profits for each R:R ratio
-  if (config.rrTargets && stopPrice !== undefined) {
-    const stopDistance = Math.abs(entryPrice - stopPrice);
     
-    for (const rr of config.rrTargets) {
-      let tpPrice: number;
-      
-      if (config.side === 'LONG') {
-        tpPrice = entryPrice + (rr * stopDistance);
-      } else {
-        tpPrice = entryPrice - (rr * stopDistance);
-      }
-      
-      const profitDiff = Math.abs(tpPrice - entryPrice);
-      let profit = profitDiff * qty;
-      
-      if (fees) {
-        profit -= (fees.open + fees.close) * entryPrice * qty;
-      }
-      
+    let netPnL = priceDiff * qty;
+    
+    // Subtract all trading costs
+    if (fees) {
+      // Opening fees (based on entry price)
+      netPnL -= fees.open * entryPrice * qty;
+      // Closing fees (based on exit trigger price)
+      netPnL -= fees.close * exitTriggerPrice * qty;
+    }
+    
+    if (slippage) {
+      // Opening slippage cost (based on entry price)
+      netPnL -= slippage.open * entryPrice * qty;
+      // Closing slippage cost (based on exit trigger price)
+      netPnL -= slippage.close * exitTriggerPrice * qty;
+    }
+    
+    // Store as expectedLoss if negative, or as a single profit entry if positive
+    if (netPnL < 0) {
+      result.expectedLoss = Math.abs(netPnL);
+    } else {
       result.expectedProfits.push({
-        rr,
-        profit,
-        price: roundToTick(tpPrice, config.roundTick),
+        rr: 0, // Special marker for exit trigger P&L
+        profit: netPnL,
+        price: exitTriggerPrice,
       });
     }
   }

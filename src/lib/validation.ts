@@ -16,6 +16,7 @@ export const calculatorFormSchema = z.object({
   stopMode: z.enum(['PRICE', 'ATR']),
   stopPrice: z.string().optional(),
   
+  
   // ATR settings
   atrPeriod: z.number().min(1).max(50).default(14),
   atrTimeframe: z.string().default('1h'),
@@ -23,11 +24,10 @@ export const calculatorFormSchema = z.object({
   
   // Take profit settings
   useTakeProfit: z.boolean().default(false),
-  takeProfitMode: z.enum(['PRICE', 'ATR', 'MA', 'EMA']).optional(),
+  takeProfitMode: z.enum(['PRICE', 'ATR', 'RR_RATIO']).optional(),
   takeProfitPrice: z.string().optional(),
   takeProfitATRMultiplier: z.string().optional(),
-  takeProfitMAPeriod: z.string().optional(),
-  takeProfitMATimeframe: z.string().optional(),
+  takeProfitRRRatio: z.string().optional(),
   
   // Risk settings
   riskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
@@ -62,7 +62,7 @@ export const settingsSchema = z.object({
   
   // Default modes
   defaultStopMode: z.enum(['PRICE', 'ATR']).default('PRICE'),
-  defaultTakeProfitMode: z.enum(['PRICE', 'ATR', 'MA', 'EMA']).default('PRICE'),
+  defaultTakeProfitMode: z.enum(['PRICE', 'ATR', 'RR_RATIO']).default('PRICE'),
   defaultUseTakeProfit: z.boolean().default(false),
   defaultRiskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
   defaultOrderType: z.enum(['MARKET', 'LIMIT']).default('MARKET'),
@@ -77,16 +77,18 @@ export const settingsSchema = z.object({
   defaultFeeOpen: z.string().default('0.0004'),
   defaultFeeClose: z.string().default('0.0004'),
   defaultSlippage: z.string().default('0.0005'),
+  defaultIncludeFees: z.boolean().default(false),
   
   // ATR settings
   defaultAtrPeriod: z.number().default(14),
   defaultAtrTimeframe: z.string().default('1h'),
   defaultAtrMultiplier: z.string().default('2'),
   
+  
   // Take profit defaults
+  defaultTakeProfitPrice: z.string().default(''),
   defaultTakeProfitATRMultiplier: z.string().default('2'),
-  defaultTakeProfitMAPeriod: z.string().default('20'),
-  defaultTakeProfitMATimeframe: z.string().default('1h'),
+  defaultTakeProfitRRRatio: z.string().default('2'),
   
   // Risk/Reward ratios
   rrRatios: z.array(z.number()).default([1, 1.5, 2]),

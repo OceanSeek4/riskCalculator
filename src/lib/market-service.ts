@@ -92,6 +92,59 @@ export async function getATRValue(
   }
 }
 
+// MA calculation functions
+function calculateMA(prices: number[], period: number): number {
+  const recentPrices = prices.slice(-period);
+  const sum = recentPrices.reduce((acc, price) => acc + price, 0);
+  return sum / period;
+}
+
+function calculateEMA(prices: number[], period: number): number {
+  const multiplier = 2 / (period + 1);
+  let ema = prices[0];
+  
+  for (let i = 1; i < prices.length; i++) {
+    ema = (prices[i] * multiplier) + (ema * (1 - multiplier));
+  }
+  
+  return ema;
+}
+
+// 获取移动平均线值
+export async function getMAValue(
+  exchange: Exchange,
+  symbol: string,
+  timeframe: string,
+  period: number = 20,
+  maType: 'MA' | 'EMA' = 'MA',
+  instType: InstType = 'SPOT'
+): Promise<number> {
+  try {
+    // 获取足够的历史数据
+    const klineData = await getOHLCVData(exchange, symbol, timeframe, period + 20, instType);
+    
+    if (klineData.length < period) {
+      throw new Error(`Insufficient data for MA calculation. Need at least ${period} candles, got ${klineData.length}`);
+    }
+    
+    // 提取收盘价数组
+    const closePrices = klineData.map(k => k.c);
+    
+    // 根据类型计算MA
+    let ma: number;
+    if (maType === 'EMA') {
+      ma = calculateEMA(closePrices, period);
+    } else {
+      ma = calculateMA(closePrices, period);
+    }
+    
+    return ma;
+  } catch (error) {
+    console.error('Error calculating MA:', error);
+    throw new Error(`Failed to calculate ${maType} for ${symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 // 获取市场元数据
 export async function getMarketMeta(
   exchange: Exchange,

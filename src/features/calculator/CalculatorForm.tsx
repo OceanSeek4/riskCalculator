@@ -8,11 +8,11 @@ import { RefreshCw, AlertCircle, Bookmark, Calculator } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
 import { validateNumberString, validateStopPrice } from '@/lib/validation';
-import { getCurrentPrice, getATRValue, formatPrice, checkSymbolSupport, getSupportedTimeframes, getMarketMeta } from '@/lib/market-service';
+import { getCurrentPrice, getATRValue, getMAValue, formatPrice, checkSymbolSupport, getSupportedTimeframes, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
 import { TrailingPanel } from './TrailingPanel';
-import { calculateExpectedPnL, updateOnClose } from '@/lib/core';
+import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/core';
 import { CandleManager, timeframeToMs } from '@/lib/candles';
 export function CalculatorForm() {
   const {
@@ -23,14 +23,20 @@ export function CalculatorForm() {
     syncWithSettings,
     currentATR,
     setCurrentATR,
+    currentMA,
+    setCurrentMA,
     isCalculating,
     setIsCalculating,
     isFetchingATR,
     setIsFetchingATR,
+    isFetchingMA,
+    setIsFetchingMA,
     calculationError,
     setCalculationError,
     atrError,
     setATRError,
+    maError,
+    setMAError,
     // Trailing exits
     trailingEnabled,
     setTrailingEnabled,
@@ -54,11 +60,30 @@ export function CalculatorForm() {
   const [candleManager, setCandleManager] = useState<CandleManager | null>(null);
   const [isInitializingCandles, setIsInitializingCandles] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined);
+  const [realTimePrice, setRealTimePrice] = useState<string>('');
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
+  const [priceTimer, setPriceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [priceChange, setPriceChange] = useState<'up' | 'down' | 'same' | null>(null);
+  
+  // Reset price change indicator after 2 seconds
+  useEffect(() => {
+    if (priceChange) {
+      const timeout = setTimeout(() => {
+        setPriceChange(null);
+      }, 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [priceChange]);
 
   // Sync calculator with settings on component mount and settings changes
   useEffect(() => {
     syncWithSettings(settings);
-  }, [settings, syncWithSettings]);
+    // Sync trailing config with settings RR ratios
+    updateTrailingConfig({ 
+      rrTargets: settings.rrRatios,
+      side: formData.side || 'LONG'
+    });
+  }, [settings, syncWithSettings, formData.side, updateTrailingConfig]);
 
   // Fetch market metadata when exchange/symbol changes
   useEffect(() => {
@@ -95,9 +120,55 @@ export function CalculatorForm() {
     }
   }, [formData.exchange, formData.symbol, formData.atrTimeframe, formData.stopMode, marketMeta, settings.autoFetchATR]);
 
+  // Auto-fetch price for market orders when exchange/symbol changes
+  useEffect(() => {
+    if (formData.orderType === 'MARKET' && 
+        formData.exchange && 
+        formData.symbol && 
+        formData.contractMode) {
+      fetchCurrentPrice();
+    }
+  }, [formData.exchange, formData.symbol, formData.contractMode, formData.orderType]);
+
+  // Real-time price updates for market orders
+  useEffect(() => {
+    // Clear existing timer
+    if (priceTimer) {
+      clearInterval(priceTimer);
+      setPriceTimer(null);
+    }
+
+    if (formData.orderType === 'MARKET' && 
+        formData.exchange && 
+        formData.symbol && 
+        formData.contractMode) {
+      // Initial fetch
+      fetchRealTimePrice();
+      
+      // Set up interval for real-time updates (every 3 seconds)
+      const timer = setInterval(() => {
+        fetchRealTimePrice();
+      }, 3000);
+      
+      setPriceTimer(timer);
+      
+      return () => {
+        clearInterval(timer);
+        setPriceTimer(null);
+      };
+    }
+
+    return () => {
+      if (priceTimer) {
+        clearInterval(priceTimer);
+        setPriceTimer(null);
+      }
+    };
+  }, [formData.orderType, formData.exchange, formData.symbol, formData.contractMode]);
+
   // Initialize CandleManager for trailing exits when enabled
   useEffect(() => {
-    if (!trailingEnabled || !formData.exchange || !formData.symbol) {
+    if (!trailingEnabled || !formData.exchange || !formData.symbol || !marketMeta) {
       if (candleManager) {
         candleManager.destroy();
         setCandleManager(null);
@@ -147,21 +218,86 @@ export function CalculatorForm() {
         );
         
         // Preheat with historical data
-        const requiredCandles = Math.max(trailingConfig.maLen, trailingConfig.atrLen) + 50;
+        // For daily and higher timeframes, we need more data for proper EMA initialization
+        const timeframeMultiplier = trailingConfig.tfMs >= 86400000 ? 3 : 2; // 3x for daily+, 2x for others
+        const requiredCandles = Math.max(trailingConfig.maLen, trailingConfig.atrLen) * timeframeMultiplier + 100;
         await newManager.preheatWithRest(requiredCandles);
         
         // Initialize trailing state with current data
         const candles = newManager.getCandles(requiredCandles);
         if (candles.length > 0) {
           let state = { indicators: {} };
-          // Process candles sequentially to build up indicators
-          for (const candle of candles) {
-            state = updateOnClose(state, candle, {
-              ...trailingConfig,
-              side: formData.side || 'LONG',
-              roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
-            });
+          
+          // Better initialization for EMA: use SMA as seed
+          if (trailingConfig.maType === 'EMA' && candles.length >= trailingConfig.maLen) {
+            // Extract all close prices
+            const closePrices = candles.map(c => c.c);
+            
+            // Initialize EMA with SMA seed
+            const multiplier = 2 / (trailingConfig.maLen + 1);
+            const smaWindow = closePrices.slice(0, trailingConfig.maLen);
+            const sma = smaWindow.reduce((sum, price) => sum + price, 0) / trailingConfig.maLen;
+            
+            state.indicators = {
+              ...state.indicators,
+              emaMultiplier: multiplier,
+              ma: sma
+            };
+            
+            // Process remaining candles
+            for (let i = trailingConfig.maLen; i < candles.length; i++) {
+              state = updateOnClose(state, candles[i], {
+                ...trailingConfig,
+                side: formData.side || 'LONG',
+                roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
+              });
+            }
+          } else {
+            // Process candles sequentially to build up MA indicators (SMA or insufficient data)
+            for (const candle of candles) {
+              state = updateOnClose(state, candle, {
+                ...trailingConfig,
+                side: formData.side || 'LONG',
+                roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
+              });
+            }
           }
+          
+          // Get ATR directly from exchange API
+          try {
+            const getTimeframeString = (ms: number): string => {
+              if (ms === 60000) return '1m';
+              if (ms === 300000) return '5m';
+              if (ms === 900000) return '15m';
+              if (ms === 1800000) return '30m';
+              if (ms === 3600000) return '1h';
+              if (ms === 14400000) return '4h';
+              if (ms === 86400000) return '1d';
+              return '1h';
+            };
+            const atrTimeframe = getTimeframeString(trailingConfig.tfMs);
+            
+            const atr = await getATRValue(
+              formData.exchange as Exchange,
+              formData.symbol!,
+              atrTimeframe,
+              trailingConfig.atrLen,
+              instType
+            );
+            
+            // Update state with ATR from exchange
+            state = {
+              ...state,
+              indicators: {
+                ...state.indicators,
+                atr: atr
+              }
+            };
+          } catch (error) {
+            console.error('Failed to fetch ATR for trailing:', error);
+          }
+          
+          console.log('Initialized trailing state:', state);
           setTrailingState(state);
         }
         
@@ -181,7 +317,7 @@ export function CalculatorForm() {
         candleManager.destroy();
       }
     };
-  }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode, trailingConfig.tfMs, marketMeta]);
+  }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode, trailingConfig.tfMs, trailingConfig.maLen, trailingConfig.atrLen, trailingConfig.strategy, trailingConfig.maType, marketMeta]);
 
   // Get current price for trailing panel when enabled
   useEffect(() => {
@@ -208,12 +344,76 @@ export function CalculatorForm() {
     return () => clearInterval(interval);
   }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode]);
 
+  // Update ATR separately every 30 seconds
+  useEffect(() => {
+    if (!trailingEnabled || !formData.exchange || !formData.symbol) {
+      return;
+    }
+
+    const updateATR = async () => {
+      try {
+        const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+        const getTimeframeString = (ms: number): string => {
+          if (ms === 60000) return '1m';
+          if (ms === 300000) return '5m';
+          if (ms === 900000) return '15m';
+          if (ms === 1800000) return '30m';
+          if (ms === 3600000) return '1h';
+          if (ms === 14400000) return '4h';
+          if (ms === 86400000) return '1d';
+          return '1h';
+        };
+        const atrTimeframe = getTimeframeString(trailingConfig.tfMs);
+        
+        const atr = await getATRValue(
+          formData.exchange as Exchange,
+          formData.symbol!,
+          atrTimeframe,
+          trailingConfig.atrLen,
+          instType
+        );
+        
+        // Update trailing state with new ATR
+        const updatedState = {
+          ...trailingState,
+          indicators: {
+            ...trailingState.indicators,
+            atr: atr
+          }
+        };
+        setTrailingState(updatedState);
+      } catch (error) {
+        console.error('Failed to update ATR for trailing:', error);
+      }
+    };
+
+    updateATR();
+    
+    // Update ATR every 30 seconds
+    const interval = setInterval(updateATR, 30000);
+    
+    return () => clearInterval(interval);
+  }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode, trailingConfig.tfMs, trailingConfig.atrLen]);
+
   const handleInputChange = (field: string, value: any) => {
     setFormData({ [field]: value });
     
     // Clear field-specific error when user starts typing
     if (formErrors[field]) {
       setFormErrors(prev => ({ ...prev, [field]: '' }));
+    }
+
+    // Auto-fetch price for market orders when relevant fields change
+    if (formData.orderType === 'MARKET' || (field === 'orderType' && value === 'MARKET')) {
+      if (field === 'orderType' || field === 'exchange' || field === 'symbol' || field === 'contractMode') {
+        // Use setTimeout to ensure the state update is processed first
+        setTimeout(() => {
+          const currentFormData = { ...formData, [field]: value };
+          if (currentFormData.exchange && currentFormData.symbol && currentFormData.contractMode) {
+            fetchCurrentPrice();
+          }
+        }, 0);
+      }
     }
   };
 
@@ -257,6 +457,7 @@ export function CalculatorForm() {
       if (multiplierError) errors.atrMultiplier = multiplierError;
     }
     
+    
     // Take profit validation
     if (formData.useTakeProfit) {
       if (formData.takeProfitMode === 'PRICE') {
@@ -280,9 +481,9 @@ export function CalculatorForm() {
           const atrMultiplierError = validateNumberString(formData.takeProfitATRMultiplier || '', 'Take profit ATR multiplier');
           if (atrMultiplierError) errors.takeProfitATRMultiplier = atrMultiplierError;
         }
-      } else if (formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') {
-        const periodError = validateNumberString(formData.takeProfitMAPeriod || '', 'MA period');
-        if (periodError) errors.takeProfitMAPeriod = periodError;
+      } else if (formData.takeProfitMode === 'RR_RATIO') {
+        const rrRatioError = validateNumberString(formData.takeProfitRRRatio || '', 'Risk/Reward ratio');
+        if (rrRatioError) errors.takeProfitRRRatio = rrRatioError;
       }
     }
     
@@ -330,6 +531,7 @@ export function CalculatorForm() {
     }
   };
 
+
   // 获取当前价格
   const fetchCurrentPrice = async () => {
     if (!formData.exchange || !formData.symbol) return;
@@ -352,6 +554,47 @@ export function CalculatorForm() {
       setPriceError(error instanceof Error ? error.message : t('failedToFetchPrice'));
     } finally {
       setIsFetchingPrice(false);
+    }
+  };
+
+  const fetchRealTimePrice = async () => {
+    if (!formData.exchange || !formData.symbol || !formData.contractMode) return;
+
+    try {
+      const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+      const price = await getCurrentPrice(
+        formData.exchange as Exchange,
+        formData.symbol,
+        instType
+      );
+
+      const newPrice = price.toString();
+      const oldPrice = parseFloat(realTimePrice || '0');
+      const currentPriceNum = parseFloat(newPrice);
+      
+      // Determine price change direction
+      if (oldPrice > 0) {
+        if (currentPriceNum > oldPrice) {
+          setPriceChange('up');
+        } else if (currentPriceNum < oldPrice) {
+          setPriceChange('down');
+        } else {
+          setPriceChange('same');
+        }
+      } else {
+        setPriceChange(null);
+      }
+
+      setRealTimePrice(newPrice);
+      setLastPriceUpdate(new Date());
+      // Only update form data if it's a market order
+      if (formData.orderType === 'MARKET') {
+        setFormData({ entryPrice: newPrice });
+      }
+      setPriceError('');
+    } catch (error) {
+      console.error('Failed to fetch real-time price:', error);
+      setPriceError(error instanceof Error ? error.message : t('failedToFetchPrice'));
     }
   };
 
@@ -385,10 +628,29 @@ export function CalculatorForm() {
     setIsCalculating(true);
     setCalculationError(null);
     
+    // For market orders, fetch the latest price and lock it for calculation
+    let lockedEntryPrice = formData.entryPrice!;
+    if (formData.orderType === 'MARKET') {
+      try {
+        // Fetch the latest real-time price for calculation
+        const instType: any = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+        const latestPrice = await getCurrentPrice(
+          formData.exchange as any,
+          formData.symbol!,
+          instType
+        );
+        lockedEntryPrice = latestPrice.toString();
+        console.log('Market order: Using locked entry price for calculation:', lockedEntryPrice);
+      } catch (error) {
+        console.warn('Failed to fetch latest price before calculation, using current displayed price');
+        lockedEntryPrice = formData.entryPrice!;
+      }
+    }
+    
     try {
       const input = {
         side: formData.side!,
-        entryPrice: formData.entryPrice!,
+        entryPrice: lockedEntryPrice,
         stopPrice: formData.stopMode === 'PRICE' ? formData.stopPrice : undefined,
         atr: formData.stopMode === 'ATR' ? currentATR || undefined : undefined,
         atrMultiplier: formData.stopMode === 'ATR' ? formData.atrMultiplier : undefined,
@@ -398,8 +660,7 @@ export function CalculatorForm() {
         takeProfitMode: formData.takeProfitMode,
         takeProfitPrice: formData.takeProfitMode === 'PRICE' ? formData.takeProfitPrice : undefined,
         takeProfitATRMultiplier: formData.takeProfitMode === 'ATR' ? formData.takeProfitATRMultiplier : undefined,
-        takeProfitMAPeriod: (formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') ? formData.takeProfitMAPeriod : undefined,
-        takeProfitMATimeframe: (formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') ? formData.takeProfitMATimeframe : undefined,
+        takeProfitRRRatio: formData.takeProfitMode === 'RR_RATIO' ? formData.takeProfitRRRatio : undefined,
         riskMode: formData.riskMode || 'FIXED_USDT',
         riskUSDT: formData.riskMode === 'FIXED_USDT' ? formData.riskAmount : undefined,
         accountEquity: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.accountEquity : undefined,
@@ -556,23 +817,49 @@ export function CalculatorForm() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>{formData.orderType === 'LIMIT' ? t('limitPrice') : t('entryPrice')}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={fetchCurrentPrice}
-                disabled={isFetchingPrice || !formData.exchange || !formData.symbol}
-                className="h-6 px-2 text-xs"
-              >
-                {isFetchingPrice ? (
-                  <>
-                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                    {t('fetchingPrice')}
-                  </>
-                ) : (
-                  t('getCurrentPrice')
-                )}
-              </Button>
+              {formData.orderType === 'LIMIT' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchCurrentPrice}
+                  disabled={isFetchingPrice || !formData.exchange || !formData.symbol}
+                  className="h-6 px-2 text-xs"
+                >
+                  {isFetchingPrice ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                      {t('fetchingPrice')}
+                    </>
+                  ) : (
+                    t('getCurrentPrice')
+                  )}
+                </Button>
+              )}
+              {formData.orderType === 'MARKET' && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex items-center">
+                    <RefreshCw className="w-3 h-3 inline animate-spin mr-1" />
+                    {t('realTimePrice')}
+                  </span>
+                  {priceChange && (
+                    <span className={`flex items-center gap-1 animate-pulse ${
+                      priceChange === 'up' ? 'text-green-600 font-semibold' : 
+                      priceChange === 'down' ? 'text-red-600 font-semibold' : 
+                      'text-gray-500'
+                    }`} style={{ animationDuration: '1s', animationIterationCount: '1' }}>
+                      {priceChange === 'up' && '↗'}
+                      {priceChange === 'down' && '↘'}
+                      {priceChange === 'same' && '→'}
+                    </span>
+                  )}
+                  {lastPriceUpdate && (
+                    <span className="text-green-600">
+                      {lastPriceUpdate.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <Input
               type="number"
@@ -580,7 +867,17 @@ export function CalculatorForm() {
               value={formData.entryPrice || ''}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('entryPrice', e.target.value)}
               placeholder={formData.orderType === 'LIMIT' ? t('enterLimitPrice') : t('enterExpectedEntryPrice')}
-              className={formErrors.entryPrice ? 'border-red-500' : ''}
+              className={`${formErrors.entryPrice ? 'border-red-500' : ''} ${
+                formData.orderType === 'MARKET' 
+                  ? `cursor-not-allowed ${
+                      priceChange === 'up' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' :
+                      priceChange === 'down' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' :
+                      'bg-muted'
+                    } transition-colors duration-500`
+                  : ''
+              }`}
+              disabled={formData.orderType === 'MARKET'}
+              readOnly={formData.orderType === 'MARKET'}
             />
             {formErrors.entryPrice && (
               <p className="text-sm text-red-500 mt-1">{formErrors.entryPrice}</p>
@@ -590,7 +887,7 @@ export function CalculatorForm() {
             )}
             {formData.orderType === 'MARKET' && (
               <p className="text-xs text-muted-foreground mt-1">
-                {t('marketOrderNote')}
+                📈 {t('marketOrderNote')} - {t('realTimePriceUpdated')}
               </p>
             )}
           </div>
@@ -696,6 +993,7 @@ export function CalculatorForm() {
               )}
             </div>
           )}
+
         </div>
 
         {/* Take Profit Settings */}
@@ -723,8 +1021,7 @@ export function CalculatorForm() {
                 >
                   <option value="PRICE">{t('priceTakeProfit')}</option>
                   <option value="ATR">{t('atrTakeProfit')}</option>
-                  <option value="MA">{t('maTakeProfit')}</option>
-                  <option value="EMA">{t('emaTakeProfit')}</option>
+                  <option value="RR_RATIO">{t('rrRatioTakeProfit')}</option>
                 </Select>
               </div>
 
@@ -765,39 +1062,138 @@ export function CalculatorForm() {
                 </div>
               )}
 
-              {(formData.takeProfitMode === 'MA' || formData.takeProfitMode === 'EMA') && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label>{t('takeProfitMAPeriod')}</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="200"
-                        value={formData.takeProfitMAPeriod || 20}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('takeProfitMAPeriod', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>{t('takeProfitMATimeframe')}</Label>
-                      <Select
-                        value={formData.takeProfitMATimeframe || '1h'}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('takeProfitMATimeframe', e.target.value)}
-                      >
-                        {supportedIntervals.map((interval: string) => (
-                          <option key={interval} value={interval}>{interval}</option>
-                        ))}
-                      </Select>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {formData.takeProfitMode === 'MA' 
-                      ? t('movingAverageExplanation')
-                      : t('emaExplanation')
-                    }
+              {formData.takeProfitMode === 'RR_RATIO' && (
+                <div>
+                  <Label>{t('takeProfitRRRatio')}</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={formData.takeProfitRRRatio || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('takeProfitRRRatio', e.target.value)}
+                    placeholder="2.0"
+                    className={formErrors.takeProfitRRRatio ? 'border-red-500' : ''}
+                  />
+                  {formErrors.takeProfitRRRatio && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.takeProfitRRRatio}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('rrRatioTakeProfitDescription')}
                   </p>
                 </div>
               )}
+
+            </div>
+          )}
+        </div>
+
+        {/* Trailing Stop Settings */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="trailingEnabled"
+              checked={trailingEnabled || false}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTrailingEnabled(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <Label htmlFor="trailingEnabled" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              {t('trailingStopSettings')}
+            </Label>
+          </div>
+          
+          {trailingEnabled && (
+            <div className="space-y-4 pl-6 border-l-2 border-blue-200 dark:border-blue-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('trailingStrategy')}</Label>
+                  <Select
+                    value={trailingConfig.strategy}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateTrailingConfig({ strategy: e.target.value as any })}
+                  >
+                    <option value="MA_CROSS_EXIT">{t('maCrossExit')}</option>
+                    <option value="MA_BAND_STOP">{t('maBandStop')}</option>
+                    <option value="MA_CHANDELIER">{t('maChandelier')}</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label>{t('trailingTimeframe')}</Label>
+                  <Select
+                    value={trailingConfig.tfMs.toString()}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateTrailingConfig({ tfMs: parseInt(e.target.value) })}
+                  >
+                    <option value="60000">1m</option>
+                    <option value="300000">5m</option>
+                    <option value="900000">15m</option>
+                    <option value="1800000">30m</option>
+                    <option value="3600000">1h</option>
+                    <option value="14400000">4h</option>
+                    <option value="86400000">1d</option>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label>{t('trailingMAType')}</Label>
+                  <Select
+                    value={trailingConfig.maType}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateTrailingConfig({ maType: e.target.value as any })}
+                  >
+                    <option value="EMA">{t('ema')}</option>
+                    <option value="SMA">{t('sma')}</option>
+                  </Select>
+                </div>
+                <div>
+                  <Label>{t('trailingMAPeriod')}</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={trailingConfig.maLen}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ maLen: parseInt(e.target.value) })}
+                  />
+                </div>
+              </div>
+              
+              {(trailingConfig.strategy === 'MA_BAND_STOP' || trailingConfig.strategy === 'MA_CHANDELIER') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t('trailingATRPeriod')}</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={trailingConfig.atrLen}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ atrLen: parseInt(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('trailingATRMultiplier')}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="10"
+                      value={trailingConfig.k || 2}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ k: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={trailingConfig.onCloseOnly}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTrailingConfig({ onCloseOnly: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm">{t('trailingOnCloseOnly')}</span>
+              </label>
+              
+              <p className="text-xs text-muted-foreground">
+                {t('trailingExplanation')}
+              </p>
             </div>
           )}
         </div>
@@ -942,40 +1338,6 @@ export function CalculatorForm() {
             )}
           </div>
         )}
-
-        {/* Trailing Exits */}
-        <TrailingPanel
-          enabled={trailingEnabled}
-          config={trailingConfig}
-          state={trailingState}
-          currentPrice={currentPrice}
-          entryPrice={parseFloat(formData.entryPrice || '0')}
-          quantity={result?.qtyRounded ? parseFloat(result.qtyRounded) : undefined}
-          tickSize={marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01}
-          fees={formData.includeFees ? {
-            open: parseFloat(formData.feeOpen || '0'),
-            close: parseFloat(formData.feeClose || '0')
-          } : undefined}
-          onConfigChange={(config) => {
-            updateTrailingConfig({
-              ...config,
-              side: formData.side || 'LONG',
-              roundTick: marketMeta?.tickSize ? parseFloat(marketMeta.tickSize) : 0.01,
-            });
-          }}
-          onEnabledChange={setTrailingEnabled}
-          expectedPnL={trailingEnabled && trailingState.stop ? calculateExpectedPnL(
-            parseFloat(formData.entryPrice || '0'),
-            result?.qtyRounded ? parseFloat(result.qtyRounded) : 0,
-            trailingState.stop,
-            trailingConfig,
-            formData.includeFees ? {
-              open: parseFloat(formData.feeOpen || '0'),
-              close: parseFloat(formData.feeClose || '0')
-            } : undefined
-          ) : undefined}
-          isInitializing={isInitializingCandles}
-        />
 
         {/* Calculate Button */}
         <Button

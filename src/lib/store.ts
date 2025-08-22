@@ -19,12 +19,18 @@ interface CalculatorState {
   currentATR: string | null;
   setCurrentATR: (atr: string | null) => void;
   
+  currentMA: string | null;
+  setCurrentMA: (ma: string | null) => void;
+  
   // Loading states
   isCalculating: boolean;
   setIsCalculating: (loading: boolean) => void;
   
   isFetchingATR: boolean;
   setIsFetchingATR: (loading: boolean) => void;
+  
+  isFetchingMA: boolean;
+  setIsFetchingMA: (loading: boolean) => void;
   
   isFetchingMarketData: boolean;
   setIsFetchingMarketData: (loading: boolean) => void;
@@ -38,6 +44,9 @@ interface CalculatorState {
   
   atrError: string | null;
   setATRError: (error: string | null) => void;
+  
+  maError: string | null;
+  setMAError: (error: string | null) => void;
   
   // Trailing exits state
   trailingEnabled: boolean;
@@ -85,7 +94,6 @@ const defaultFormData: Partial<CalculatorFormData> = {
   leverage: 10,
   atrPeriod: 14,
   atrTimeframe: '1h',
-  includeFees: false,
   feeOpen: '0.0004',
   feeClose: '0.0004',
   slippage: '0.0005',
@@ -130,12 +138,13 @@ const defaultSettings: SettingsData = {
   defaultFeeOpen: '0.0004',
   defaultFeeClose: '0.0004',
   defaultSlippage: '0.0005',
+  defaultIncludeFees: false,
   defaultAtrPeriod: 14,
   defaultAtrTimeframe: '1h',
   defaultAtrMultiplier: '2',
+  defaultTakeProfitPrice: '',
   defaultTakeProfitATRMultiplier: '2',
-  defaultTakeProfitMAPeriod: '20',
-  defaultTakeProfitMATimeframe: '1h',
+  defaultTakeProfitRRRatio: '2',
   rrRatios: [1, 1.5, 2],
   theme: 'system',
   language: 'en',
@@ -160,9 +169,9 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
       stopMode: settings.defaultStopMode,
       useTakeProfit: settings.defaultUseTakeProfit,
       takeProfitMode: settings.defaultTakeProfitMode,
+      takeProfitPrice: settings.defaultTakeProfitPrice,
       takeProfitATRMultiplier: settings.defaultTakeProfitATRMultiplier,
-      takeProfitMAPeriod: settings.defaultTakeProfitMAPeriod,
-      takeProfitMATimeframe: settings.defaultTakeProfitMATimeframe,
+      takeProfitRRRatio: settings.defaultTakeProfitRRRatio,
       riskMode: settings.defaultRiskMode,
       orderType: settings.defaultOrderType,
       leverage: settings.defaultLeverage,
@@ -172,6 +181,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
       atrPeriod: settings.defaultAtrPeriod,
       atrTimeframe: settings.defaultAtrTimeframe,
       atrMultiplier: settings.defaultAtrMultiplier,
+      includeFees: settings.defaultIncludeFees,
       feeOpen: settings.defaultFeeOpen,
       feeClose: settings.defaultFeeClose,
       slippage: settings.defaultSlippage,
@@ -186,12 +196,18 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   currentATR: null,
   setCurrentATR: (atr) => set({ currentATR: atr }),
   
+  currentMA: null,
+  setCurrentMA: (ma) => set({ currentMA: ma }),
+  
   // Loading states
   isCalculating: false,
   setIsCalculating: (loading) => set({ isCalculating: loading }),
   
   isFetchingATR: false,
   setIsFetchingATR: (loading) => set({ isFetchingATR: loading }),
+  
+  isFetchingMA: false,
+  setIsFetchingMA: (loading) => set({ isFetchingMA: loading }),
   
   isFetchingMarketData: false,
   setIsFetchingMarketData: (loading) => set({ isFetchingMarketData: loading }),
@@ -205,6 +221,9 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   
   atrError: null,
   setATRError: (error) => set({ atrError: error }),
+  
+  maError: null,
+  setMAError: (error) => set({ maError: error }),
   
   // Trailing exits state
   trailingEnabled: false,

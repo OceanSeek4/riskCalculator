@@ -1,12 +1,50 @@
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Copy, AlertTriangle, TrendingUp, DollarSign, Calculator, Target } from 'lucide-react';
 import { useCalculatorStore } from '@/lib/store';
 import { useTranslation } from 'react-i18next';
+import { calculateExpectedPnL } from '@/lib/core';
+import { getCurrentPrice } from '@/lib/market-service';
+import type { Exchange, InstType } from '@/lib/adapters';
 
 export function ResultCard() {
-  const { result } = useCalculatorStore();
+  const { 
+    result, 
+    formData,
+    trailingEnabled,
+    trailingConfig,
+    trailingState,
+  } = useCalculatorStore();
+  
+  // Get current price from CalculatorForm's state if available
+  const [currentPrice, setCurrentPrice] = React.useState<number | undefined>(undefined);
   const { t } = useTranslation();
+  
+  // Fetch current price when trailing is enabled
+  React.useEffect(() => {
+    if (!trailingEnabled || !formData.exchange || !formData.symbol) {
+      setCurrentPrice(undefined);
+      return;
+    }
+
+    const fetchPrice = async () => {
+      try {
+        const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+        const price = await getCurrentPrice(formData.exchange as Exchange, formData.symbol!, instType);
+        setCurrentPrice(price);
+      } catch (error) {
+        console.error('Failed to fetch current price for trailing results:', error);
+      }
+    };
+
+    fetchPrice();
+    
+    // Update price every 5 seconds when trailing is enabled
+    const interval = setInterval(fetchPrice, 5000);
+    
+    return () => clearInterval(interval);
+  }, [trailingEnabled, formData.exchange, formData.symbol, formData.contractMode]);
 
   const generateLocalizedOrderSummary = (result: any) => {
     if (!result) return '';
@@ -155,6 +193,74 @@ export function ResultCard() {
             <p className="text-xl font-bold font-mono text-red-600">${result.stopPriceFormatted}</p>
           </div>
 
+          {/* Stop Loss Risk */}
+          {result.stopLossRisk && (
+            <div 
+              className="p-4 bg-red-100 dark:bg-red-900 rounded-lg border border-red-300 dark:border-red-700 animate-in slide-in-from-bottom-3 duration-600 hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200 cursor-pointer"
+              onClick={() => handleCopyValue(result.stopLossRisk || '0', 'Stop Loss Risk')}
+              title={t('clickToCopy')}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-4 h-4 text-red-700">⚠️</div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">{t('stopLossRisk')}</p>
+              </div>
+              <p className="text-xl font-bold font-mono text-red-700 dark:text-red-300 mb-2">
+                ${result.stopLossRiskFormatted || parseFloat(result.stopLossRisk).toLocaleString()}
+              </p>
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {t('maxPotentialLoss')} {result.includeFees ? `(${t('includesFees')})` : ''}
+              </p>
+              {/* Risk Calculation Verification */}
+              {result.actualRiskAmount && result.riskBreakdown && (
+                <div className="mt-2 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950 p-3 rounded border border-red-200 dark:border-red-800">
+                  <div className="flex justify-between font-medium mb-2">
+                    <span>实际计算:</span>
+                    <span className="font-mono">${result.actualRiskAmountFormatted}</span>
+                  </div>
+                  
+                  <div className="space-y-1 text-xs">
+                    {/* 价格风险 */}
+                    <div className="flex justify-between">
+                      <span>价格风险 (数量×点差):</span>
+                      <span className="font-mono">${result.riskBreakdown.priceRiskFormatted}</span>
+                    </div>
+                    
+                    {/* 开仓手续费 */}
+                    {result.includeFees && parseFloat(result.riskBreakdown.openFeeAmount) > 0 && (
+                      <div className="flex justify-between">
+                        <span>开仓手续费:</span>
+                        <span className="font-mono">${result.riskBreakdown.openFeeAmountFormatted}</span>
+                      </div>
+                    )}
+                    
+                    {/* 平仓手续费 */}
+                    {result.includeFees && parseFloat(result.riskBreakdown.closeFeeAmount) > 0 && (
+                      <div className="flex justify-between">
+                        <span>平仓手续费:</span>
+                        <span className="font-mono">${result.riskBreakdown.closeFeeAmountFormatted}</span>
+                      </div>
+                    )}
+                    
+                    {/* 滑点成本 */}
+                    {result.includeFees && result.riskBreakdown.slippageAmount && parseFloat(result.riskBreakdown.slippageAmount) > 0 && (
+                      <div className="flex justify-between">
+                        <span>滑点成本:</span>
+                        <span className="font-mono">${result.riskBreakdown.slippageAmountFormatted}</span>
+                      </div>
+                    )}
+                    
+                    <div className="border-t border-red-300 dark:border-red-700 pt-1 mt-2">
+                      <div className="flex justify-between font-medium">
+                        <span>总计:</span>
+                        <span className="font-mono">${result.actualRiskAmountFormatted}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Contract Details */}
           {result.initialMargin && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -232,14 +338,81 @@ export function ResultCard() {
               <p className="text-xl font-bold font-mono text-green-600 mb-2">
                 ${result.takeProfitPriceFormatted || parseFloat(result.takeProfitPrice).toLocaleString()}
               </p>
+              
+              {/* Expected Profit Amount */}
+              {result.takeProfitProfit && (
+                <div className="p-3 bg-green-100 dark:bg-green-900 rounded border border-green-300 dark:border-green-700 mb-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-3 h-3 text-green-700">💰</div>
+                    <p className="text-xs font-medium text-green-800 dark:text-green-200">{t('expectedProfit')}</p>
+                  </div>
+                  <p className="text-lg font-bold font-mono text-green-700 dark:text-green-300 mb-2">
+                    +${result.takeProfitProfitFormatted || parseFloat(result.takeProfitProfit).toLocaleString()}
+                  </p>
+                  
+                  {/* Profit Calculation Details */}
+                  {result.profitBreakdown && (
+                    <div className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950 p-2 rounded border border-green-200 dark:border-green-800 mt-2">
+                      <div className="flex justify-between font-medium mb-1">
+                        <span>盈利计算:</span>
+                        <span className="font-mono">+${result.takeProfitProfitFormatted}</span>
+                      </div>
+                      
+                      <div className="space-y-1 text-xs">
+                        {/* 价格盈利 */}
+                        <div className="flex justify-between">
+                          <span>价格盈利 (数量×价差):</span>
+                          <span className="font-mono text-green-600">+${result.profitBreakdown.priceProfitFormatted}</span>
+                        </div>
+                        
+                        {/* 开仓手续费成本 */}
+                        {result.includeFees && parseFloat(result.profitBreakdown.openFeeAmount) < 0 && (
+                          <div className="flex justify-between">
+                            <span>开仓手续费:</span>
+                            <span className="font-mono text-red-600">{result.profitBreakdown.openFeeAmountFormatted}</span>
+                          </div>
+                        )}
+                        
+                        {/* 平仓手续费成本 */}
+                        {result.includeFees && parseFloat(result.profitBreakdown.closeFeeAmount) < 0 && (
+                          <div className="flex justify-between">
+                            <span>平仓手续费:</span>
+                            <span className="font-mono text-red-600">{result.profitBreakdown.closeFeeAmountFormatted}</span>
+                          </div>
+                        )}
+                        
+                        {/* 滑点成本 */}
+                        {result.includeFees && result.profitBreakdown.slippageAmount && parseFloat(result.profitBreakdown.slippageAmount) < 0 && (
+                          <div className="flex justify-between">
+                            <span>滑点成本:</span>
+                            <span className="font-mono text-red-600">{result.profitBreakdown.slippageAmountFormatted}</span>
+                          </div>
+                        )}
+                        
+                        <div className="border-t border-green-300 dark:border-green-700 pt-1 mt-2">
+                          <div className="flex justify-between font-medium">
+                            <span>净盈利:</span>
+                            <span className="font-mono text-green-600">+${result.takeProfitProfitFormatted}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                    {t('potentialGain')} {result.includeFees ? `(${t('includesFees')})` : ''}
+                  </p>
+                </div>
+              )}
+              
               {result.takeProfitRR && (
-                <div className="text-xs text-green-700 dark:text-green-300">
+                <div className="text-xs text-green-700 dark:text-green-300 mt-2">
                   <div className="flex justify-between">
-                    <span>{t('riskRewardRatio')}:</span>
+                    <span>风险收益比 (盈利:风险):</span>
                     <span className="font-mono">1:{result.takeProfitRR.toFixed(2)}</span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {t('includesFees')}: {result.includeFees ? t('yes') : t('no')}
+                    预期盈利 ÷ 止损风险 • {t('includesFees')}: {result.includeFees ? t('yes') : t('no')}
                   </p>
                 </div>
               )}
@@ -287,6 +460,214 @@ export function ResultCard() {
                   </p>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Trailing Stop Results */}
+      {trailingEnabled && (
+        <Card className="animate-in slide-in-from-top-5 duration-600 hover:shadow-lg transition-shadow duration-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-5 h-5 text-blue-600">🎯</div>
+              {t('trailingStopResults')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Current Status */}
+              <div className="space-y-4">
+                {/* Price Information Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide font-medium">
+                    {t('entryPrice')}
+                  </p>
+                  <p className="text-lg font-bold font-mono text-blue-900 dark:text-blue-100 mt-1">
+                    ${parseFloat(result.entryPrice || formData.entryPrice || '0').toLocaleString()}
+                    {formData.orderType === 'MARKET' && result.entryPrice && (
+                      <span className="text-xs text-blue-600 dark:text-blue-400 block mt-1">
+                        🔒 {t('lockedAtCalculation')}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                
+                <div className="p-4 bg-cyan-50 dark:bg-cyan-950 rounded-lg border border-cyan-200 dark:border-cyan-800">
+                  <p className="text-xs text-cyan-600 dark:text-cyan-400 uppercase tracking-wide font-medium">
+                    {t('currentPrice')}
+                  </p>
+                  <p className="text-lg font-bold font-mono text-cyan-900 dark:text-cyan-100 mt-1">
+                    {currentPrice ? `$${currentPrice.toLocaleString()}` : t('loading')}
+                  </p>
+                </div>
+                </div>
+                
+                {/* Indicators Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {trailingState.indicators?.ma ? (
+                    <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                      <p className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide font-medium">
+                        {trailingConfig.maType} ({trailingConfig.maLen})
+                      </p>
+                      <p className="text-lg font-bold font-mono text-green-900 dark:text-green-100 mt-1">
+                        ${trailingState.indicators.ma.toFixed(4)}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide font-medium">
+                        {trailingConfig.maType} ({trailingConfig.maLen})
+                      </p>
+                      <p className="text-lg font-bold font-mono text-gray-900 dark:text-gray-100 mt-1">
+                        {t('calculating')}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {(trailingConfig.strategy === 'MA_BAND_STOP' || trailingConfig.strategy === 'MA_CHANDELIER') && (
+                    trailingState.indicators?.atr ? (
+                      <div className="p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400 uppercase tracking-wide font-medium">
+                          ATR ({trailingConfig.atrLen})
+                        </p>
+                        <p className="text-lg font-bold font-mono text-yellow-900 dark:text-yellow-100 mt-1">
+                          ${trailingState.indicators.atr.toFixed(4)}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-gray-50 dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide font-medium">
+                          ATR ({trailingConfig.atrLen})
+                        </p>
+                        <p className="text-lg font-bold font-mono text-gray-900 dark:text-gray-100 mt-1">
+                          {t('calculating')}
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+              
+              {/* Trailing Stop Price */}
+              <div 
+                className={`p-4 rounded-lg border transition-colors duration-200 ${
+                  (trailingState.stop || trailingState.exitTrigger)
+                    ? 'bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900'
+                    : 'bg-gray-50 dark:bg-gray-950 border-gray-200 dark:border-gray-800'
+                }`}
+                onClick={() => {
+                  const price = trailingState.stop || trailingState.exitTrigger;
+                  if (price) handleCopyValue(price.toString(), trailingConfig.strategy === 'MA_CROSS_EXIT' ? 'Exit Trigger' : 'Trailing Stop');
+                }}
+                title={(trailingState.stop || trailingState.exitTrigger) ? t('clickToCopy') : undefined}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className={`w-4 h-4 ${(trailingState.stop || trailingState.exitTrigger) ? 'text-orange-600' : 'text-gray-400'}`} />
+                  <p className={`text-sm font-medium ${
+                    (trailingState.stop || trailingState.exitTrigger)
+                      ? 'text-orange-900 dark:text-orange-100'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {trailingConfig.strategy === 'MA_CROSS_EXIT' ? t('exitTriggerPrice') : t('trailingStopPrice')}
+                  </p>
+                </div>
+                <p className={`text-xl font-bold font-mono ${
+                  (trailingState.stop || trailingState.exitTrigger)
+                    ? 'text-orange-600'
+                    : 'text-gray-400'
+                }`}>
+                  {(() => {
+                    const price = trailingState.stop || trailingState.exitTrigger;
+                    return price ? `$${price.toFixed(4)}` : t('calculating');
+                  })()}
+                </p>
+              </div>
+              
+              {/* Expected P&L */}
+              {trailingEnabled && (trailingState.stop || trailingState.exitTrigger) && result?.qtyRounded && (
+                <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <p className="text-sm font-medium text-purple-900 dark:text-purple-100 mb-3">
+                    {t('expectedPnL')}
+                  </p>
+                  {(() => {
+                    // Use exit trigger price for P&L calculation
+                    const exitTriggerPrice = trailingConfig.strategy === 'MA_CROSS_EXIT' 
+                      ? trailingState.exitTrigger 
+                      : trailingState.stop;
+                    
+                    const expectedPnL = calculateExpectedPnL(
+                      parseFloat(result.entryPrice || formData.entryPrice || '0'),
+                      parseFloat(result.qtyRounded),
+                      exitTriggerPrice,
+                      trailingConfig,
+                      formData.includeFees ? {
+                        open: parseFloat(formData.feeOpen || '0'),
+                        close: parseFloat(formData.feeClose || '0')
+                      } : undefined,
+                      formData.includeFees ? {
+                        open: parseFloat(formData.slippage || '0'),
+                        close: parseFloat(formData.slippage || '0')
+                      } : undefined
+                    );
+                    
+                    return (
+                      <div className="space-y-2">
+                        {expectedPnL.expectedLoss && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-red-600 dark:text-red-400">{t('maxLoss')}:</span>
+                            <span className="font-mono text-red-600 dark:text-red-400">
+                              -${expectedPnL.expectedLoss.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {expectedPnL.expectedProfits.map((profit, index) => (
+                          <div key={index} className="flex justify-between text-sm">
+                            <span className="text-green-600 dark:text-green-400">
+                              {t('target')} {profit.rr}:
+                            </span>
+                            <span className="font-mono text-green-600 dark:text-green-400">
+                              +${profit.profit.toLocaleString()} (${profit.price.toFixed(4)})
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+              
+              {/* Strategy Info */}
+              <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded border">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="font-medium">{t('strategy')}:</span> {t(trailingConfig.strategy.toLowerCase())}
+                  </div>
+                  <div>
+                    <span className="font-medium">{t('timeframe')}:</span> {(() => {
+                      const tf = trailingConfig.tfMs;
+                      if (tf === 60000) return '1m';
+                      if (tf === 300000) return '5m';
+                      if (tf === 900000) return '15m';
+                      if (tf === 1800000) return '30m';
+                      if (tf === 3600000) return '1h';
+                      if (tf === 14400000) return '4h';
+                      if (tf === 86400000) return '1d';
+                      return 'Unknown';
+                    })()}
+                  </div>
+                  <div>
+                    <span className="font-medium">{t('maType')}:</span> {trailingConfig.maType}({trailingConfig.maLen})
+                  </div>
+                  {(trailingConfig.strategy === 'MA_BAND_STOP' || trailingConfig.strategy === 'MA_CHANDELIER') && (
+                    <div>
+                      <span className="font-medium">ATR:</span> {trailingConfig.atrLen}×{trailingConfig.k}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

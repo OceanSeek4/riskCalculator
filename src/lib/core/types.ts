@@ -1,6 +1,6 @@
 export type Side = 'LONG' | 'SHORT';
 export type StopMode = 'PRICE' | 'ATR';
-export type TakeProfitMode = 'PRICE' | 'ATR' | 'MA' | 'EMA';
+export type TakeProfitMode = 'PRICE' | 'ATR' | 'RR_RATIO';
 export type ContractMode = 'SPOT' | 'USDT_PERP' | 'INVERSE';
 
 export type Exchange = 'BINANCE' | 'BYBIT' | 'BITGET' | 'OKX';
@@ -45,8 +45,7 @@ export interface CalcInput {
   takeProfitMode?: TakeProfitMode;
   takeProfitPrice?: string;
   takeProfitATRMultiplier?: string;
-  takeProfitMAPeriod?: string;
-  takeProfitMATimeframe?: string;
+  takeProfitRRRatio?: string;
   riskMode: RiskMode;
   riskUSDT?: string;
   accountEquity?: string;
@@ -67,12 +66,42 @@ export interface CalcResult {
   qtyRounded: string;
   notional: string;
   initialMargin?: string;
+  entryPrice: string; // Store the entry price used in calculation
   stopPrice: string;
   liquidationPrice?: string;
   // Take profit result
   takeProfitPrice?: string;
   takeProfitPriceFormatted?: string;
   takeProfitRR?: number; // Risk/Reward ratio including fees
+  takeProfitProfit?: string; // Expected profit amount in USDT
+  takeProfitProfitFormatted?: string;
+  // Detailed profit breakdown
+  profitBreakdown?: {
+    priceProfit: string; // 数量 × 价格差
+    priceProfitFormatted: string;
+    openFeeAmount: string; // 数量 × 开仓价格 × 开仓手续费率 (负数，成本)
+    openFeeAmountFormatted: string;
+    closeFeeAmount: string; // 数量 × 止盈价格 × 平仓手续费率 (负数，成本)
+    closeFeeAmountFormatted: string;
+    slippageAmount?: string; // 数量 × 开仓价格 × 滑点率 (负数，成本)
+    slippageAmountFormatted?: string;
+  };
+  // Stop loss risk
+  stopLossRisk?: string; // Total risk including fees and price difference
+  stopLossRiskFormatted?: string;
+  actualRiskAmount?: string; // Actual calculated risk based on position size
+  actualRiskAmountFormatted?: string;
+  // Detailed risk breakdown
+  riskBreakdown?: {
+    priceRisk: string; // 数量 × 点差
+    priceRiskFormatted: string;
+    openFeeAmount: string; // 数量 × 开仓价格 × 开仓手续费率
+    openFeeAmountFormatted: string;
+    closeFeeAmount: string; // 数量 × 平仓价格 × 平仓手续费率
+    closeFeeAmountFormatted: string;
+    slippageAmount?: string; // 数量 × 开仓价格 × 滑点率
+    slippageAmountFormatted?: string;
+  };
   targets: Array<{ rr: number; price: string; priceFormatted: string; isBreakeven?: boolean }>;
   warnings: string[];
   warningKeys: WarningKey[];

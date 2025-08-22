@@ -370,86 +370,52 @@ export function TrailingPanel({
             </div>
           )}
 
-          {/* R:R Target Prices Table */}
-          {config.rrTargets && config.rrTargets.length > 0 && expectedPnL && (
+          {/* Exit Trigger P&L */}
+          {expectedPnL && (
             <div className="space-y-4">
               <Label className="text-sm font-semibold">
-                {t('trailingResults.targets', 'R:R Target Prices')}
+                {t('trailingResults.exitTriggerPnL', 'Exit Trigger P&L')}
               </Label>
+              <p className="text-xs text-muted-foreground">
+                {t('trailingResults.exitTriggerPnLDesc', 'Expected P&L when price reaches exit trigger and trailing stop activates')}
+              </p>
               
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2">{t('trailingResults.rrRatio', 'R:R')}</th>
-                      <th className="text-left p-2">{t('trailingResults.targetPrice', 'Target Price')}</th>
-                      <th className="text-left p-2">{t('trailingResults.expectedProfit', 'Expected Profit')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expectedPnL.expectedProfits.map((target, index) => (
-                      <tr key={index} className="border-b">
-                        <td className="p-2 font-mono">1:{target.rr}</td>
-                        <td className="p-2 font-mono text-green-600">
-                          ${formatPrice(target.price)}
-                        </td>
-                        <td className="p-2 font-mono text-green-600">
-                          ${target.profit.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Result Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Expected Loss */}
-            {expectedPnL?.expectedLoss !== undefined && (
-              <Card className="border-red-200">
+              {/* Single P&L Result */}
+              <Card className={expectedPnL.expectedLoss !== undefined ? "border-red-200" : "border-green-200"}>
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-sm">
-                    <TrendingDown className="w-4 h-4 text-red-600" />
-                    {t('trailingResults.expectedLoss', 'Expected Loss')}
+                    {expectedPnL.expectedLoss !== undefined ? (
+                      <>
+                        <TrendingDown className="w-4 h-4 text-red-600" />
+                        {t('trailingResults.exitTriggerLoss', 'Exit Trigger Loss')}
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                        {t('trailingResults.exitTriggerProfit', 'Exit Trigger Profit')}
+                      </>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold font-mono text-red-600">
-                    ${expectedPnL.expectedLoss.toFixed(2)}
+                  <p className={`text-2xl font-bold font-mono ${expectedPnL.expectedLoss !== undefined ? 'text-red-600' : 'text-green-600'}`}>
+                    ${expectedPnL.expectedLoss !== undefined 
+                      ? expectedPnL.expectedLoss.toFixed(2) 
+                      : (expectedPnL.expectedProfits[0]?.profit.toFixed(2) || '0.00')
+                    }
                   </p>
                   {quantity && (
                     <p className="text-xs text-muted-foreground mt-1">
                       {t('trailingResults.basedOnQuantity', 'Based on {{qty}} units', { qty: formatVolume(quantity) })}
                     </p>
                   )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Best R:R Profit */}
-            {expectedPnL?.expectedProfits && expectedPnL.expectedProfits.length > 0 && (
-              <Card className="border-green-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <TrendingUp className="w-4 h-4 text-green-600" />
-                    {t('trailingResults.bestTarget', 'Best Target ({{rr}}:1)', { 
-                      rr: expectedPnL.expectedProfits[expectedPnL.expectedProfits.length - 1]?.rr || 1 
-                    })}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold font-mono text-green-600">
-                    ${expectedPnL.expectedProfits[expectedPnL.expectedProfits.length - 1]?.profit.toFixed(2) || '0.00'}
-                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {t('trailingResults.priceIncludesFees', 'Includes fees if enabled')}
+                    {t('trailingResults.priceIncludesFees', 'Includes fees and slippage if enabled')}
                   </p>
                 </CardContent>
               </Card>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Rounding Notice */}
           <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
