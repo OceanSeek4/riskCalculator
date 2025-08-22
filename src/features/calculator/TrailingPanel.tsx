@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, AlertCircle, Target, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Target, Activity, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { 
   TrailingConfig, 
@@ -30,6 +30,7 @@ interface TrailingPanelProps {
   onConfigChange: (config: Partial<TrailingConfig>) => void;
   onEnabledChange: (enabled: boolean) => void;
   expectedPnL?: ExpectedPnL;
+  isInitializing?: boolean;
 }
 
 export function TrailingPanel({
@@ -44,6 +45,7 @@ export function TrailingPanel({
   onConfigChange,
   onEnabledChange,
   expectedPnL,
+  isInitializing = false,
 }: TrailingPanelProps) {
   const { t } = useTranslation();
   
@@ -313,9 +315,17 @@ export function TrailingPanel({
           {/* Real-time Readings */}
           {isExpanded && (
             <div className="space-y-4">
-              <Label className="text-sm font-semibold">
-                {t('trailingReadings.title', 'Real-time Readings')}
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-semibold">
+                  {t('trailingReadings.title', 'Real-time Readings')}
+                </Label>
+                {isInitializing && (
+                  <div className="flex items-center gap-1 text-xs text-blue-600">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Loading indicators...
+                  </div>
+                )}
+              </div>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-3 bg-muted rounded-lg">

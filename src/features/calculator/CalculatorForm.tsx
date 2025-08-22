@@ -974,6 +974,7 @@ export function CalculatorForm() {
               close: parseFloat(formData.feeClose || '0')
             } : undefined
           ) : undefined}
+          isInitializing={isInitializingCandles}
         />
 
         {/* Calculate Button */}
