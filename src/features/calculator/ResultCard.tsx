@@ -12,6 +12,7 @@ export function ResultCard() {
   const { 
     result, 
     formData,
+    currentATR,
     trailingEnabled,
     trailingConfig,
     trailingState,
@@ -59,16 +60,47 @@ export function ResultCard() {
     const stepSizeMatch = result.orderSummary.match(/stepSize=([^,\s]+)/);
     const tickSizeMatch = result.orderSummary.match(/tickSize=([^\s\n]+)/);
     
-    let summary = `${t(side.toLowerCase())} ${symbol}\n`;
+    // Generate timestamp
+    const now = new Date();
+    const timestamp = now.toLocaleString(undefined, {
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
     
-    // Use properly formatted values from the result object
-    summary += `${t('orderSummaryEntry')}: $${parseFloat(result.entryPrice || '0').toLocaleString()} | ${t('orderSummaryStop')}: $${result.stopPriceFormatted}\n`;
+    let summary = `📈 ${t('orderSummary').toUpperCase()}\n`;
+    summary += `${'='.repeat(40)}\n`;
     
+    // Market Settings Section
+    summary += `\n🏦 ${t('orderSummaryMarketSettings').toUpperCase()}\n`;
+    summary += `${t('exchange')}: ${t(formData.exchange?.toLowerCase() || 'binance')}\n`;
+    summary += `${t('symbol')}: ${formData.symbol || symbol}\n`;
+    
+    // Contract mode translation
+    const contractModeMap: Record<string, string> = {
+      'SPOT': 'spot',
+      'USDT_PERP': 'usdtPerp',
+      'INVERSE': 'inverse'
+    };
+    const contractModeKey = contractModeMap[formData.contractMode || 'USDT_PERP'] || 'spot';
+    summary += `${t('contractMode')}: ${t(contractModeKey)}\n`;
+    summary += `${t('side')}: ${t(side.toLowerCase())}\n`;
+    summary += `${t('orderType')}: ${formData.orderType === 'MARKET' ? t('marketOrder') : t('limitOrder')}\n`;
+    
+    // Timestamp
+    summary += `${t('orderSummaryGeneratedAt')}: ${timestamp}\n`;
+    
+    summary += `\n💼 ${t('positionResults').toUpperCase()}\n`;
+    
+    // Basic Position Info
+    summary += `${t('orderSummaryEntry')}: $${parseFloat(result.entryPrice || '0').toLocaleString()}\n`;
     summary += `${t('orderSummaryQty')}: ${result.qtyRoundedFormatted} | ${t('orderSummaryNotional')}: ${parseFloat(result.notional || '0').toLocaleString()} USDT\n`;
     
     // Add leverage and margin if available
     if (result.initialMargin) {
-      // Calculate leverage from notional and margin
       const leverage = Math.round(parseFloat(result.notional) / parseFloat(result.initialMargin));
       summary += `${t('orderSummaryLeverage')}: ${leverage}x | ${t('orderSummaryMargin')}: ${parseFloat(result.initialMargin).toLocaleString()} USDT\n`;
     }
@@ -78,35 +110,134 @@ export function ResultCard() {
       summary += `${t('orderSummaryEstLiquidation')}: $${result.liquidationPriceFormatted || parseFloat(result.liquidationPrice).toLocaleString()}\n`;
     }
     
-    // Add fees if included
-    if (result.includeFees && result.openFee && result.closeFee) {
-      summary += `${t('orderSummaryFees')}: ${t('orderSummaryOpen')} $${parseFloat(result.openFee).toLocaleString()} + ${t('orderSummaryClose')} $${parseFloat(result.closeFee).toLocaleString()} = $${parseFloat(result.totalFees || '0').toLocaleString()}\n`;
+    summary += `\n📊 ${t('orderSummaryStopMode').toUpperCase()}\n`;
+    // Stop Loss Mode and Settings
+    const stopModeMap: Record<string, string> = {
+      'PRICE': 'orderSummaryStopModePrice',
+      'ATR': 'orderSummaryStopModeATR', 
+      'PIPS': 'orderSummaryStopModePIPS'
+    };
+    const stopModeKey = stopModeMap[formData.stopMode || 'PRICE'] || 'orderSummaryStopModePrice';
+    summary += `${t('orderSummaryStopMode')}: ${t(stopModeKey)}\n`;
+    summary += `${t('orderSummaryStop')}: $${result.stopPriceFormatted}\n`;
+    
+    // Add stop mode specific settings
+    if (formData.stopMode === 'ATR') {
+      summary += `ATR ${t('period')}: ${formData.atrPeriod} | ${t('timeframe')}: ${formData.atrTimeframe} | ${t('multiplier')}: ${formData.atrMultiplier}\n`;
+      if (currentATR) {
+        summary += `ATR ${t('value')}: ${parseFloat(currentATR).toFixed(4)}\n`;
+      }
+    } else if (formData.stopMode === 'PIPS') {
+      summary += `${t('stopDistance')}: ${formData.stopPips} PIPS\n`;
     }
     
-    // Add breakeven target if available
-    const breakevenTarget = result.targets?.find((target: any) => target.isBreakeven);
-    if (breakevenTarget) {
-      summary += `${t('orderSummaryBreakeven')}: $${breakevenTarget.priceFormatted}\n`;
+    // Stop Loss Risk Information
+    if (result.stopLossRisk) {
+      summary += `\n🔥 ${t('orderSummaryStopLossRisk').toUpperCase()}\n`;
+      summary += `${t('orderSummaryStopLossRisk')}: $${result.stopLossRiskFormatted || parseFloat(result.stopLossRisk).toLocaleString()}\n`;
+      
+      // Risk breakdown if available
+      if (result.riskBreakdown) {
+        summary += `├─ ${t('priceRisk')}: $${result.riskBreakdown.priceRiskFormatted}\n`;
+        if (result.includeFees) {
+          if (parseFloat(result.riskBreakdown.openFeeAmount) > 0) {
+            summary += `├─ ${t('openFee')}: $${result.riskBreakdown.openFeeAmountFormatted}\n`;
+          }
+          if (parseFloat(result.riskBreakdown.closeFeeAmount) > 0) {
+            summary += `├─ ${t('closeFee')}: $${result.riskBreakdown.closeFeeAmountFormatted}\n`;
+          }
+          if (result.riskBreakdown.slippageAmount && parseFloat(result.riskBreakdown.slippageAmount) > 0) {
+            summary += `├─ ${t('slippage')}: $${result.riskBreakdown.slippageAmountFormatted}\n`;
+          }
+        }
+        summary += `└─ ${t('total')}: $${result.actualRiskAmountFormatted}\n`;
+      }
     }
     
-    // Add first profit target if available
-    const firstProfitTarget = result.targets?.find((target: any) => !target.isBreakeven);
-    if (firstProfitTarget) {
-      summary += `${t('orderSummaryTarget')} 1:${firstProfitTarget.rr}: $${firstProfitTarget.priceFormatted}\n`;
+    // Take Profit Mode and Expected Profit
+    if (formData.useTakeProfit && formData.takeProfitMode) {
+      summary += `\n🎯 ${t('orderSummaryTakeProfitMode').toUpperCase()}\n`;
+      
+      const tpModeMap: Record<string, string> = {
+        'PRICE': 'orderSummaryTPModePrice',
+        'ATR': 'orderSummaryTPModeATR',
+        'RR_RATIO': 'orderSummaryTPModeRR',
+        'PIPS': 'orderSummaryTPModePIPS'
+      };
+      const tpModeKey = tpModeMap[formData.takeProfitMode] || 'orderSummaryTPModeRR';
+      summary += `${t('orderSummaryTakeProfitMode')}: ${t(tpModeKey)}\n`;
+      
+      // Add take profit mode specific settings
+      if (formData.takeProfitMode === 'PRICE' && formData.takeProfitPrice) {
+        summary += `${t('takeProfitPrice')}: $${parseFloat(formData.takeProfitPrice).toLocaleString()}\n`;
+      } else if (formData.takeProfitMode === 'ATR' && formData.takeProfitATRMultiplier) {
+        summary += `ATR ${t('multiplier')}: ${formData.takeProfitATRMultiplier}\n`;
+      } else if (formData.takeProfitMode === 'RR_RATIO' && formData.takeProfitRRRatio) {
+        summary += `${t('orderSummaryRRRatio')}: 1:${formData.takeProfitRRRatio}\n`;
+      } else if (formData.takeProfitMode === 'PIPS' && formData.takeProfitPips) {
+        summary += `${t('takeProfitDistance')}: ${formData.takeProfitPips} PIPS\n`;
+      }
+      
+      // Expected Take Profit and Profit
+      if (result.takeProfitPrice) {
+        summary += `${t('takeProfitPrice')}: $${result.takeProfitPriceFormatted || parseFloat(result.takeProfitPrice).toLocaleString()}\n`;
+        
+        if (result.takeProfitProfit) {
+          summary += `${t('orderSummaryExpectedProfit')}: +$${result.takeProfitProfitFormatted || parseFloat(result.takeProfitProfit).toLocaleString()}\n`;
+          
+          // Profit breakdown if available
+          if (result.profitBreakdown) {
+            summary += `├─ ${t('priceProfit')}: +$${result.profitBreakdown.priceProfitFormatted}\n`;
+            if (result.includeFees) {
+              if (parseFloat(result.profitBreakdown.openFeeAmount) < 0) {
+                summary += `├─ ${t('openFee')}: ${result.profitBreakdown.openFeeAmountFormatted}\n`;
+              }
+              if (parseFloat(result.profitBreakdown.closeFeeAmount) < 0) {
+                summary += `├─ ${t('closeFee')}: ${result.profitBreakdown.closeFeeAmountFormatted}\n`;
+              }
+              if (result.profitBreakdown.slippageAmount && parseFloat(result.profitBreakdown.slippageAmount) < 0) {
+                summary += `├─ ${t('slippage')}: ${result.profitBreakdown.slippageAmountFormatted}\n`;
+              }
+            }
+            summary += `└─ ${t('netProfit')}: +$${result.takeProfitProfitFormatted}\n`;
+          }
+        }
+        
+        // Risk/Reward Ratio
+        if (result.takeProfitRR) {
+          summary += `${t('orderSummaryRRRatio')}: 1:${result.takeProfitRR.toFixed(2)}\n`;
+        }
+      }
     }
     
-    // Add compliance info with original stepSize and tickSize
+    // All Targets
+    if (result.targets && result.targets.length > 0) {
+      summary += `\n🎯 ${t('orderSummaryAllTargets').toUpperCase()}\n`;
+      result.targets.forEach((target: any, index: number) => {
+        const prefix = index === result.targets.length - 1 ? '└─' : '├─';
+        if (target.isBreakeven) {
+          summary += `${prefix} ${t('orderSummaryBreakeven')}: $${target.priceFormatted}\n`;
+        } else {
+          summary += `${prefix} ${t('orderSummaryTarget')} 1:${target.rr}: $${target.priceFormatted}\n`;
+        }
+      });
+    }
+    
+    // Compliance and Warnings
+    summary += `\n📋 ${t('orderSummaryCompliance').toUpperCase()}\n`;
     if (stepSizeMatch && tickSizeMatch) {
-      summary += `${t('orderSummaryCompliance')}: stepSize=${stepSizeMatch[1]}, tickSize=${tickSizeMatch[1]}\n`;
+      summary += `stepSize=${stepSizeMatch[1]}, tickSize=${tickSizeMatch[1]}\n`;
     }
     
-    // Add warnings if available
     if (result.warningKeys && result.warningKeys.length > 0) {
-      const localizedWarnings = result.warningKeys.map((key: string) => t(key)).join('; ');
-      summary += `${t('orderSummaryWarnings')}: ${localizedWarnings}\n`;
+      summary += `\n⚠️  ${t('orderSummaryWarnings').toUpperCase()}\n`;
+      result.warningKeys.forEach((key: string, index: number) => {
+        const prefix = index === result.warningKeys.length - 1 ? '└─' : '├─';
+        summary += `${prefix} ${t(key)}\n`;
+      });
     }
     
-    summary += t('orderSummaryNote');
+    summary += `\n${t('orderSummaryNote')}`;
     
     return summary;
   };

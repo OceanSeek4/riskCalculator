@@ -397,6 +397,32 @@ const resources = {
       orderSummaryWarnings: 'Warnings',
       orderSummaryNote: 'Note: Estimates only. Exchange rules prevail.',
       
+      // Enhanced Order Summary
+      orderSummaryMarketSettings: 'Market Settings',
+      orderSummaryGeneratedAt: 'Generated at',
+      orderSummaryStopLossRisk: 'Stop Loss Risk',
+      orderSummaryExpectedProfit: 'Expected Profit',
+      orderSummaryRRRatio: 'R:R Ratio',
+      orderSummaryAllTargets: 'All Targets',
+      orderSummaryStopMode: 'Stop Loss Mode',
+      orderSummaryTakeProfitMode: 'Take Profit Mode',
+      orderSummaryStopModePrice: 'Price-based stop',
+      orderSummaryStopModeATR: 'ATR-based stop',
+      orderSummaryStopModePIPS: 'PIPS-based stop',
+      orderSummaryTPModePrice: 'Price-based take profit',
+      orderSummaryTPModeATR: 'ATR-based take profit',
+      orderSummaryTPModeRR: 'Risk/Reward ratio',
+      orderSummaryTPModePIPS: 'PIPS-based take profit',
+      
+      // Additional terms for enhanced summary
+      period: 'Period',
+      value: 'Value',
+      stopDistance: 'Stop Distance',
+      priceRisk: 'Price Risk',
+      takeProfitDistance: 'Take Profit Distance',
+      priceProfit: 'Price Profit',
+      netProfit: 'Net Profit',
+      
       // Trailing Exits
       trailingExits: {
         title: 'Trailing Exits',
@@ -848,6 +874,32 @@ const resources = {
       orderSummaryCompliance: '合规检查',
       orderSummaryWarnings: '警告',
       orderSummaryNote: '注意：仅为估算值，以交易所规则为准。',
+      
+      // Enhanced Order Summary
+      orderSummaryMarketSettings: '市场设置',
+      orderSummaryGeneratedAt: '生成时间',
+      orderSummaryStopLossRisk: '止损风险',
+      orderSummaryExpectedProfit: '预期盈利',
+      orderSummaryRRRatio: '风险收益比',
+      orderSummaryAllTargets: '所有目标位',
+      orderSummaryStopMode: '止损模式',
+      orderSummaryTakeProfitMode: '止盈模式',
+      orderSummaryStopModePrice: '价格止损',
+      orderSummaryStopModeATR: 'ATR止损',
+      orderSummaryStopModePIPS: '点数止损',
+      orderSummaryTPModePrice: '价格止盈',
+      orderSummaryTPModeATR: 'ATR止盈',
+      orderSummaryTPModeRR: '风险收益比',
+      orderSummaryTPModePIPS: '点数止盈',
+      
+      // Additional terms for enhanced summary
+      period: '周期',
+      value: '数值',
+      stopDistance: '止损距离',
+      priceRisk: '价格风险',
+      takeProfitDistance: '止盈距离',
+      priceProfit: '价格盈利',
+      netProfit: '净盈利',
       
       // Trailing Exits
       trailingExits: {
