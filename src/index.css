@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
     line-height: 1.5;
     font-weight: 400;
     
@@ -14,44 +14,46 @@
     -moz-osx-font-smoothing: grayscale;
     -webkit-text-size-adjust: 100%;
 
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* macOS-optimized light theme */
+    --background: 0 0% 99%;          /* Slightly off-white for better eye comfort */
+    --foreground: 220 9% 15%;        /* Softer black */
+    --card: 0 0% 100%;               /* Pure white cards */
+    --card-foreground: 220 9% 15%;
+    --primary: 213 94% 68%;          /* macOS blue accent */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;        /* Warm light grey */
+    --secondary-foreground: 220 9% 20%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 45%;  /* Better contrast for muted text */
+    --accent: 220 14% 93%;           /* Subtle accent background */
+    --accent-foreground: 220 9% 20%;
+    --destructive: 0 84% 60%;        /* macOS red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 87%;           /* More visible light borders */
+    --input: 220 14% 94%;            /* Input background */
+    --ring: 213 94% 68%;             /* Ring matches primary */
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* macOS-optimized dark theme with warmer tones */
+    --background: 220 13% 9%;       /* Deep charcoal instead of cold blue-black */
+    --foreground: 220 9% 97%;       /* Softer white */
+    --card: 220 13% 11%;            /* Slightly lighter card background */
+    --card-foreground: 220 9% 97%;
+    --primary: 213 94% 68%;         /* macOS blue accent */
+    --primary-foreground: 220 13% 9%;
+    --secondary: 220 13% 15%;       /* Warmer secondary */
+    --secondary-foreground: 220 9% 90%;
+    --muted: 220 13% 15%;           /* Consistent with secondary */
+    --muted-foreground: 220 9% 65%; /* Higher contrast muted text */
+    --accent: 220 13% 18%;          /* Subtle accent background */
+    --accent-foreground: 220 9% 90%;
+    --destructive: 0 91% 71%;       /* Softer red for better readability */
+    --destructive-foreground: 220 13% 9%;
+    --border: 220 13% 20%;          /* More visible borders */
+    --input: 220 13% 15%;           /* Input background */
+    --ring: 213 94% 68%;            /* Ring matches primary */
   }
 
   .system {
@@ -89,9 +91,21 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--secondary)) 50%, hsl(var(--muted)) 100%);
   color: hsl(var(--foreground));
   transition: all 0.3s ease;
+  /* macOS-style backdrop blur effect */
+  backdrop-filter: blur(20px);
+}
+
+/* Enhanced dark mode background */
+.dark body {
+  background: linear-gradient(135deg, 
+    hsl(var(--background)) 0%, 
+    hsl(220 13% 12%) 25%,
+    hsl(var(--secondary)) 50%, 
+    hsl(220 13% 12%) 75%,
+    hsl(var(--background)) 100%);
 }
 
 .system body {
@@ -155,16 +169,30 @@ body,
   100% { background-position: 0% 50%; }
 }
 
-/* Modern card styles */
+/* Modern macOS-style card styles */
 .modern-card {
-  background: hsl(var(--card) / 0.8);
-  backdrop-filter: blur(4px);
-  transition: all 0.3s ease;
+  background: hsl(var(--card) / 0.85);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid hsl(var(--border) / 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modern-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  box-shadow: 0 20px 40px hsl(var(--foreground) / 0.1);
+  background: hsl(var(--card) / 0.9);
+}
+
+/* macOS-style glass morphism for dark mode */
+.dark .modern-card {
+  background: hsl(var(--card) / 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid hsl(var(--border) / 0.3);
+}
+
+.dark .modern-card:hover {
+  background: hsl(var(--card) / 0.8);
+  box-shadow: 0 20px 40px hsl(0 0% 0% / 0.3);
 }
 
 /* Animation classes */
@@ -196,4 +224,63 @@ body,
 
 .btn-modern:hover::before {
   left: 100%;
+}
+
+/* macOS-specific enhancements */
+@media (prefers-color-scheme: dark) {
+  /* Enhance scrollbars for dark mode */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.5);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.7);
+  }
+}
+
+/* macOS-style focus rings */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Better text selection */
+::selection {
+  background: hsl(var(--primary) / 0.2);
+  color: hsl(var(--foreground));
+}
+
+.dark ::selection {
+  background: hsl(var(--primary) / 0.3);
+}
+
+/* macOS-style shadows for cards */
+.shadow-macos {
+  box-shadow: 
+    0 0 0 1px hsl(var(--border) / 0.05),
+    0 1px 2px hsl(var(--foreground) / 0.1),
+    0 8px 16px hsl(var(--foreground) / 0.08);
+}
+
+.dark .shadow-macos {
+  box-shadow: 
+    0 0 0 1px hsl(var(--border) / 0.1),
+    0 1px 2px hsl(0 0% 0% / 0.3),
+    0 8px 16px hsl(0 0% 0% / 0.2);
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease;
 }

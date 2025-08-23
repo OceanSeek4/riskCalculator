@@ -210,7 +210,7 @@ const defaultSettings: SettingsData = {
   // Symbol list for dropdown
   symbolList: ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'],
   rrRatios: [1, 1.5, 2],
-  theme: 'system',
+  theme: 'dark',
   language: 'zh',
   autoFetchATR: true,
   showAdvancedOptions: true,
