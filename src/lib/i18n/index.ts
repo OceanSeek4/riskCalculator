@@ -290,6 +290,8 @@ const resources = {
       resetConfirm: 'Are you sure you want to reset all settings to defaults?',
       settingsSaved: 'Settings saved successfully',
       settingsError: 'Failed to save settings',
+      settingsReset: 'Settings reset to defaults successfully',
+      resetError: 'Failed to reset settings',
       
       // Presets
       presetsTitle: 'Presets Manager',
@@ -740,6 +742,8 @@ const resources = {
       resetConfirm: '确定要将所有设置重置为默认值吗？',
       settingsSaved: '设置保存成功',
       settingsError: '设置保存失败',
+      settingsReset: '设置已成功重置为默认值',
+      resetError: '设置重置失败',
       
       // Presets
       presetsTitle: '预设管理器',

@@ -111,9 +111,38 @@ export function SettingsForm() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm(t('resetConfirm'))) {
-      resetSettings();
+      try {
+        // Reset settings
+        resetSettings();
+        
+        // Add a small delay to show the reset process
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Show success notification
+        setNotification(t('settingsReset') || 'Settings reset to defaults successfully!', 'success');
+        
+        // Scroll to top to ensure user sees the notification at the top of the card
+        setTimeout(() => {
+          window.scrollTo({ 
+            top: 0, 
+            behavior: 'smooth' 
+          });
+        }, 100);
+        
+      } catch (error) {
+        console.error('Settings reset error:', error);
+        setNotification(t('resetError') || 'Failed to reset settings', 'error');
+        
+        // Scroll to top to ensure user sees the error notification
+        setTimeout(() => {
+          window.scrollTo({ 
+            top: 0, 
+            behavior: 'smooth' 
+          });
+        }, 100);
+      }
     }
   };
 
