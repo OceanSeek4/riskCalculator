@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,15 +23,20 @@ export function SettingsForm() {
   const { setFormData } = useCalculatorStore();
   const { t, i18n } = useTranslation();
 
-  // Auto-clear notification after 3 seconds
+  // Loading state for save operation
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Auto-clear notification after different durations based on type
   useEffect(() => {
     if (showNotification) {
+      const duration = notificationType === 'success' ? 4000 : 
+                       notificationType === 'error' ? 5000 : 3000;
       const timer = setTimeout(() => {
         clearNotification();
-      }, 3000);
+      }, duration);
       return () => clearTimeout(timer);
     }
-  }, [showNotification, clearNotification]);
+  }, [showNotification, notificationType, clearNotification]);
 
   const handleInputChange = (field: keyof typeof settings, value: any) => {
     setSettings({ [field]: value });
@@ -42,7 +47,9 @@ export function SettingsForm() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setIsSaving(true);
+    
     try {
       // Settings are automatically persisted via Zustand persist middleware
       // Apply new defaults to calculator form - this will update the displayed values
@@ -68,9 +75,39 @@ export function SettingsForm() {
         takeProfitPips: settings.defaultTakeProfitPips,
       });
       
+      // Add a small delay to show the saving state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Show success notification
       setNotification(t('settingsSaved') || 'Settings saved successfully!', 'success');
+      
+      // Scroll to top to ensure user sees the notification at the top of the card
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: 0, 
+          behavior: 'smooth' 
+        });
+      }, 100);
+      
+      // Optional: Navigate to calculator tab after a short delay
+      setTimeout(() => {
+        // This would require access to the tab switching function from parent component
+        // For now, we'll focus on making the notification more visible
+      }, 2000);
+      
     } catch (error) {
+      console.error('Settings save error:', error);
       setNotification(t('settingsError') || 'Failed to save settings', 'error');
+      
+      // Scroll to top to ensure user sees the error notification
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: 0, 
+          behavior: 'smooth' 
+        });
+      }, 100);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -126,6 +163,39 @@ export function SettingsForm() {
           <CardTitle className="text-xl">{t('settingsTitle')}</CardTitle>
         </div>
       </CardHeader>
+      
+      {/* Notification at top of card content */}
+      {showNotification && (
+        <div className="mx-6 mb-4">
+          <div className={`
+            p-4 rounded-lg border-l-4 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300
+            ${notificationType === 'success' ? 'bg-green-50 dark:bg-green-950/50 border-green-500 text-green-800 dark:text-green-200' : 
+              notificationType === 'error' ? 'bg-red-50 dark:bg-red-950/50 border-red-500 text-red-800 dark:text-red-200' : 
+              'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-800 dark:text-blue-200'}
+          `}>
+            <div className="flex-shrink-0">
+              {notificationType === 'success' && <Check className="w-5 h-5 text-green-600 dark:text-green-400" />}
+              {notificationType === 'error' && <X className="w-5 h-5 text-red-600 dark:text-red-400" />}
+              {notificationType === 'info' && <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+            </div>
+            <div className="flex-1 text-center">
+              <p className="font-medium">
+                {notificationType === 'success' ? t('successTitle') : 
+                 notificationType === 'error' ? t('errorTitle') : 
+                 t('infoTitle')}
+              </p>
+              <p className="text-sm opacity-75 mt-1">{notificationMessage}</p>
+            </div>
+            <button
+              onClick={clearNotification}
+              className="flex-shrink-0 p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      
       <CardContent className="space-y-8">
         {/* Default Market Settings */}
         <div className="space-y-4">
@@ -157,7 +227,7 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultSymbol', e.target.value)
                 }
-                placeholder="BTCUSDT"
+                placeholder={t('enterValue') + ' (e.g. BTCUSDT)'}
               />
             </div>
             
@@ -237,8 +307,11 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultLeverage', parseInt(e.target.value) || 1)
                 }
-                placeholder="10"
+                placeholder={t('enterValue') + ' (1-200x)'}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('leverageSettingHelp')}
+              </p>
             </div>
           </div>
         </div>
@@ -260,8 +333,11 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultAccountEquity', e.target.value)
                 }
-                placeholder="10000"
+                placeholder={t('enterAmount') + ' (USDT)'}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('accountEquityHelp')}
+              </p>
             </div>
             
             <div>
@@ -275,7 +351,7 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultRiskPercent', e.target.value)
                 }
-                placeholder="1"
+                placeholder={t('enterPercentage') + ' (%)'}
               />
             </div>
             
@@ -288,7 +364,7 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultRiskAmount', e.target.value)
                 }
-                placeholder="100"
+                placeholder={t('enterAmount') + ' (USDT)'}
               />
             </div>
           </div>
@@ -301,6 +377,16 @@ export function SettingsForm() {
             {t('defaultFeeSettings')}
           </h3>
           
+          <div className="text-sm text-muted-foreground mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800">
+            <p className="flex items-center gap-1 mb-1">
+              <span className="text-blue-600 dark:text-blue-400">💡</span>
+              <strong>{t('feeSettingsHelp')}</strong>
+            </p>
+            <p className="ml-5 text-blue-700 dark:text-blue-300 text-xs">
+              {t('feeSettingsDescription')}
+            </p>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>{t('openFee')}</Label>
@@ -311,7 +397,7 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultFeeOpen', e.target.value)
                 }
-                placeholder="0.0004"
+                placeholder={t('enterValue') + ' (0.0004 = 0.04%)'}
               />
             </div>
             
@@ -324,7 +410,7 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultFeeClose', e.target.value)
                 }
-                placeholder="0.0004"
+                placeholder={t('enterValue') + ' (0.0004 = 0.04%)'}
               />
             </div>
             
@@ -337,7 +423,7 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultSlippage', e.target.value)
                 }
-                placeholder="0.0005"
+                placeholder={t('enterValue') + ' (0.0005 = 0.05%)'}
               />
             </div>
           </div>
@@ -387,8 +473,11 @@ export function SettingsForm() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                   handleInputChange('defaultAtrMultiplier', e.target.value)
                 }
-                placeholder="2"
+                placeholder={t('enterMultiplier') + ' (e.g. 2.0)'}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {t('atrMultiplierHelp')}
+              </p>
             </div>
           </div>
         </div>
@@ -440,6 +529,10 @@ export function SettingsForm() {
                   }
                   placeholder={t('takeProfitPricePlaceholder')}
                 />
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <span className="text-blue-500">💡</span>
+                  {t('takeProfitPriceHelp')}
+                </p>
               </div>
             </div>
             
@@ -453,7 +546,7 @@ export function SettingsForm() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                     handleInputChange('defaultTakeProfitATRMultiplier', e.target.value)
                   }
-                  placeholder="2.0"
+                  placeholder={t('enterMultiplier') + ' (e.g. 2.0)'}
                 />
               </div>
               
@@ -466,7 +559,7 @@ export function SettingsForm() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                     handleInputChange('defaultTakeProfitRRRatio', e.target.value)
                   }
-                  placeholder="2.0"
+                  placeholder={t('enterValue') + ' (e.g. 2.0)'}
                 />
               </div>
               
@@ -480,8 +573,11 @@ export function SettingsForm() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                     handleInputChange('defaultStopPips', e.target.value)
                   }
-                  placeholder="50"
+                  placeholder={t('enterPips') + ' (e.g. 50)'}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('pipsSettingHelp')}
+                </p>
               </div>
               
               <div>
@@ -494,8 +590,11 @@ export function SettingsForm() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                     handleInputChange('defaultTakeProfitPips', e.target.value)
                   }
-                  placeholder="100"
+                  placeholder={t('enterPips') + ' (e.g. 100)'}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {t('pipsSettingHelp')}
+                </p>
               </div>
             </div>
           </div>
@@ -758,9 +857,9 @@ export function SettingsForm() {
                     handleInputChange('defaultTrailingStrategy', e.target.value as 'MA_CROSS_EXIT' | 'MA_BAND_STOP' | 'MA_CHANDELIER')
                   }
                 >
-                  <option value="MA_CROSS_EXIT">{t('trailingStrategies.maCrossExit', 'MA Cross Exit')}</option>
-                  <option value="MA_BAND_STOP">{t('trailingStrategies.maBandStop', 'MA Band Stop')}</option>
-                  <option value="MA_CHANDELIER">{t('trailingStrategies.maChandelier', 'MA Chandelier')}</option>
+                  <option value="MA_CROSS_EXIT">{t('maCrossExit')}</option>
+                  <option value="MA_BAND_STOP">{t('maBandStop')}</option>
+                  <option value="MA_CHANDELIER">{t('maChandelier')}</option>
                 </Select>
               </div>
               
@@ -789,7 +888,7 @@ export function SettingsForm() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                     handleInputChange('defaultTrailingMaPeriod', parseInt(e.target.value) || 20)
                   }
-                  placeholder="20"
+                  placeholder={t('enterPeriod') + ' (e.g. 20)'}
                 />
               </div>
               
@@ -803,7 +902,7 @@ export function SettingsForm() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                     handleInputChange('defaultTrailingAtrPeriod', parseInt(e.target.value) || 14)
                   }
-                  placeholder="14"
+                  placeholder={t('enterPeriod') + ' (e.g. 14)'}
                 />
               </div>
               
@@ -853,7 +952,7 @@ export function SettingsForm() {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                           handleInputChange('defaultTrailingAtrMultiplier', parseFloat(e.target.value) || 2)
                         }
-                        placeholder="2.0"
+                        placeholder={t('enterMultiplier') + ' (e.g. 2.0)'}
                       />
                     </div>
                   )}
@@ -870,7 +969,7 @@ export function SettingsForm() {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                           handleInputChange('defaultTrailingPercentage', parseFloat(e.target.value) || 0.5)
                         }
-                        placeholder="0.5"
+                        placeholder={t('enterPercentage') + ' (e.g. 0.5%)'}
                       />
                     </div>
                   )}
@@ -886,7 +985,7 @@ export function SettingsForm() {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
                           handleInputChange('defaultTrailingAbsolute', parseFloat(e.target.value) || 10)
                         }
-                        placeholder="10"
+                        placeholder={t('enterAmount') + ' (USDT)'}
                       />
                     </div>
                   )}
@@ -956,9 +1055,18 @@ export function SettingsForm() {
 
         {/* Action Buttons */}
         <div className="flex gap-4 pt-4">
-          <Button onClick={handleSave} className="flex-1 btn-modern">
-            <Save className="w-4 h-4 mr-2" />
-            {t('save')}
+          <Button onClick={handleSave} disabled={isSaving} className="flex-1 btn-modern">
+            {isSaving ? (
+              <>
+                <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                {t('saving')}
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {t('save')}
+              </>
+            )}
           </Button>
           
           <Button onClick={handleReset} variant="outline" className="btn-modern">
@@ -967,30 +1075,6 @@ export function SettingsForm() {
           </Button>
         </div>
 
-        {/* Notification */}
-        {showNotification && (
-          <div className={`
-            fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg border-l-4 flex items-center gap-3 min-w-[300px] animate-in slide-in-from-right-full duration-300
-            ${notificationType === 'success' ? 'bg-green-50 border-green-500 text-green-800' : 
-              notificationType === 'error' ? 'bg-red-50 border-red-500 text-red-800' : 
-              'bg-blue-50 border-blue-500 text-blue-800'}
-          `}>
-            <div className="flex-shrink-0">
-              {notificationType === 'success' && <Check className="w-5 h-5 text-green-600" />}
-              {notificationType === 'error' && <X className="w-5 h-5 text-red-600" />}
-              {notificationType === 'info' && <AlertCircle className="w-5 h-5 text-blue-600" />}
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">{notificationMessage}</p>
-            </div>
-            <button
-              onClick={clearNotification}
-              className="flex-shrink-0 p-1 rounded-full hover:bg-black/10 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

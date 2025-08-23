@@ -155,10 +155,23 @@ export function ResultCard() {
       {/* Main Position Card */}
       <Card className="animate-in slide-in-from-top-2 duration-300 hover:shadow-lg transition-shadow duration-200">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            {t('positionResults')}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              {t('positionResults')}
+            </CardTitle>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+                {formData.orderType === 'MARKET' ? t('entryPriceResult') : t('entryPriceLimit')}
+              </p>
+              <p className="text-sm font-bold font-mono text-primary">
+                ${parseFloat(result.entryPrice || formData.entryPrice || '0').toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 8
+                })}
+              </p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-5">
           {/* Key Metrics */}
@@ -482,7 +495,7 @@ export function ResultCard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide font-medium">
-                    {t('entryPrice')}
+                    {formData.orderType === 'MARKET' ? t('entryPriceResult') : t('entryPriceLimit')}
                   </p>
                   <p className="text-lg font-bold font-mono text-blue-900 dark:text-blue-100 mt-1">
                     ${parseFloat(result.entryPrice || formData.entryPrice || '0').toLocaleString()}

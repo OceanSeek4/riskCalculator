@@ -772,6 +772,14 @@ export function CalculatorForm() {
       
       const result = calculatePosition(input);
       setResult(result);
+      
+      // Scroll to top to show calculation results
+      setTimeout(() => {
+        window.scrollTo({ 
+          top: 0, 
+          behavior: 'smooth' 
+        });
+      }, 100);
     } catch (error) {
       setCalculationError(error instanceof Error ? error.message : t('calculationFailed'));
     } finally {

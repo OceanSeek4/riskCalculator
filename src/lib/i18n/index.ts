@@ -41,7 +41,9 @@ const resources = {
       orderType: 'Order Type',
       marketOrder: 'Market Order',
       limitOrder: 'Limit Order',
-      entryPrice: 'Entry Price (Current/Expected)',
+      entryPrice: 'Current Price',
+      entryPriceResult: 'Entry Price (Market)',
+      entryPriceLimit: 'Entry Price (Limit)',
       limitPrice: 'Limit Price',
       marketOrderNote: 'For market orders, enter the expected execution price',
       realTimePriceUpdated: 'Price updates automatically from market',
@@ -168,6 +170,7 @@ const resources = {
       
       // Common
       save: 'Save',
+      saving: 'Saving...',
       delete: 'Delete',
       load: 'Load',
       reset: 'Reset',
@@ -229,6 +232,30 @@ const resources = {
       defaultStopPips: 'Default stop pips',
       defaultTakeProfitPips: 'Default take profit pips',
       takeProfitPricePlaceholder: 'Leave empty for no default',
+      takeProfitPriceHelp: 'Leave empty to disable price-based take profit by default',
+      pipsSettingHelp: 'Distance in pips from entry price. Used when PIPS mode is selected.',
+      leverageSettingHelp: 'Default leverage for perpetual contracts (1-200x)',
+      accountEquityHelp: 'Your total account balance for percentage-based risk calculations',
+      atrMultiplierHelp: 'How many times ATR to use for stop distance (e.g. 2.0 = 2x ATR)',
+      feeSettingsHelp: 'Trading fee configuration for accurate profit/loss calculations',
+      feeSettingsDescription: 'Enter fees as decimal values (e.g., 0.0004 = 0.04%). These values are used when "Include Fees" is enabled in calculations.',
+      
+      // Placeholder texts for empty fields
+      noDefaultSet: 'No default set',
+      noDefaultValue: 'No default value',
+      optional: 'Optional',
+      enterValue: 'Enter value',
+      enterDefaultAmount: 'Enter default amount',
+      enterDefaultPercentage: 'Enter default percentage',
+      enterDefaultMultiplier: 'Enter default multiplier',
+      enterDefaultPips: 'Enter default pips',
+      enterPeriod: 'Enter period',
+      
+      // Notification titles and descriptions
+      successTitle: 'Success!',
+      errorTitle: 'Error!',
+      infoTitle: 'Information',
+      settingsSavedDescription: 'Your settings have been saved and applied to the calculator.',
       
       // Symbol List Settings
       symbolListSettings: 'Symbol List Settings',
@@ -298,7 +325,7 @@ const resources = {
       fetchingPrice: 'Fetching current price...',
       priceUpdated: 'Price updated',
       failedToFetchPrice: 'Failed to fetch current price',
-      lockedAtCalculation: 'Locked at calculation time',
+      lockedAtMarketPrice: 'Locked at market price',
       symbolNotSupported: 'Symbol not supported on this exchange',
       getCurrentPrice: 'Get Current Price',
       autoFetchPrice: 'Auto-fetch current price',
@@ -463,7 +490,9 @@ const resources = {
       orderType: '订单类型',
       marketOrder: '市价单',
       limitOrder: '限价单',
-      entryPrice: '入场价格（当前/预期）',
+      entryPrice: '当前价格',
+      entryPriceResult: '入场价格（市价）',
+      entryPriceLimit: '入场价格（限价）',
       limitPrice: '限价',
       marketOrderNote: '市价单请输入预期成交价格',
       realTimePriceUpdated: '价格自动从市场更新',
@@ -590,6 +619,7 @@ const resources = {
       
       // Common
       save: '保存',
+      saving: '保存中...',
       cancel: '取消',
       delete: '删除',
       load: '加载',
@@ -652,6 +682,30 @@ const resources = {
       defaultStopPips: '默认止损点差',
       defaultTakeProfitPips: '默认止盈点差',
       takeProfitPricePlaceholder: '留空表示无默认值',
+      takeProfitPriceHelp: '留空表示默认不启用价格止盈模式',
+      pipsSettingHelp: '距离入场价格的点差。当选择点差模式时使用',
+      leverageSettingHelp: '永续合约的默认杠杆倍数 (1-200倍)',
+      accountEquityHelp: '用于百分比风险计算的账户总余额',
+      atrMultiplierHelp: 'ATR倍数，用于计算止损距离 (例如: 2.0 = 2倍ATR)',
+      feeSettingsHelp: '交易手续费配置，用于精确的盈亏计算',
+      feeSettingsDescription: '请输入小数格式的费率 (例如: 0.0004 = 0.04%)。这些数值在启用"包含手续费"计算时使用。',
+      
+      // Placeholder texts for empty fields
+      noDefaultSet: '无默认值',
+      noDefaultValue: '未设默认值',
+      optional: '可选',
+      enterValue: '输入数值',
+      enterDefaultAmount: '输入默认金额',
+      enterDefaultPercentage: '输入默认百分比',
+      enterDefaultMultiplier: '输入默认倍数',
+      enterDefaultPips: '输入默认点差',
+      enterPeriod: '输入周期',
+      
+      // Notification titles and descriptions
+      successTitle: '成功！',
+      errorTitle: '错误！',
+      infoTitle: '提示',
+      settingsSavedDescription: '您的设置已保存并应用到计算器中。',
       
       // Symbol List Settings
       symbolListSettings: '交易对列表设置',
@@ -721,7 +775,7 @@ const resources = {
       fetchingPrice: '正在获取当前价格...',
       priceUpdated: '价格已更新',
       failedToFetchPrice: '获取当前价格失败',
-      lockedAtCalculation: '计算时锁定价格',
+      lockedAtMarketPrice: '锁定市价',
       symbolNotSupported: '该交易所不支持此交易对',
       getCurrentPrice: '获取当前价格',
       autoFetchPrice: '自动获取当前价格',
