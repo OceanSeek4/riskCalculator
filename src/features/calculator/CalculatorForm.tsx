@@ -12,7 +12,7 @@ import { validateNumberString, validateStopPrice } from '@/lib/validation';
 import { getCurrentPrice, getATRValue, getMAValue, formatPrice, checkSymbolSupport, getSupportedTimeframes, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
-import { TrailingPanel } from './TrailingPanel';
+import { TrailingPanel } from './TrailingPanelWrapper';
 import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/core/trailing';
 import { CandleManager, timeframeToMs } from '@/lib/candles';
 export function CalculatorForm() {
@@ -808,6 +808,21 @@ export function CalculatorForm() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* 防御性渲染：检查必要数据是否就绪 */}
+        {(!formData.exchange || !formData.symbol || !formData.contractMode) && !marketMeta && (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+              <Calculator className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              数据初始化中... Initializing data...
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              请选择交易所、交易对和合约模式，然后获取市场信息
+            </p>
+          </div>
+        )}
+
         {/* Quick Load Preset */}
         {presets.length > 0 && (
           <div>
