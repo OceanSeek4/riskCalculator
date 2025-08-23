@@ -15,6 +15,8 @@ export default defineConfig(async () => ({
 
   // Build configuration for Tauri
   build: {
+    // 生产调试：根据环境变量控制 source map 生成
+    sourcemap: process.env.VITE_SOURCEMAP === '1',
     rollupOptions: {
       // No external dependencies needed for Tauri v2
     },

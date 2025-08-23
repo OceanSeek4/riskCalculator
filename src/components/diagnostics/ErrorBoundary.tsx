@@ -67,8 +67,12 @@ export class ErrorBoundary extends Component<Props, State> {
   handleRestart = async () => {
     try {
       // 尝试调用 Tauri 重启应用
-      const { relaunch } = await import('@tauri-apps/api/process');
-      await relaunch();
+      // TODO: 在 Step F 中正确配置 Tauri process API
+      // const processModule = await import('@tauri-apps/api/process');
+      // await processModule.relaunch();
+      
+      // 暂时回退到页面刷新
+      window.location.reload();
     } catch {
       // 回退到页面刷新
       window.location.reload();

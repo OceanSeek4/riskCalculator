@@ -105,21 +105,28 @@ export async function captureError(
   // 尝试写入 Tauri 日志
   try {
     // 动态导入 Tauri 日志插件，避免在非 Tauri 环境报错
-    const { error: tauriLogError, warn: tauriLogWarn, info: tauriLogInfo } = await import('@tauri-apps/plugin-log');
+    // TODO: 在 Step F 中正确配置 Tauri 日志插件
+    // const logModule = await import('@tauri-apps/plugin-log');
+    // const { error: tauriLogError, warn: tauriLogWarn, info: tauriLogInfo } = logModule;
     
     const logMessage = JSON.stringify(payload);
     
-    switch (level) {
-      case 'error':
-        await tauriLogError(logMessage);
-        break;
-      case 'warn':
-        await tauriLogWarn(logMessage);
-        break;
-      case 'info':
-        await tauriLogInfo(logMessage);
-        break;
+    // 暂时跳过 Tauri 日志写入，在 Step F 中完成
+    if (import.meta.env.VITE_DEBUG === '1') {
+      console.log(`📝 Tauri log (${level}):`, logMessage);
     }
+    
+    // switch (level) {
+    //   case 'error':
+    //     await tauriLogError(logMessage);
+    //     break;
+    //   case 'warn':
+    //     await tauriLogWarn(logMessage);
+    //     break;
+    //   case 'info':
+    //     await tauriLogInfo(logMessage);
+    //     break;
+    // }
   } catch (logError) {
     // 静默失败，不影响主要功能
     if (import.meta.env.VITE_DEBUG === '1') {
