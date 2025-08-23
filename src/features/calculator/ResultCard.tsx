@@ -699,7 +699,16 @@ export function ResultCard() {
               <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded border">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="font-medium">{t('strategy')}:</span> {t(trailingConfig.strategy.toLowerCase())}
+                    <span className="font-medium">{t('strategy')}:</span> {(() => {
+                      // Map strategy enum to translation key
+                      const strategyMap: Record<string, string> = {
+                        'MA_CROSS_EXIT': 'maCrossExit',
+                        'MA_BAND_STOP': 'maBandStop', 
+                        'MA_CHANDELIER': 'maChandelier'
+                      };
+                      const translationKey = strategyMap[trailingConfig.strategy] || trailingConfig.strategy;
+                      return t(translationKey);
+                    })()}
                   </div>
                   <div>
                     <span className="font-medium">{t('timeframe')}:</span> {(() => {
