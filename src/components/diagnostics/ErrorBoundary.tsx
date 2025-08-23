@@ -67,14 +67,13 @@ export class ErrorBoundary extends Component<Props, State> {
   handleRestart = async () => {
     try {
       // 尝试调用 Tauri 重启应用
-      // TODO: 在 Step F 中正确配置 Tauri process API
-      // const processModule = await import('@tauri-apps/api/process');
-      // await processModule.relaunch();
-      
-      // 暂时回退到页面刷新
-      window.location.reload();
-    } catch {
+      const processModule = await import('@tauri-apps/plugin-process');
+      await processModule.relaunch();
+    } catch (restartError) {
       // 回退到页面刷新
+      if (import.meta.env.VITE_DEBUG === '1') {
+        console.warn('Failed to restart via Tauri, falling back to reload:', restartError);
+      }
       window.location.reload();
     }
   };

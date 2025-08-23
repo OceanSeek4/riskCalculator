@@ -105,28 +105,26 @@ export async function captureError(
   // 尝试写入 Tauri 日志
   try {
     // 动态导入 Tauri 日志插件，避免在非 Tauri 环境报错
-    // TODO: 在 Step F 中正确配置 Tauri 日志插件
-    // const logModule = await import('@tauri-apps/plugin-log');
-    // const { error: tauriLogError, warn: tauriLogWarn, info: tauriLogInfo } = logModule;
+    const logModule = await import('@tauri-apps/plugin-log');
+    const { error: tauriLogError, warn: tauriLogWarn, info: tauriLogInfo } = logModule;
     
     const logMessage = JSON.stringify(payload);
     
-    // 暂时跳过 Tauri 日志写入，在 Step F 中完成
-    if (import.meta.env.VITE_DEBUG === '1') {
-      console.log(`📝 Tauri log (${level}):`, logMessage);
+    switch (level) {
+      case 'error':
+        await tauriLogError(logMessage);
+        break;
+      case 'warn':
+        await tauriLogWarn(logMessage);
+        break;
+      case 'info':
+        await tauriLogInfo(logMessage);
+        break;
     }
     
-    // switch (level) {
-    //   case 'error':
-    //     await tauriLogError(logMessage);
-    //     break;
-    //   case 'warn':
-    //     await tauriLogWarn(logMessage);
-    //     break;
-    //   case 'info':
-    //     await tauriLogInfo(logMessage);
-    //     break;
-    // }
+    if (import.meta.env.VITE_DEBUG === '1') {
+      console.log(`📝 Tauri log written (${level}):`, logMessage);
+    }
   } catch (logError) {
     // 静默失败，不影响主要功能
     if (import.meta.env.VITE_DEBUG === '1') {
@@ -192,27 +190,21 @@ export async function copyErrorToClipboard(errorId: string, error: unknown, cont
   try {
     const summary = createErrorSummary(errorId, error, context);
     
-    // 优先使用 Tauri 剪贴板 API
-    try {
-      await invoke('plugin:clipboard-manager|write_text', { data: summary });
+    // 优先使用 Web 剪贴板 API（在现代浏览器和 Tauri 中都可用）
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(summary);
       return true;
-    } catch {
-      // 回退到 Web API
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(summary);
-        return true;
-      } else {
-        // 最后回退到传统方法
-        const textArea = document.createElement('textarea');
-        textArea.value = summary;
-        textArea.style.position = 'absolute';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        return true;
-      }
+    } else {
+      // 回退到传统方法
+      const textArea = document.createElement('textarea');
+      textArea.value = summary;
+      textArea.style.position = 'absolute';
+      textArea.style.left = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return true;
     }
   } catch (clipboardError) {
     console.warn('Failed to copy error to clipboard:', clipboardError);
