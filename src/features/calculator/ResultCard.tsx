@@ -51,58 +51,56 @@ export function ResultCard() {
   const generateLocalizedOrderSummary = (result: any) => {
     if (!result) return '';
     
-    // Extract values from original result
+    // Extract side and symbol from original order summary (for backward compatibility)
     const side = result.orderSummary.match(/^(LONG|SHORT)/)?.[1] || '';
     const symbol = result.orderSummary.match(/(LONG|SHORT)\s+(\S+)/)?.[2] || '';
     
-    // Parse values from original summary
-    const entryMatch = result.orderSummary.match(/Entry:\s*([^\s|]+)/);
-    const stopMatch = result.orderSummary.match(/Stop:\s*([^\s\n]+)/);
-    const qtyMatch = result.orderSummary.match(/Qty:\s*([^\s|]+)/);
-    const notionalMatch = result.orderSummary.match(/Notional:\s*([^\s\n]+)/);
-    const leverageMatch = result.orderSummary.match(/Leverage:\s*([^\s|]+)/);
-    const marginMatch = result.orderSummary.match(/Margin:\s*([^\s\n]+)/);
-    const liquidationMatch = result.orderSummary.match(/Est\.\s*Liquidation:\s*([^\s\n]+)/);
-    const feesMatch = result.orderSummary.match(/Fees:\s*Open\s*([^\s]+)\s*\+\s*Close\s*([^\s]+)\s*=\s*([^\s]+)/);
-    const breakevenMatch = result.orderSummary.match(/Breakeven:\s*([^\s\n]+)/);
-    const targetMatch = result.orderSummary.match(/Target\s*1:([^:]+):\s*([^\s\n]+)/);
+    // Extract stepSize and tickSize from original order summary
     const stepSizeMatch = result.orderSummary.match(/stepSize=([^,\s]+)/);
     const tickSizeMatch = result.orderSummary.match(/tickSize=([^\s\n]+)/);
     
     let summary = `${t(side.toLowerCase())} ${symbol}\n`;
     
-    if (entryMatch && stopMatch) {
-      summary += `${t('orderSummaryEntry')}: ${entryMatch[1]} | ${t('orderSummaryStop')}: ${stopMatch[1]}\n`;
+    // Use properly formatted values from the result object
+    summary += `${t('orderSummaryEntry')}: $${parseFloat(result.entryPrice || '0').toLocaleString()} | ${t('orderSummaryStop')}: $${result.stopPriceFormatted}\n`;
+    
+    summary += `${t('orderSummaryQty')}: ${result.qtyRoundedFormatted} | ${t('orderSummaryNotional')}: ${parseFloat(result.notional || '0').toLocaleString()} USDT\n`;
+    
+    // Add leverage and margin if available
+    if (result.initialMargin) {
+      // Calculate leverage from notional and margin
+      const leverage = Math.round(parseFloat(result.notional) / parseFloat(result.initialMargin));
+      summary += `${t('orderSummaryLeverage')}: ${leverage}x | ${t('orderSummaryMargin')}: ${parseFloat(result.initialMargin).toLocaleString()} USDT\n`;
     }
     
-    if (qtyMatch && notionalMatch) {
-      summary += `${t('orderSummaryQty')}: ${qtyMatch[1]} | ${t('orderSummaryNotional')}: ${notionalMatch[1]} USDT\n`;
+    // Add liquidation price if available
+    if (result.liquidationPrice) {
+      summary += `${t('orderSummaryEstLiquidation')}: $${result.liquidationPriceFormatted || parseFloat(result.liquidationPrice).toLocaleString()}\n`;
     }
     
-    if (leverageMatch && marginMatch) {
-      summary += `${t('orderSummaryLeverage')}: ${leverageMatch[1]} | ${t('orderSummaryMargin')}: ${marginMatch[1]} USDT\n`;
+    // Add fees if included
+    if (result.includeFees && result.openFee && result.closeFee) {
+      summary += `${t('orderSummaryFees')}: ${t('orderSummaryOpen')} $${parseFloat(result.openFee).toLocaleString()} + ${t('orderSummaryClose')} $${parseFloat(result.closeFee).toLocaleString()} = $${parseFloat(result.totalFees || '0').toLocaleString()}\n`;
     }
     
-    if (liquidationMatch) {
-      summary += `${t('orderSummaryEstLiquidation')}: ${liquidationMatch[1]}\n`;
+    // Add breakeven target if available
+    const breakevenTarget = result.targets?.find((target: any) => target.isBreakeven);
+    if (breakevenTarget) {
+      summary += `${t('orderSummaryBreakeven')}: $${breakevenTarget.priceFormatted}\n`;
     }
     
-    if (feesMatch) {
-      summary += `${t('orderSummaryFees')}: ${t('orderSummaryOpen')} ${feesMatch[1]} + ${t('orderSummaryClose')} ${feesMatch[2]} = ${feesMatch[3]} USDT\n`;
+    // Add first profit target if available
+    const firstProfitTarget = result.targets?.find((target: any) => !target.isBreakeven);
+    if (firstProfitTarget) {
+      summary += `${t('orderSummaryTarget')} 1:${firstProfitTarget.rr}: $${firstProfitTarget.priceFormatted}\n`;
     }
     
-    if (breakevenMatch) {
-      summary += `${t('orderSummaryBreakeven')}: ${breakevenMatch[1]}\n`;
-    }
-    
-    if (targetMatch) {
-      summary += `${t('orderSummaryTarget')} 1:${targetMatch[1]}: ${targetMatch[2]}\n`;
-    }
-    
+    // Add compliance info with original stepSize and tickSize
     if (stepSizeMatch && tickSizeMatch) {
       summary += `${t('orderSummaryCompliance')}: stepSize=${stepSizeMatch[1]}, tickSize=${tickSizeMatch[1]}\n`;
     }
     
+    // Add warnings if available
     if (result.warningKeys && result.warningKeys.length > 0) {
       const localizedWarnings = result.warningKeys.map((key: string) => t(key)).join('; ');
       summary += `${t('orderSummaryWarnings')}: ${localizedWarnings}\n`;
