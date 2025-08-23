@@ -155,21 +155,48 @@ export function ResultCard() {
       {/* Main Position Card */}
       <Card className="animate-in slide-in-from-top-2 duration-300 hover:shadow-lg transition-shadow duration-200">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              {t('positionResults')}
-            </CardTitle>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                {formData.orderType === 'MARKET' ? t('entryPriceResult') : t('entryPriceLimit')}
-              </p>
-              <p className="text-sm font-bold font-mono text-primary">
-                ${parseFloat(result.entryPrice || formData.entryPrice || '0').toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 8
-                })}
-              </p>
+          <CardTitle className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-5 h-5" />
+            {t('positionResults')}
+          </CardTitle>
+          
+          {/* Enhanced Entry Price Display */}
+          <div 
+            className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg border border-blue-200 dark:border-blue-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900 dark:hover:to-indigo-900 transition-all duration-200 cursor-pointer"
+            onClick={() => handleCopyValue(parseFloat(result.entryPrice || formData.entryPrice || '0').toString(), 'Entry Price')}
+            title={t('clickToCopy')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500 text-white rounded-full">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide font-medium">
+                    {formData.orderType === 'MARKET' ? t('entryPriceResult') : t('entryPriceLimit')}
+                  </p>
+                  <p className="text-lg font-bold font-mono text-blue-900 dark:text-blue-100">
+                    ${parseFloat(result.entryPrice || formData.entryPrice || '0').toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 8
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                {formData.orderType === 'MARKET' && result.entryPrice && (
+                  <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    {t('lockedAtCalculation')}
+                  </div>
+                )}
+                {formData.orderType === 'LIMIT' && (
+                  <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    {t('limitOrder')}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -493,18 +520,34 @@ export function ResultCard() {
               <div className="space-y-4">
                 {/* Price Information Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide font-medium">
-                    {formData.orderType === 'MARKET' ? t('entryPriceResult') : t('entryPriceLimit')}
-                  </p>
+                <div 
+                  className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-lg border border-blue-200 dark:border-blue-800 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900 dark:hover:to-indigo-900 transition-all duration-200 cursor-pointer"
+                  onClick={() => handleCopyValue(parseFloat(result.entryPrice || formData.entryPrice || '0').toString(), 'Entry Price')}
+                  title={t('clickToCopy')}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="p-1.5 bg-blue-500 text-white rounded-full">
+                      <DollarSign className="w-3 h-3" />
+                    </div>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wide font-medium">
+                      {formData.orderType === 'MARKET' ? t('entryPriceResult') : t('entryPriceLimit')}
+                    </p>
+                  </div>
                   <p className="text-lg font-bold font-mono text-blue-900 dark:text-blue-100 mt-1">
                     ${parseFloat(result.entryPrice || formData.entryPrice || '0').toLocaleString()}
-                    {formData.orderType === 'MARKET' && result.entryPrice && (
-                      <span className="text-xs text-blue-600 dark:text-blue-400 block mt-1">
-                        🔒 {t('lockedAtCalculation')}
-                      </span>
-                    )}
                   </p>
+                  {formData.orderType === 'MARKET' && result.entryPrice && (
+                    <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      {t('lockedAtCalculation')}
+                    </div>
+                  )}
+                  {formData.orderType === 'LIMIT' && (
+                    <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mt-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      {t('limitOrder')}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="p-4 bg-cyan-50 dark:bg-cyan-950 rounded-lg border border-cyan-200 dark:border-cyan-800">
