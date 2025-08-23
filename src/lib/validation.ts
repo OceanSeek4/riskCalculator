@@ -13,8 +13,9 @@ export const calculatorFormSchema = z.object({
     .refine(val => !isNaN(Number(val)) && Number(val) > 0, 'Entry price must be a positive number'),
   
   // Stop loss settings
-  stopMode: z.enum(['PRICE', 'ATR']),
+  stopMode: z.enum(['PRICE', 'ATR', 'PIPS']),
   stopPrice: z.string().optional(),
+  stopPips: z.string().optional(),
   
   
   // ATR settings
@@ -24,10 +25,11 @@ export const calculatorFormSchema = z.object({
   
   // Take profit settings
   useTakeProfit: z.boolean().default(false),
-  takeProfitMode: z.enum(['PRICE', 'ATR', 'RR_RATIO']).optional(),
+  takeProfitMode: z.enum(['PRICE', 'ATR', 'RR_RATIO', 'PIPS']).optional(),
   takeProfitPrice: z.string().optional(),
   takeProfitATRMultiplier: z.string().optional(),
   takeProfitRRRatio: z.string().optional(),
+  takeProfitPips: z.string().optional(),
   
   // Risk settings
   riskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
@@ -61,8 +63,8 @@ export const settingsSchema = z.object({
   defaultContractMode: z.enum(['SPOT', 'USDT_PERP', 'INVERSE']).default('USDT_PERP'),
   
   // Default modes
-  defaultStopMode: z.enum(['PRICE', 'ATR']).default('PRICE'),
-  defaultTakeProfitMode: z.enum(['PRICE', 'ATR', 'RR_RATIO']).default('PRICE'),
+  defaultStopMode: z.enum(['PRICE', 'ATR', 'PIPS']).default('PRICE'),
+  defaultTakeProfitMode: z.enum(['PRICE', 'ATR', 'RR_RATIO', 'PIPS']).default('PRICE'),
   defaultUseTakeProfit: z.boolean().default(false),
   defaultRiskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
   defaultOrderType: z.enum(['MARKET', 'LIMIT']).default('MARKET'),
@@ -89,6 +91,8 @@ export const settingsSchema = z.object({
   defaultTakeProfitPrice: z.string().default(''),
   defaultTakeProfitATRMultiplier: z.string().default('2'),
   defaultTakeProfitRRRatio: z.string().default('2'),
+  defaultStopPips: z.string().default('50'),
+  defaultTakeProfitPips: z.string().default('100'),
   
   // Risk/Reward ratios
   rrRatios: z.array(z.number()).default([1, 1.5, 2]),
@@ -111,7 +115,7 @@ export const settingsSchema = z.object({
   defaultTrailingOnCloseOnly: z.boolean().default(true),
 
   // Symbol list for dropdown
-  symbolList: z.array(z.string()).default(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT']),
+  symbolList: z.array(z.string()).default(['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT']),
 
   // Advanced
   autoFetchATR: z.boolean().default(true),

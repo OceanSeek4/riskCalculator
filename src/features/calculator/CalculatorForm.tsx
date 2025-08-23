@@ -71,6 +71,11 @@ export function CalculatorForm() {
   const [priceTimer, setPriceTimer] = useState<NodeJS.Timeout | null>(null);
   const [priceChange, setPriceChange] = useState<'up' | 'down' | 'same' | null>(null);
   
+  // For PIPS mode - store locked prices during calculation
+  const [lockedPipsStopPrice, setLockedPipsStopPrice] = useState<string | null>(null);
+  const [lockedPipsTakeProfitPrice, setLockedPipsTakeProfitPrice] = useState<string | null>(null);
+  const [lockedEntryPriceForPips, setLockedEntryPriceForPips] = useState<string | null>(null);
+  
   // Reset price change indicator after 2 seconds
   useEffect(() => {
     if (priceChange) {
@@ -479,6 +484,12 @@ export function CalculatorForm() {
       if (multiplierError) errors.atrMultiplier = multiplierError;
     }
     
+    // PIPS validation
+    if (formData.stopMode === 'PIPS') {
+      const pipsError = validateNumberString(formData.stopPips || '', 'Stop pips');
+      if (pipsError) errors.stopPips = pipsError;
+    }
+    
     
     // Take profit validation
     if (formData.useTakeProfit) {
@@ -506,6 +517,9 @@ export function CalculatorForm() {
       } else if (formData.takeProfitMode === 'RR_RATIO') {
         const rrRatioError = validateNumberString(formData.takeProfitRRRatio || '', 'Risk/Reward ratio');
         if (rrRatioError) errors.takeProfitRRRatio = rrRatioError;
+      } else if (formData.takeProfitMode === 'PIPS') {
+        const takeProfitPipsError = validateNumberString(formData.takeProfitPips || '', 'Take profit pips');
+        if (takeProfitPipsError) errors.takeProfitPips = takeProfitPipsError;
       }
     }
     
@@ -579,6 +593,14 @@ export function CalculatorForm() {
     } finally {
       setIsFetchingPrice(false);
     }
+  };
+
+  // Helper function to get the effective entry price for calculations
+  const getEffectiveEntryPrice = (): string => {
+    if (formData.orderType === 'MARKET' && realTimePrice) {
+      return realTimePrice;
+    }
+    return formData.entryPrice || '';
   };
 
   const fetchRealTimePrice = async () => {
@@ -672,6 +694,52 @@ export function CalculatorForm() {
       }
     }
     
+    // Calculate and store locked PIPS prices if in PIPS modes
+    if (formData.stopMode === 'PIPS' || (formData.useTakeProfit && formData.takeProfitMode === 'PIPS')) {
+      setLockedEntryPriceForPips(lockedEntryPrice);
+      
+      if (formData.stopMode === 'PIPS' && formData.stopPips && marketMeta) {
+        try {
+          const entryPrice = parseFloat(lockedEntryPrice);
+          const stopPips = parseFloat(formData.stopPips);
+          const tickSize = parseFloat(marketMeta.tickSize);
+          
+          if (!isNaN(entryPrice) && !isNaN(stopPips) && !isNaN(tickSize)) {
+            const pipsDistance = stopPips * tickSize;
+            const stopPrice = formData.side === 'LONG' 
+              ? entryPrice - pipsDistance 
+              : entryPrice + pipsDistance;
+            setLockedPipsStopPrice(stopPrice.toFixed(Math.abs(Math.log10(tickSize))));
+          }
+        } catch (error) {
+          console.error('Error calculating locked PIPS stop price:', error);
+        }
+      }
+      
+      if (formData.useTakeProfit && formData.takeProfitMode === 'PIPS' && formData.takeProfitPips && marketMeta) {
+        try {
+          const entryPrice = parseFloat(lockedEntryPrice);
+          const takeProfitPips = parseFloat(formData.takeProfitPips);
+          const tickSize = parseFloat(marketMeta.tickSize);
+          
+          if (!isNaN(entryPrice) && !isNaN(takeProfitPips) && !isNaN(tickSize)) {
+            const pipsDistance = takeProfitPips * tickSize;
+            const takeProfitPrice = formData.side === 'LONG' 
+              ? entryPrice + pipsDistance 
+              : entryPrice - pipsDistance;
+            setLockedPipsTakeProfitPrice(takeProfitPrice.toFixed(Math.abs(Math.log10(tickSize))));
+          }
+        } catch (error) {
+          console.error('Error calculating locked PIPS take profit price:', error);
+        }
+      }
+    } else {
+      // Clear locked prices if not in PIPS mode
+      setLockedPipsStopPrice(null);
+      setLockedPipsTakeProfitPrice(null);
+      setLockedEntryPriceForPips(null);
+    }
+
     try {
       const input = {
         side: formData.side!,
@@ -679,6 +747,7 @@ export function CalculatorForm() {
         stopPrice: formData.stopMode === 'PRICE' ? formData.stopPrice : undefined,
         atr: formData.stopMode === 'ATR' ? currentATR || undefined : undefined,
         atrMultiplier: formData.stopMode === 'ATR' ? formData.atrMultiplier : undefined,
+        stopPips: formData.stopMode === 'PIPS' ? formData.stopPips : undefined,
         stopMode: formData.stopMode!,
         // Take profit settings
         useTakeProfit: formData.useTakeProfit || false,
@@ -686,6 +755,7 @@ export function CalculatorForm() {
         takeProfitPrice: formData.takeProfitMode === 'PRICE' ? formData.takeProfitPrice : undefined,
         takeProfitATRMultiplier: formData.takeProfitMode === 'ATR' ? formData.takeProfitATRMultiplier : undefined,
         takeProfitRRRatio: formData.takeProfitMode === 'RR_RATIO' ? formData.takeProfitRRRatio : undefined,
+        takeProfitPips: formData.takeProfitMode === 'PIPS' ? formData.takeProfitPips : undefined,
         riskMode: formData.riskMode || 'FIXED_USDT',
         riskUSDT: formData.riskMode === 'FIXED_USDT' ? formData.riskAmount : undefined,
         accountEquity: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.accountEquity : undefined,
@@ -931,6 +1001,7 @@ export function CalculatorForm() {
             >
               <option value="PRICE">{t('priceStop')}</option>
               <option value="ATR">{t('atrStop')}</option>
+              <option value="PIPS">{t('pipsStop')}</option>
             </Select>
           </div>
 
@@ -1020,6 +1091,79 @@ export function CalculatorForm() {
             </div>
           )}
 
+          {formData.stopMode === 'PIPS' && (
+            <div>
+              <Label>{t('stopPips')}</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={formData.stopPips || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('stopPips', e.target.value)}
+                placeholder="50"
+                className={formErrors.stopPips ? 'border-red-500' : ''}
+              />
+              {formErrors.stopPips && (
+                <p className="text-sm text-red-500 mt-1">{formErrors.stopPips}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter stop loss distance in pips from entry price
+              </p>
+              {formData.stopPips && getEffectiveEntryPrice() && marketMeta && (
+                <div className="mt-2 p-2 bg-muted rounded text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">{t('calculatedStopPrice')}:</span>
+                    <span className="font-mono font-medium text-red-600">
+                      {(() => {
+                        try {
+                          const effectiveEntryPrice = getEffectiveEntryPrice();
+                          const entryPrice = parseFloat(effectiveEntryPrice);
+                          const stopPips = parseFloat(formData.stopPips);
+                          const tickSize = parseFloat(marketMeta.tickSize);
+                          
+                          if (!isNaN(entryPrice) && !isNaN(stopPips) && !isNaN(tickSize)) {
+                            const pipsDistance = stopPips * tickSize;
+                            const stopPrice = formData.side === 'LONG' 
+                              ? entryPrice - pipsDistance 
+                              : entryPrice + pipsDistance;
+                            return stopPrice.toFixed(Math.abs(Math.log10(tickSize)));
+                          }
+                          return '--';
+                        } catch {
+                          return '--';
+                        }
+                      })()}
+                    </span>
+                  </div>
+                  {formData.orderType === 'MARKET' && realTimePrice && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      📈 {t('basedOnRealTimePrice')}: {realTimePrice}
+                      {priceChange && (
+                        <span className={`ml-1 ${
+                          priceChange === 'up' ? 'text-green-600' : 
+                          priceChange === 'down' ? 'text-red-600' : ''
+                        }`}>
+                          {priceChange === 'up' ? '↑' : priceChange === 'down' ? '↓' : ''}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {lockedPipsStopPrice && lockedEntryPriceForPips && (
+                    <div className="text-xs mt-1 p-2 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-between">
+                        <span className="text-blue-700 dark:text-blue-300">🔒 {t('lockedAtCalculation')}:</span>
+                        <span className="font-mono font-semibold text-blue-800 dark:text-blue-200">{lockedPipsStopPrice}</span>
+                      </div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        Entry: {lockedEntryPriceForPips}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Take Profit Settings */}
@@ -1048,6 +1192,7 @@ export function CalculatorForm() {
                   <option value="PRICE">{t('priceTakeProfit')}</option>
                   <option value="ATR">{t('atrTakeProfit')}</option>
                   <option value="RR_RATIO">{t('rrRatioTakeProfit')}</option>
+                  <option value="PIPS">{t('pipsTakeProfit')}</option>
                 </Select>
               </div>
 
@@ -1105,6 +1250,79 @@ export function CalculatorForm() {
                   <p className="text-xs text-muted-foreground mt-1">
                     {t('rrRatioTakeProfitDescription')}
                   </p>
+                </div>
+              )}
+
+              {formData.takeProfitMode === 'PIPS' && (
+                <div>
+                  <Label>{t('takeProfitPips')}</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={formData.takeProfitPips || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('takeProfitPips', e.target.value)}
+                    placeholder="100"
+                    className={formErrors.takeProfitPips ? 'border-red-500' : ''}
+                  />
+                  {formErrors.takeProfitPips && (
+                    <p className="text-sm text-red-500 mt-1">{formErrors.takeProfitPips}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter take profit distance in pips from entry price
+                  </p>
+                  {formData.takeProfitPips && getEffectiveEntryPrice() && marketMeta && (
+                    <div className="mt-2 p-2 bg-muted rounded text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">{t('calculatedTakeProfitPrice')}:</span>
+                        <span className="font-mono font-medium text-green-600">
+                          {(() => {
+                            try {
+                              const effectiveEntryPrice = getEffectiveEntryPrice();
+                              const entryPrice = parseFloat(effectiveEntryPrice);
+                              const takeProfitPips = parseFloat(formData.takeProfitPips);
+                              const tickSize = parseFloat(marketMeta.tickSize);
+                              
+                              if (!isNaN(entryPrice) && !isNaN(takeProfitPips) && !isNaN(tickSize)) {
+                                const pipsDistance = takeProfitPips * tickSize;
+                                const takeProfitPrice = formData.side === 'LONG' 
+                                  ? entryPrice + pipsDistance 
+                                  : entryPrice - pipsDistance;
+                                return takeProfitPrice.toFixed(Math.abs(Math.log10(tickSize)));
+                              }
+                              return '--';
+                            } catch {
+                              return '--';
+                            }
+                          })()}
+                        </span>
+                      </div>
+                      {formData.orderType === 'MARKET' && realTimePrice && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          📈 {t('basedOnRealTimePrice')}: {realTimePrice}
+                          {priceChange && (
+                            <span className={`ml-1 ${
+                              priceChange === 'up' ? 'text-green-600' : 
+                              priceChange === 'down' ? 'text-red-600' : ''
+                            }`}>
+                              {priceChange === 'up' ? '↑' : priceChange === 'down' ? '↓' : ''}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {lockedPipsTakeProfitPrice && lockedEntryPriceForPips && (
+                        <div className="text-xs mt-1 p-2 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-center justify-between">
+                            <span className="text-blue-700 dark:text-blue-300">🔒 {t('lockedAtCalculation')}:</span>
+                            <span className="font-mono font-semibold text-blue-800 dark:text-blue-200">{lockedPipsTakeProfitPrice}</span>
+                          </div>
+                          <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                            Entry: {lockedEntryPriceForPips}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

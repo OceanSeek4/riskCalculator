@@ -1,6 +1,6 @@
 export type Side = 'LONG' | 'SHORT';
-export type StopMode = 'PRICE' | 'ATR';
-export type TakeProfitMode = 'PRICE' | 'ATR' | 'RR_RATIO';
+export type StopMode = 'PRICE' | 'ATR' | 'PIPS';
+export type TakeProfitMode = 'PRICE' | 'ATR' | 'RR_RATIO' | 'PIPS';
 export type ContractMode = 'SPOT' | 'USDT_PERP' | 'INVERSE';
 
 export type Exchange = 'BINANCE' | 'BYBIT' | 'BITGET' | 'OKX';
@@ -39,6 +39,7 @@ export interface CalcInput {
   stopPrice?: string;
   atr?: string;
   atrMultiplier?: string;
+  stopPips?: string;
   stopMode: StopMode;
   // Take profit settings
   useTakeProfit?: boolean;
@@ -46,6 +47,7 @@ export interface CalcInput {
   takeProfitPrice?: string;
   takeProfitATRMultiplier?: string;
   takeProfitRRRatio?: string;
+  takeProfitPips?: string;
   riskMode: RiskMode;
   riskUSDT?: string;
   accountEquity?: string;

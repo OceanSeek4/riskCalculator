@@ -64,6 +64,8 @@ export function SettingsForm() {
         feeClose: settings.defaultFeeClose,
         slippage: settings.defaultSlippage,
         includeFees: settings.defaultIncludeFees,
+        stopPips: settings.defaultStopPips,
+        takeProfitPips: settings.defaultTakeProfitPips,
       });
       
       setNotification(t('settingsSaved') || 'Settings saved successfully!', 'success');
@@ -188,11 +190,12 @@ export function SettingsForm() {
               <Select
                 value={settings.defaultStopMode}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
-                  handleInputChange('defaultStopMode', e.target.value as 'PRICE' | 'ATR')
+                  handleInputChange('defaultStopMode', e.target.value as 'PRICE' | 'ATR' | 'PIPS')
                 }
               >
                 <option value="PRICE">{t('priceStop')}</option>
                 <option value="ATR">{t('atrStop')}</option>
+                <option value="PIPS">{t('pipsStop')}</option>
               </Select>
             </div>
             
@@ -416,12 +419,13 @@ export function SettingsForm() {
                 <Select
                   value={settings.defaultTakeProfitMode}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
-                    handleInputChange('defaultTakeProfitMode', e.target.value as 'PRICE' | 'ATR' | 'RR_RATIO')
+                    handleInputChange('defaultTakeProfitMode', e.target.value as 'PRICE' | 'ATR' | 'RR_RATIO' | 'PIPS')
                   }
                 >
                   <option value="PRICE">{t('priceTakeProfit')}</option>
                   <option value="ATR">{t('atrTakeProfit')}</option>
                   <option value="RR_RATIO">{t('rrRatioTakeProfit')}</option>
+                  <option value="PIPS">{t('pipsTakeProfit')}</option>
                 </Select>
               </div>
               
@@ -463,6 +467,34 @@ export function SettingsForm() {
                     handleInputChange('defaultTakeProfitRRRatio', e.target.value)
                   }
                   placeholder="2.0"
+                />
+              </div>
+              
+              <div>
+                <Label>{t('defaultStopPips')}</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  value={settings.defaultStopPips}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultStopPips', e.target.value)
+                  }
+                  placeholder="50"
+                />
+              </div>
+              
+              <div>
+                <Label>{t('defaultTakeProfitPips')}</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  value={settings.defaultTakeProfitPips}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultTakeProfitPips', e.target.value)
+                  }
+                  placeholder="100"
                 />
               </div>
             </div>
@@ -578,25 +610,60 @@ export function SettingsForm() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>{t('symbolList')}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const newSymbol = prompt(t('enterSymbolPrompt'));
-                  if (newSymbol && newSymbol.trim()) {
-                    const trimmedSymbol = newSymbol.trim().toUpperCase();
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const defaultSymbols = ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'];
                     const currentList = settings.symbolList || [];
-                    if (!currentList.includes(trimmedSymbol)) {
-                      handleInputChange('symbolList', [...currentList, trimmedSymbol]);
+                    const newSymbols = defaultSymbols.filter(symbol => !currentList.includes(symbol));
+                    if (newSymbols.length > 0) {
+                      handleInputChange('symbolList', [...currentList, ...newSymbols]);
+                      setNotification(
+                        `${t('addedDefaultSymbols')} ${newSymbols.length}: ${newSymbols.join(', ')}`,
+                        'success'
+                      );
+                    } else {
+                      setNotification(t('allDefaultSymbolsExist'), 'info');
                     }
-                  }
-                }}
-                className="flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                {t('addSymbol')}
-              </Button>
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  {t('addDefaultSymbols')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newSymbol = prompt(t('enterSymbolPrompt'));
+                    if (newSymbol && newSymbol.trim()) {
+                      const trimmedSymbol = newSymbol.trim().toUpperCase();
+                      const currentList = settings.symbolList || [];
+                      if (!currentList.includes(trimmedSymbol)) {
+                        handleInputChange('symbolList', [...currentList, trimmedSymbol]);
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  {t('addSymbol')}
+                </Button>
+              </div>
+            </div>
+            
+            <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded border border-blue-200 dark:border-blue-800">
+              <p className="flex items-center gap-1 mb-1">
+                <span className="text-blue-600 dark:text-blue-400">💡</span>
+                <strong>{t('defaultSymbolsInfo')}:</strong>
+              </p>
+              <p className="ml-5 text-blue-700 dark:text-blue-300">
+                BTCUSDT, ETHUSDT, SUIUSDT, ADAUSDT, XRPUSDT
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -636,6 +703,29 @@ export function SettingsForm() {
             <p className="text-xs text-muted-foreground">
               {t('symbolListHelp')}
             </p>
+            
+            {(!settings.symbolList || settings.symbolList.length === 0) && (
+              <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                  <span className="inline-block mr-1">⚠️</span>
+                  {t('emptySymbolListWarning')}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const defaultSymbols = ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'];
+                    handleInputChange('symbolList', defaultSymbols);
+                    setNotification(t('defaultSymbolsAdded'), 'success');
+                  }}
+                  className="flex items-center gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-900"
+                >
+                  <Plus className="w-3 h-3" />
+                  {t('loadDefaultSymbols')}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

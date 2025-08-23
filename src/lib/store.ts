@@ -193,6 +193,8 @@ const defaultSettings: SettingsData = {
   defaultTakeProfitPrice: '',
   defaultTakeProfitATRMultiplier: '2',
   defaultTakeProfitRRRatio: '2',
+  defaultStopPips: '50',
+  defaultTakeProfitPips: '100',
   // Trailing stop defaults
   defaultTrailingEnabled: false,
   defaultTrailingStrategy: 'MA_BAND_STOP',
@@ -206,7 +208,7 @@ const defaultSettings: SettingsData = {
   defaultTrailingAbsolute: 10,
   defaultTrailingOnCloseOnly: true,
   // Symbol list for dropdown
-  symbolList: ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT', 'LINKUSDT', 'LTCUSDT'],
+  symbolList: ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'],
   rrRatios: [1, 1.5, 2],
   theme: 'system',
   language: 'en',
@@ -239,6 +241,8 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         takeProfitPrice: settings.defaultTakeProfitPrice,
         takeProfitATRMultiplier: settings.defaultTakeProfitATRMultiplier,
         takeProfitRRRatio: settings.defaultTakeProfitRRRatio,
+        stopPips: settings.defaultStopPips,
+        takeProfitPips: settings.defaultTakeProfitPips,
         riskMode: settings.defaultRiskMode,
         orderType: settings.defaultOrderType,
         leverage: settings.defaultLeverage,
@@ -421,6 +425,21 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'settings-storage',
       storage: createJSONStorage(() => localStorage),
+      version: 1,
+      migrate: (persistedState: any, version: number) => {
+        // Version 0 to 1: Update symbol list with new defaults
+        if (version < 1) {
+          const state = persistedState as any;
+          if (state && state.settings) {
+            // If symbolList is empty or using old defaults, update it
+            if (!state.settings.symbolList || state.settings.symbolList.length === 0 || 
+                JSON.stringify(state.settings.symbolList) === JSON.stringify(['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'SUIUSDT'])) {
+              state.settings.symbolList = ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'];
+            }
+          }
+        }
+        return persistedState;
+      },
     }
   )
 );

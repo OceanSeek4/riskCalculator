@@ -25,6 +25,29 @@ export function calculateATRStopPrice(
 }
 
 /**
+ * Calculate stop price based on PIPS
+ * @param entryPrice Entry price
+ * @param pips PIPS distance
+ * @param tickSize Tick size (pip value)
+ * @param side Trading side (LONG/SHORT)
+ * @returns Stop price
+ */
+export function calculatePipsStopPrice(
+  entryPrice: SafeDecimal,
+  pips: SafeDecimal,
+  tickSize: SafeDecimal,
+  side: Side
+): SafeDecimal {
+  const pipsDistance = pips.safeMul(tickSize);
+  
+  if (side === 'LONG') {
+    return entryPrice.safeSub(pipsDistance);
+  } else {
+    return entryPrice.safeAdd(pipsDistance);
+  }
+}
+
+/**
  * Calculate take profit price based on different modes
  * @param entryPrice Entry price
  * @param takeProfitMode Take profit mode
@@ -47,7 +70,9 @@ export function calculateTakeProfitPrice(
   feeOpen?: SafeDecimal,
   feeClose?: SafeDecimal,
   slippage?: SafeDecimal,
-  includeFees?: boolean
+  includeFees?: boolean,
+  takeProfitPips?: string,
+  tickSize?: SafeDecimal
 ): SafeDecimal {
   switch (takeProfitMode) {
     case 'PRICE':
@@ -96,6 +121,22 @@ export function calculateTakeProfitPrice(
         const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippage)).safeSub(requiredReward);
         const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippage);
         return numerator.safeDiv(denominator);
+      }
+      
+    case 'PIPS':
+      if (!takeProfitPips) {
+        throw new ValidationError('Take profit pips is required for PIPS mode');
+      }
+      if (!tickSize) {
+        throw new ValidationError('Tick size is required for PIPS mode');
+      }
+      
+      const pipsDistance = SafeDecimal.from(takeProfitPips).safeMul(tickSize);
+      
+      if (side === 'LONG') {
+        return entryPrice.safeAdd(pipsDistance);
+      } else {
+        return entryPrice.safeSub(pipsDistance);
       }
       
     default:
@@ -381,6 +422,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
     stopPrice: stopPriceStr,
     atr: atrStr,
     atrMultiplier: atrMultiplierStr,
+    stopPips: stopPipsStr,
     stopMode,
     // Take profit settings
     useTakeProfit,
@@ -388,6 +430,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
     takeProfitPrice,
     takeProfitATRMultiplier,
     takeProfitRRRatio,
+    takeProfitPips,
     riskMode,
     riskUSDT: riskUSDTStr,
     accountEquity: accountEquityStr,
@@ -427,6 +470,12 @@ export function calculatePosition(input: CalcInput): CalcResult {
       const atr = SafeDecimal.from(atrStr);
       const atrMultiplier = SafeDecimal.from(atrMultiplierStr);
       stopPrice = calculateATRStopPrice(entryPrice, atr, atrMultiplier, side);
+    } else if (stopMode === 'PIPS') {
+      if (!stopPipsStr) {
+        throw new ValidationError('Stop pips is required for PIPS stop mode');
+      }
+      const stopPips = SafeDecimal.from(stopPipsStr);
+      stopPrice = calculatePipsStopPrice(entryPrice, stopPips, tickSize, side);
     } else {
       if (!stopPriceStr) {
         throw new ValidationError('Stop price is required for price stop mode');
@@ -458,7 +507,16 @@ export function calculatePosition(input: CalcInput): CalcResult {
           side,
           takeProfitPrice,
           atr,
-          takeProfitATRMultiplier
+          takeProfitATRMultiplier,
+          undefined, // rrRatio - not used for non-RR modes
+          undefined, // totalStopRisk - not used for non-RR modes
+          undefined, // positionSize - not used for non-RR modes
+          undefined, // feeOpen - not used for non-RR modes
+          undefined, // feeClose - not used for non-RR modes
+          undefined, // slippage - not used for non-RR modes
+          undefined, // includeFees - not used for non-RR modes
+          takeProfitPips,
+          tickSize
         );
         
         // Round take profit price to tick size
