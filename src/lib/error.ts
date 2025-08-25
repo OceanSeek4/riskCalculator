@@ -8,7 +8,13 @@ import { invoke } from '@tauri-apps/api/core';
 // 错误 ID 生成器
 export function makeErrorId(error: unknown): string {
   const now = new Date();
-  const timestamp = now.toISOString().replace(/[-:T.Z]/g, '').slice(0, 14); // yyyymmddHHMMss
+  const timestamp = now.toISOString()
+    .replace(/-/g, '')
+    .replace(/:/g, '')
+    .replace(/T/g, '')
+    .replace(/\./g, '')
+    .replace(/Z/g, '')
+    .slice(0, 14); // yyyymmddHHMMss
   
   const message = error instanceof Error ? error.message : String(error);
   const stack = error instanceof Error ? error.stack || '' : '';

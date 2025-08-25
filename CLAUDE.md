@@ -7,16 +7,25 @@ A professional Tauri + React + TypeScript application for calculating cryptocurr
 ### ✅ 已完成功能 (Completed Features)
 1. **多交易所支持** - 支持 Binance、Bybit、Bitget、OKX 四大交易所
 2. **双风险模式** - 固定USDT金额 & 账户权益百分比风险计算
-3. **订单类型** - 市价单/限价单，智能滑点处理
-4. **ATR止损** - 自动ATR计算和倍数止损
-5. **完整国际化** - 中英文双语界面，动态切换
-6. **专业结果展示** - 多卡片布局，风险等级颜色编码
-7. **智能风险警告** - 15+种风险提示，包括清算、杠杆、保证金使用率分析
-8. **数据持久化** - 设置和预设自动保存
-9. **离线支持** - 静态数据回退，网络故障时仍可使用
-10. **主题支持** - 明暗主题自动切换
+3. **专业订单类型** - 市价单/限价单，智能滑点处理，支持maker/taker费率策略
+4. **颗粒化费率控制** - 四种费率策略精确控制开仓、止损、止盈的手续费和滑点成本
+5. **ATR止损** - 自动ATR计算和倍数止损
+6. **完整国际化** - 中英文双语界面，动态切换
+7. **专业结果展示** - 多卡片布局，风险等级颜色编码，详细费率信息展示
+8. **智能风险警告** - 15+种风险提示，包括清算、杠杆、保证金使用率分析
+9. **数据持久化** - 设置和预设自动保存
+10. **离线支持** - 静态数据回退，网络故障时仍可使用
+11. **主题支持** - 明暗主题自动切换
 
-### 🎯 最新更新 (Latest Updates - 2025.01)
+### 🎯 最新更新 (Latest Updates - 2025.08)
+- ✅ **颗粒化费率控制系统** - 实现四种专业费率策略精确控制
+  - 全部Maker (开仓平仓都挂单，无滑点成本)
+  - 全部Taker (开仓平仓都吃单，完整滑点成本)  
+  - 开仓Maker止损Taker (开仓挂单+止盈挂单，止损吃单)
+  - 仅开仓Maker (开仓挂单，止盈止损都吃单)
+- ✅ **智能订单摘要** - 详细展示费率类型、具体费率和滑点成本
+- ✅ **精确目标位计算** - 止盈价格根据费率策略使用正确的手续费和滑点
+- ✅ **默认费率类型设置** - 用户可在设置中配置默认费率策略偏好
 - ✅ 新增 Bitget 交易所完整支持
 - ✅ 新增 OKX 交易所完整支持  
 - ✅ 优化交易所适配器架构
@@ -71,17 +80,24 @@ src/
 
 ### Calculator
 - **Market Selection**: Exchange (Binance/Bybit/Bitget/OKX), Symbol, Contract Mode (Spot/USDT Perp/Inverse)
-- **Order Types**: Market orders or Limit orders with intelligent slippage handling
+- **Professional Order Types**: Market orders or Limit orders with granular fee control
+  - 市价单: 自动使用Taker费率和完整滑点成本
+  - 限价单: 四种费率策略可选，精确控制每个环节的费用
+- **颗粒化费率控制**: 
+  - **全部Maker**: 开仓平仓都使用挂单费率，无滑点成本
+  - **全部Taker**: 开仓平仓都使用吃单费率，完整滑点成本
+  - **开仓Maker止损Taker**: 开仓和止盈使用挂单费率，止损使用吃单费率
+  - **仅开仓Maker**: 仅开仓使用挂单费率，止盈止损都使用吃单费率
 - **Position Settings**: Entry price, side (Long/Short)
 - **Stop Loss**: Price-based or ATR-based stops with automatic calculation
 - **Risk Management**: 
   - Fixed USDT amount mode
   - Account percentage mode (r% × Account Equity = Risk Amount)
-- **Advanced Options**: Trading fees, slippage (when enabled in settings)
 - **Professional Results**: Multi-card layout with risk-coded visualization
   - Main position metrics (quantity, notional value)
   - Stop loss and liquidation prices with risk indicators
-  - Profit targets with R:R ratios
+  - **详细费率信息**: 订单摘要显示具体费率策略和成本明细
+  - **精确目标位**: 止盈价格根据费率策略计算，确保盈亏比准确
   - Intelligent risk warnings and margin analysis
 
 ### Presets
@@ -92,7 +108,8 @@ src/
 
 ### Settings
 - **Market Defaults**: Default exchange, symbol, contract mode
-- **Fee Defaults**: Open/close fees, slippage
+- **Fee Defaults**: Separate maker/taker fees for opening/closing, slippage rates
+- **Default Fee Type**: Configurable default fee strategy for new calculations
 - **ATR Defaults**: Period, timeframe, multiplier
 - **Risk/Reward Ratios**: Configurable profit targets
 - **UI Preferences**: Theme (light/dark/system), language
@@ -122,13 +139,56 @@ Uses Zustand with persistence middleware:
 - Static market data included for development
 - Unified API interface across all exchanges
 
+## Professional Fee Control System
+
+### 颗粒化费率策略 (Granular Fee Strategies)
+
+The application supports four professional fee strategies for optimal cost control:
+
+#### 1. 全部Maker (All Maker Orders)
+- **开仓**: Maker费率 (0.02%) + 0%滑点
+- **止损**: Maker费率 (0.02%) + 0%滑点  
+- **止盈**: Maker费率 (0.02%) + 0%滑点
+- **适用场景**: 耐心等待最佳价位，追求最低交易成本
+
+#### 2. 全部Taker (All Taker Orders)  
+- **开仓**: Taker费率 (0.06%) + 滑点成本
+- **止损**: Taker费率 (0.06%) + 滑点成本
+- **止盈**: Taker费率 (0.06%) + 滑点成本
+- **适用场景**: 快速执行为优先，接受较高成本
+
+#### 3. 开仓Maker止损Taker (Mixed Strategy - Recommended)
+- **开仓**: Maker费率 (0.02%) + 0%滑点
+- **止损**: Taker费率 (0.06%) + 滑点成本  
+- **止盈**: Maker费率 (0.02%) + 0%滑点
+- **适用场景**: 平衡成本和执行，开仓和止盈用挂单，止损快速执行
+
+#### 4. 仅开仓Maker (Opening Maker Only)
+- **开仓**: Maker费率 (0.02%) + 0%滑点
+- **止损**: Taker费率 (0.06%) + 滑点成本
+- **止盈**: Taker费率 (0.06%) + 滑点成本
+- **适用场景**: 开仓成本最低，平仓快速执行
+
+### 智能订单摘要 (Intelligent Order Summary)
+```
+Order Type: 限价单 (开仓Maker,止损Taker)
+Fee Rates:
+  Opening: 0.020% (Maker)
+  Stop Loss: 0.060% (Taker)
+  Take Profit: 0.020% (Maker)
+  Slippage: 0% + 0.050% + 0%
+```
+
 ## Calculation Logic
 
 - **Position Sizing**: Based on fixed risk amount and stop distance
-- **ATR Stops**: Automatic stop placement using Average True Range
-- **Fee Calculation**: Optional trading cost inclusion
+- **ATR Stops**: Automatic stop placement using Average True Range  
+- **Advanced Fee Calculation**: Granular maker/taker fee control for opening, stop loss, and take profit
+  - Intelligent fee type detection based on order type
+  - Separate slippage calculation for maker (0%) vs taker orders
+  - Accurate cost breakdown in profit/loss calculations
 - **Leverage**: Auto-calculation for perpetual contracts
-- **Risk/Reward**: Multiple profit targets with configurable ratios
+- **Risk/Reward**: Multiple profit targets with precise fee-adjusted calculations
 
 ## Theme Support
 

@@ -870,6 +870,12 @@ export function calculatePosition(input: CalcInput): CalcResult {
       };
     }
 
+    // Calculate take profit fees for targets (R:R ratios)
+    const takeProfitTargetFee = takeProfitFeeType === 'MAKER'
+      ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
+      : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+    const takeProfitTargetSlippage = takeProfitFeeType === 'MAKER' ? SafeDecimal.from('0') : slippageClose;
+
     // Calculate targets using the calculated stop loss risk
     const targets = calculateTargets(
       entryPrice, 
@@ -877,9 +883,9 @@ export function calculatePosition(input: CalcInput): CalcResult {
       input.rrRatios, 
       side, 
       feeOpen, 
-      feeClose, 
+      takeProfitTargetFee, // Use take profit specific fee
       slippageOpen,
-      slippageClose,
+      takeProfitTargetSlippage, // Use take profit specific slippage
       includeFees, 
       stopLossRisk, 
       qtyRounded, 
@@ -909,8 +915,16 @@ export function calculatePosition(input: CalcInput): CalcResult {
       openFee,
       closeFee,
       includeFees,
-      orderType,
-      feeType
+      orderType: useOrderType,
+      feeType: useFeeType,
+      feeRates: {
+        openMaker: feeOpenMakerStr,
+        openTaker: feeOpenTakerStr,
+        closeMaker: feeCloseMakerStr,
+        closeTaker: feeCloseTakerStr,
+        slippageOpen: slippageOpenStr,
+        slippageClose: slippageCloseStr
+      }
     });
     
     return {
@@ -975,6 +989,14 @@ function generateOrderSummary(params: {
   includeFees: boolean;
   orderType?: OrderType;
   feeType?: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY';
+  feeRates?: {
+    openMaker: string;
+    openTaker: string;
+    closeMaker: string;
+    closeTaker: string;
+    slippageOpen: string;
+    slippageClose: string;
+  };
 }): string {
   const {
     side,
@@ -994,7 +1016,8 @@ function generateOrderSummary(params: {
     closeFee,
     includeFees,
     orderType,
-    feeType
+    feeType,
+    feeRates
   } = params;
   
   let summary = `${side} ${marketMeta.symbol}\n`;
@@ -1016,6 +1039,41 @@ function generateOrderSummary(params: {
       summary += feeTypeMap[feeType] || '';
     }
     summary += '\n';
+    
+    // Add detailed fee rate information for limit orders
+    if (orderType === 'LIMIT' && feeType && feeRates) {
+      const formatFeeRate = (rate: string) => (parseFloat(rate) * 100).toFixed(3) + '%';
+      
+      summary += `Fee Rates:\n`;
+      
+      if (feeType === 'MAKER') {
+        summary += `  Opening: ${formatFeeRate(feeRates.openMaker)} (Maker)\n`;
+        summary += `  Stop Loss: ${formatFeeRate(feeRates.closeMaker)} (Maker)\n`;
+        summary += `  Take Profit: ${formatFeeRate(feeRates.closeMaker)} (Maker)\n`;
+        summary += `  Slippage: 0% (Maker orders)\n`;
+      } else if (feeType === 'TAKER') {
+        summary += `  Opening: ${formatFeeRate(feeRates.openTaker)} (Taker)\n`;
+        summary += `  Stop Loss: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
+        summary += `  Take Profit: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
+        summary += `  Slippage: ${formatFeeRate(feeRates.slippageOpen)} + ${formatFeeRate(feeRates.slippageClose)} + ${formatFeeRate(feeRates.slippageClose)}\n`;
+      } else if (feeType === 'MAKER_OPEN_TAKER_CLOSE') {
+        summary += `  Opening: ${formatFeeRate(feeRates.openMaker)} (Maker)\n`;
+        summary += `  Stop Loss: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
+        summary += `  Take Profit: ${formatFeeRate(feeRates.closeMaker)} (Maker)\n`;
+        summary += `  Slippage: 0% + ${formatFeeRate(feeRates.slippageClose)} + 0%\n`;
+      } else if (feeType === 'MAKER_OPEN_ONLY') {
+        summary += `  Opening: ${formatFeeRate(feeRates.openMaker)} (Maker)\n`;
+        summary += `  Stop Loss: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
+        summary += `  Take Profit: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
+        summary += `  Slippage: 0% + ${formatFeeRate(feeRates.slippageClose)}\n`;
+      }
+    } else if (orderType === 'MARKET' && feeRates) {
+      const formatFeeRate = (rate: string) => (parseFloat(rate) * 100).toFixed(3) + '%';
+      summary += `Fee Rates:\n`;
+      summary += `  Opening: ${formatFeeRate(feeRates.openTaker)} (Market Taker)\n`;
+      summary += `  Stop Loss: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
+      summary += `  Slippage: ${formatFeeRate(feeRates.slippageOpen)} + ${formatFeeRate(feeRates.slippageClose)}\n`;
+    }
   }
   
   if (contractMode !== 'SPOT' && leverage && initialMargin) {
