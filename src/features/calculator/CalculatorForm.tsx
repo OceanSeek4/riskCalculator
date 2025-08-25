@@ -128,35 +128,54 @@ export function CalculatorForm() {
     
     // 当切换到离线模式时，强制重置订单类型和价格
     if (!wasOffline && isNowOffline) {
-      // 切换到离线模式：强制设置为限价单和默认价格
+      // 切换到离线模式：强制设置为限价单、默认价格、止损模式和止盈模式
       const updates = {
         orderType: settings.offlineOrderType || 'LIMIT',
-        entryPrice: settings.offlineDefaultEntryPrice || '100000'
+        entryPrice: settings.offlineDefaultEntryPrice || '100000',
+        stopMode: settings.offlineStopMode || 'PIPS',
+        takeProfitMode: settings.offlineTakeProfitMode || 'RR_RATIO',
+        trailingEnabled: settings.offlineTrailingEnabled || false
       };
       setFormData(updates);
       
       // 显示切换通知
       setTimeout(() => {
-        setNotification('已切换到离线模式，订单类型和价格已重置为离线设置', 'info');
+        setNotification('已切换到离线模式，订单类型、价格、止损和止盈模式已重置为离线设置', 'info');
       }, 100);
     }
     // 当切换回在线模式时，恢复在线默认设置
     else if (wasOffline && !isNowOffline) {
-      // 切换到在线模式：恢复在线默认订单类型
+      // 切换到在线模式：恢复在线默认订单类型、止损模式和止盈模式
       const updates = {
-        orderType: settings.defaultOrderType || 'MARKET'
+        orderType: settings.defaultOrderType || 'MARKET',
+        stopMode: settings.defaultStopMode || 'ATR',
+        takeProfitMode: settings.defaultTakeProfitMode || 'RR_RATIO',
+        trailingEnabled: settings.defaultTrailingEnabled || false
       };
       setFormData(updates);
       
       // 显示切换通知
       setTimeout(() => {
-        setNotification('已切换到在线模式，订单类型已恢复为在线设置', 'success');
+        setNotification('已切换到在线模式，订单类型、止损和止盈模式已恢复为在线设置', 'success');
       }, 100);
     }
     
     // 更新ref
     prevOfflineModeRef.current = isNowOffline;
-  }, [isOfflineMode, settings.offlineOrderType, settings.offlineDefaultEntryPrice, settings.defaultOrderType, setFormData, setNotification]);
+  }, [
+    isOfflineMode, 
+    settings.offlineOrderType, 
+    settings.offlineDefaultEntryPrice, 
+    settings.offlineStopMode, 
+    settings.offlineTakeProfitMode, 
+    settings.offlineTrailingEnabled,
+    settings.defaultOrderType, 
+    settings.defaultStopMode, 
+    settings.defaultTakeProfitMode, 
+    settings.defaultTrailingEnabled,
+    setFormData, 
+    setNotification
+  ]);
 
   // 确保离线模式下的入场价格设置（保持现有逻辑作为后备）
   useEffect(() => {
