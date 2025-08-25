@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, AlertCircle, Target, Activity, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useSettingsStore } from '@/lib/store';
 import type { 
   TrailingConfig, 
   TrailingState, 
@@ -48,6 +49,7 @@ export function TrailingPanel({
   isInitializing = false,
 }: TrailingPanelProps) {
   const { t } = useTranslation();
+  const { isOfflineMode } = useSettingsStore();
   
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -112,6 +114,22 @@ export function TrailingPanel({
     return vol.toFixed(0);
   };
 
+  // Handle enabling/disabling with offline mode check
+  const handleEnabledChange = (newEnabled: boolean) => {
+    if (newEnabled && isOfflineMode) {
+      // Prevent enabling trailing stops in offline mode
+      return;
+    }
+    onEnabledChange(newEnabled);
+  };
+
+  // Disable trailing stops if offline mode is enabled and they're currently on
+  useEffect(() => {
+    if (isOfflineMode && enabled) {
+      onEnabledChange(false);
+    }
+  }, [isOfflineMode, enabled, onEnabledChange]);
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -124,14 +142,23 @@ export function TrailingPanel({
             </Badge>
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Label htmlFor="trailing-enabled" className="text-sm">
+            <Label 
+              htmlFor="trailing-enabled" 
+              className={`text-sm ${isOfflineMode ? 'text-muted-foreground' : ''}`}
+            >
               {t('trailingExits.enable', 'Enable')}
             </Label>
             <Checkbox
               id="trailing-enabled"
               checked={enabled}
-              onCheckedChange={onEnabledChange}
+              onCheckedChange={handleEnabledChange}
+              disabled={isOfflineMode}
             />
+            {isOfflineMode && (
+              <Badge variant="destructive" className="text-xs">
+                离线模式下不可用
+              </Badge>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -144,7 +171,7 @@ export function TrailingPanel({
         </div>
       </CardHeader>
 
-      {enabled && (
+      {enabled && !isOfflineMode && (
         <CardContent className="space-y-6">
           {/* Strategy Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -429,6 +456,23 @@ export function TrailingPanel({
                 )}
               </p>
             </div>
+          </div>
+        </CardContent>
+      )}
+      
+      {isOfflineMode && (
+        <CardContent>
+          <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              <h3 className="font-medium text-orange-800 dark:text-orange-200">离线模式</h3>
+            </div>
+            <p className="text-sm text-orange-700 dark:text-orange-300 mb-2">
+              移动止损功能需要实时市场数据支持，在离线模式下暂时不可用。
+            </p>
+            <p className="text-sm text-orange-600 dark:text-orange-400">
+              请切换到在线模式以启用此功能。
+            </p>
           </div>
         </CardContent>
       )}

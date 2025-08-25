@@ -2,6 +2,18 @@
 let tauriHttpAvailable = false;
 let tauriHttpMod: any = null;
 
+// Network failure tracking for automatic offline detection
+let networkFailureCallback: (() => void) | null = null;
+let networkSuccessCallback: (() => void) | null = null;
+
+export function setNetworkCallbacks(
+  onFailure: () => void,
+  onSuccess: () => void
+) {
+  networkFailureCallback = onFailure;
+  networkSuccessCallback = onSuccess;
+}
+
 // Try to initialize Tauri HTTP plugin once
 const initTauriHttp = async () => {
   if (tauriHttpMod !== null) return; // Already initialized
@@ -21,13 +33,23 @@ export async function httpGet(url: string) {
     await initTauriHttp();
   }
   
+  let lastError: Error | null = null;
+  
   // Try Tauri HTTP first if available
   if (tauriHttpAvailable && tauriHttpMod?.fetch) {
     try {
       const r = await tauriHttpMod.fetch(url, { method: 'GET' });
-      return await r.json();
+      const data = await r.json();
+      
+      // Success - notify callback
+      if (networkSuccessCallback) {
+        networkSuccessCallback();
+      }
+      
+      return data;
     } catch (error) {
       console.warn('Tauri HTTP request failed, falling back to browser fetch:', error);
+      lastError = error instanceof Error ? error : new Error('Tauri HTTP failed');
     }
   }
   
@@ -37,8 +59,24 @@ export async function httpGet(url: string) {
     if (!r.ok) {
       throw new Error(`HTTP ${r.status}: ${r.statusText}`);
     }
-    return await r.json();
+    
+    const data = await r.json();
+    
+    // Success - notify callback  
+    if (networkSuccessCallback) {
+      networkSuccessCallback();
+    }
+    
+    return data;
   } catch (error) {
-    throw new Error(`HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const finalError = error instanceof Error ? error : new Error('Browser fetch failed');
+    
+    // Network failure - notify callback
+    if (networkFailureCallback) {
+      networkFailureCallback();
+    }
+    
+    // Throw the most relevant error
+    throw new Error(`HTTP request failed: ${finalError.message}${lastError ? ` (Tauri: ${lastError.message})` : ''}`);
   }
 }

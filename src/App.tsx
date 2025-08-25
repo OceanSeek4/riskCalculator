@@ -8,12 +8,22 @@ import { Calculator, Bookmark, Settings, TrendingUp, Shield, Globe2 } from 'luci
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { LanguageToggle } from '@/components/ui/language-toggle';
+import { OfflineToggle } from '@/components/ui/offline-toggle';
 import { useCalculatorStore, useSettingsStore } from '@/lib/store';
+import { setNetworkCallbacks } from '@/lib/http';
 
 function App() {
   const { t } = useTranslation();
   const { syncWithSettings } = useCalculatorStore();
-  const { settings } = useSettingsStore();
+  const { settings, incrementNetworkFailure, resetNetworkFailures } = useSettingsStore();
+
+  // Set up network callbacks for automatic offline detection
+  useEffect(() => {
+    setNetworkCallbacks(
+      () => incrementNetworkFailure(),
+      () => resetNetworkFailures()
+    );
+  }, [incrementNetworkFailure, resetNetworkFailures]);
 
   // Ensure calculator is always synced with current settings on app startup
   useEffect(() => {
@@ -26,8 +36,9 @@ function App() {
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-[0.02]" />
         <div className="relative max-w-7xl mx-auto px-4 py-8">
-          {/* Theme and Language toggles */}
+          {/* Theme, Language, and Offline toggles */}
           <div className="absolute top-4 right-4 flex gap-2">
+            <OfflineToggle />
             <LanguageToggle />
             <ThemeToggle />
           </div>

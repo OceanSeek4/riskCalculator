@@ -74,6 +74,15 @@ interface SettingsState {
   setSettings: (settings: Partial<SettingsData>) => void;
   resetSettings: () => void;
   
+  // Offline mode state
+  isOfflineMode: boolean;
+  offlineReason: string | null;
+  networkFailureCount: number;
+  lastNetworkAttempt: number | null;
+  setOfflineMode: (offline: boolean, reason?: string) => void;
+  incrementNetworkFailure: () => void;
+  resetNetworkFailures: () => void;
+  
   // Notification state
   showNotification: boolean;
   notificationMessage: string;
@@ -210,10 +219,16 @@ const defaultSettings: SettingsData = {
   // Symbol list for dropdown
   symbolList: ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'],
   rrRatios: [1, 1.5, 2],
-  theme: 'dark',
+  theme: 'system',
   language: 'zh',
   autoFetchATR: true,
   showAdvancedOptions: true,
+  // Offline mode settings
+  defaultOfflineMode: false,
+  offlineStopMode: 'PIPS',
+  offlineTakeProfitMode: 'RR_RATIO',
+  offlineOrderType: 'LIMIT',
+  offlineTrailingEnabled: false,
 };
 
 // Calculator store
@@ -225,9 +240,19 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   })),
   resetFormData: () => set({ formData: defaultFormData }),
   syncWithSettings: (settings) => set((state) => {
+    // Get offline mode state from settings store
+    const settingsStore = useSettingsStore.getState();
+    const isOfflineMode = settingsStore.isOfflineMode;
+    
     // Create trailing config from settings using current side or default to LONG
     const currentSide = state.formData.side || 'LONG';
     const trailingConfigFromSettings = createTrailingConfigFromSettings(settings, currentSide);
+    
+    // Apply offline mode overrides if in offline mode
+    const stopMode = isOfflineMode ? settings.offlineStopMode : settings.defaultStopMode;
+    const takeProfitMode = isOfflineMode ? settings.offlineTakeProfitMode : settings.defaultTakeProfitMode;
+    const orderType = isOfflineMode ? settings.offlineOrderType : settings.defaultOrderType;
+    const trailingEnabled = isOfflineMode ? settings.offlineTrailingEnabled : settings.defaultTrailingEnabled;
     
     return {
       formData: {
@@ -235,16 +260,16 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         exchange: settings.defaultExchange,
         symbol: settings.defaultSymbol,
         contractMode: settings.defaultContractMode,
-        stopMode: settings.defaultStopMode,
+        stopMode,
         useTakeProfit: settings.defaultUseTakeProfit,
-        takeProfitMode: settings.defaultTakeProfitMode,
+        takeProfitMode,
         takeProfitPrice: settings.defaultTakeProfitPrice,
         takeProfitATRMultiplier: settings.defaultTakeProfitATRMultiplier,
         takeProfitRRRatio: settings.defaultTakeProfitRRRatio,
         stopPips: settings.defaultStopPips,
         takeProfitPips: settings.defaultTakeProfitPips,
         riskMode: settings.defaultRiskMode,
-        orderType: settings.defaultOrderType,
+        orderType,
         leverage: settings.defaultLeverage,
         accountEquity: settings.defaultAccountEquity,
         riskPercent: settings.defaultRiskPercent,
@@ -257,8 +282,8 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         feeClose: settings.defaultFeeClose,
         slippage: settings.defaultSlippage,
       },
-      // Apply trailing stop defaults
-      trailingEnabled: settings.defaultTrailingEnabled,
+      // Apply trailing stop defaults with offline mode override
+      trailingEnabled,
       trailingConfig: {
         ...state.trailingConfig,
         ...trailingConfigFromSettings,
@@ -400,12 +425,61 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
 // Settings store with persistence
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       settings: defaultSettings,
       setSettings: (newSettings) => set((state) => ({
         settings: { ...state.settings, ...newSettings }
       })),
       resetSettings: () => set({ settings: defaultSettings }),
+      
+      // Offline mode state - initialize with default setting
+      isOfflineMode: defaultSettings.defaultOfflineMode,
+      offlineReason: defaultSettings.defaultOfflineMode ? '默认启用离线模式' : null,
+      networkFailureCount: 0,
+      lastNetworkAttempt: null,
+      setOfflineMode: (offline, reason) => set((state) => {
+        // Show notification when switching modes
+        if (offline && !state.isOfflineMode) {
+          // Switching to offline mode
+          setTimeout(() => {
+            get().setNotification(
+              reason || '已切换到离线模式 - 使用默认市场数据', 
+              'info'
+            );
+          }, 100);
+        } else if (!offline && state.isOfflineMode) {
+          // Switching back to online mode
+          setTimeout(() => {
+            get().setNotification('已恢复在线模式 - 可获取实时市场数据', 'success');
+          }, 100);
+        }
+        
+        return {
+          isOfflineMode: offline,
+          offlineReason: offline ? reason : null,
+          networkFailureCount: offline ? state.networkFailureCount : 0
+        };
+      }),
+      incrementNetworkFailure: () => set((state) => {
+        const newCount = state.networkFailureCount + 1;
+        const now = Date.now();
+        
+        // Auto-switch to offline mode after 3 failures
+        if (newCount >= 3 && !state.isOfflineMode) {
+          setTimeout(() => {
+            get().setOfflineMode(true, '网络连接失败3次，已自动切换到离线模式');
+          }, 100);
+        }
+        
+        return {
+          networkFailureCount: newCount,
+          lastNetworkAttempt: now
+        };
+      }),
+      resetNetworkFailures: () => set({
+        networkFailureCount: 0,
+        lastNetworkAttempt: null
+      }),
       
       // Notification state
       showNotification: false,

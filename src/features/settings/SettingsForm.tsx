@@ -1036,6 +1036,73 @@ export function SettingsForm() {
           </div>
         </div>
 
+        {/* Offline Mode Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+            离线模式设置 (Offline Mode Settings)
+          </h3>
+          
+          <div className="space-y-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultOfflineMode}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultOfflineMode', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">默认启用离线模式 (Default offline mode)</span>
+            </label>
+            
+            <div className="pl-6 space-y-4 border-l-2 border-orange-200 dark:border-orange-800">
+              <p className="text-sm text-muted-foreground">
+                离线模式下的默认参数设置，用于替代需要网络数据的在线模式选项
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>离线默认止损模式 (Offline Stop Mode)</Label>
+                  <Select
+                    value={settings.offlineStopMode}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                      handleInputChange('offlineStopMode', e.target.value as 'PRICE' | 'PIPS')
+                    }
+                  >
+                    <option value="PIPS">点差止损 (Pips Stop)</option>
+                    <option value="PRICE">价格止损 (Price Stop)</option>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label>离线默认止盈模式 (Offline Take Profit Mode)</Label>
+                  <Select
+                    value={settings.offlineTakeProfitMode}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                      handleInputChange('offlineTakeProfitMode', e.target.value as 'PRICE' | 'RR_RATIO' | 'PIPS')
+                    }
+                  >
+                    <option value="RR_RATIO">风险回报比 (R:R Ratio)</option>
+                    <option value="PRICE">价格止盈 (Price TP)</option>
+                    <option value="PIPS">点差止盈 (Pips TP)</option>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="bg-muted/50 p-3 rounded text-sm">
+                <p className="font-medium text-orange-700 dark:text-orange-300 mb-2">注意事项 (Notes):</p>
+                <ul className="space-y-1 text-muted-foreground">
+                  <li>• 离线模式下，ATR相关功能将不可用</li>
+                  <li>• 市价单将自动切换为限价单</li>
+                  <li>• 移动止损功能将被禁用</li>
+                  <li>• 使用静态市场数据进行计算</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Advanced Settings */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">

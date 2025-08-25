@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { ComboInput } from '@/components/ui/combo-input';
-import { RefreshCw, AlertCircle, Bookmark, Calculator } from 'lucide-react';
+import { RefreshCw, AlertCircle, Bookmark, Calculator, WifiOff } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
 import { validateNumberString, validateStopPrice } from '@/lib/validation';
@@ -52,7 +52,7 @@ export function CalculatorForm() {
     loadTrailingState,
   } = useCalculatorStore();
 
-  const { settings } = useSettingsStore();
+  const { settings, isOfflineMode } = useSettingsStore();
   const { presets, loadPreset } = usePresetStore();
   const { t } = useTranslation();
   
@@ -95,6 +95,44 @@ export function CalculatorForm() {
       updateTrailingConfig({ side: formData.side });
     }
   }, [settings, syncWithSettings, formData.side, updateTrailingConfig]);
+
+  // Auto-switch away from data-dependent modes when offline mode is enabled
+  useEffect(() => {
+    if (isOfflineMode) {
+      // Switch order type away from MARKET
+      if (formData.orderType === 'MARKET') {
+        handleInputChange('orderType', 'LIMIT');
+        // Set initial price when switching from MARKET to LIMIT
+        setTimeout(() => {
+          if (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '') {
+            handleInputChange('entryPrice', '100000');
+          }
+        }, 0);
+      }
+      
+      // Switch stop mode away from ATR
+      if (formData.stopMode === 'ATR') {
+        handleInputChange('stopMode', 'PRICE');
+      }
+      
+      // Switch take profit mode away from ATR
+      if (formData.takeProfitMode === 'ATR') {
+        handleInputChange('takeProfitMode', 'PRICE');
+      }
+      
+      // Disable trailing stops
+      if (trailingEnabled) {
+        setTrailingEnabled(false);
+      }
+    }
+  }, [isOfflineMode, formData.orderType, formData.stopMode, formData.takeProfitMode, trailingEnabled]);
+
+  // Separate effect for setting initial price in offline mode (to avoid dependency loop)
+  useEffect(() => {
+    if (isOfflineMode && formData.orderType === 'LIMIT' && (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '')) {
+      handleInputChange('entryPrice', '100000');
+    }
+  }, [isOfflineMode, formData.orderType]);
 
   // 步骤4.3：初始化时水合持久化数据（追加）
   useEffect(() => {
@@ -800,11 +838,21 @@ export function CalculatorForm() {
   return (
     <Card className="w-full max-w-md sm:max-w-lg lg:max-w-xl modern-card fade-in">
       <CardHeader className="pb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-white">
-            <Calculator className="w-5 h-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-white">
+              <Calculator className="w-5 h-5" />
+            </div>
+            <CardTitle className="text-xl">{t('calculator')}</CardTitle>
           </div>
-          <CardTitle className="text-xl">{t('calculator')}</CardTitle>
+          {isOfflineMode && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-full text-xs">
+              <WifiOff className="w-3 h-3 text-orange-600 dark:text-orange-400" />
+              <span className="text-orange-700 dark:text-orange-300 font-medium">
+                离线模式
+              </span>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -898,7 +946,7 @@ export function CalculatorForm() {
               variant="outline"
               size="sm"
               onClick={fetchMarketMetadata}
-              disabled={isFetchingMeta || !formData.exchange || !formData.symbol || !formData.contractMode}
+              disabled={isFetchingMeta || !formData.exchange || !formData.symbol || !formData.contractMode || isOfflineMode}
               className="flex-1"
             >
               {isFetchingMeta ? (
@@ -906,6 +954,8 @@ export function CalculatorForm() {
                   <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                   {t('fetchingMetadata')}
                 </>
+              ) : isOfflineMode ? (
+                '离线模式不可用'
               ) : (
                 t('fetchMetadata')
               )}
@@ -913,6 +963,12 @@ export function CalculatorForm() {
             {marketMeta && (
               <div className="text-xs text-muted-foreground px-3 py-2 bg-green-50 rounded border border-green-200 whitespace-nowrap">
                 ✓ {t('metadataLoaded')}: {marketMeta.tickSize}/{marketMeta.stepSize}
+              </div>
+            )}
+            {isOfflineMode && (
+              <div className="text-xs text-muted-foreground px-3 py-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded whitespace-nowrap">
+                <WifiOff className="w-3 h-3 inline mr-1 text-orange-600 dark:text-orange-400" />
+                <span className="text-orange-700 dark:text-orange-300">使用默认市场数据</span>
               </div>
             )}
           </div>
@@ -926,11 +982,35 @@ export function CalculatorForm() {
             <Label>{t('orderType')}</Label>
             <Select
               value={formData.orderType || 'MARKET'}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('orderType', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                if (e.target.value === 'MARKET' && isOfflineMode) {
+                  return; // Prevent switching to market order in offline mode
+                }
+                handleInputChange('orderType', e.target.value);
+                
+                // Set initial price when switching to LIMIT order in offline mode
+                if (e.target.value === 'LIMIT' && isOfflineMode) {
+                  if (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '') {
+                    handleInputChange('entryPrice', '100000');
+                  }
+                }
+              }}
             >
-              <option value="MARKET">{t('marketOrder')}</option>
+              <option value="MARKET" disabled={isOfflineMode}>
+                {t('marketOrder')} {isOfflineMode && '(离线模式不可用)'}
+              </option>
               <option value="LIMIT">{t('limitOrder')}</option>
             </Select>
+            {isOfflineMode && formData.orderType === 'MARKET' && (
+              <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
+                <div className="flex items-center gap-2">
+                  <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-orange-700 dark:text-orange-300">
+                    市价单在离线模式下不可用，已自动切换为限价单
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           
           <div>
@@ -942,7 +1022,7 @@ export function CalculatorForm() {
                   variant="outline"
                   size="sm"
                   onClick={fetchCurrentPrice}
-                  disabled={isFetchingPrice || !formData.exchange || !formData.symbol}
+                  disabled={isFetchingPrice || !formData.exchange || !formData.symbol || isOfflineMode}
                   className="h-6 px-2 text-xs"
                 >
                   {isFetchingPrice ? (
@@ -950,6 +1030,8 @@ export function CalculatorForm() {
                       <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                       {t('fetchingPrice')}
                     </>
+                  ) : isOfflineMode ? (
+                    '离线不可用'
                   ) : (
                     t('getCurrentPrice')
                   )}
@@ -1005,9 +1087,21 @@ export function CalculatorForm() {
               <p className="text-sm text-red-500 mt-1">{priceError}</p>
             )}
             {formData.orderType === 'MARKET' && (
-              <p className="text-xs text-muted-foreground mt-1">
-                📈 {t('marketOrderNote')} - {t('realTimePriceUpdated')}
-              </p>
+              <>
+                <p className="text-xs text-muted-foreground mt-1">
+                  📈 {t('marketOrderNote')} - {t('realTimePriceUpdated')}
+                </p>
+                {isOfflineMode && (
+                  <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
+                    <div className="flex items-center gap-2">
+                      <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <span className="text-orange-700 dark:text-orange-300">
+                        离线模式下无法获取实时价格，请手动输入预期的入场价格
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -1020,12 +1114,29 @@ export function CalculatorForm() {
             <Label>{t('stopMode')}</Label>
             <Select
               value={formData.stopMode || ''}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('stopMode', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                if (e.target.value === 'ATR' && isOfflineMode) {
+                  return; // Prevent switching to ATR mode in offline mode
+                }
+                handleInputChange('stopMode', e.target.value);
+              }}
             >
               <option value="PRICE">{t('priceStop')}</option>
-              <option value="ATR">{t('atrStop')}</option>
+              <option value="ATR" disabled={isOfflineMode}>
+                {t('atrStop')} {isOfflineMode && '(离线模式不可用)'}
+              </option>
               <option value="PIPS">{t('pipsStop')}</option>
             </Select>
+            {isOfflineMode && formData.stopMode === 'ATR' && (
+              <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
+                <div className="flex items-center gap-2">
+                  <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-orange-700 dark:text-orange-300">
+                    ATR 止损在离线模式下不可用，请切换到价格止损或点差止损
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {formData.stopMode === 'PRICE' && (
@@ -1092,11 +1203,11 @@ export function CalculatorForm() {
                   variant="outline"
                   size="sm"
                   onClick={handleFetchATR}
-                  disabled={isFetchingATR}
+                  disabled={isFetchingATR || isOfflineMode}
                   className="flex-1"
                 >
                   <RefreshCw className={`w-4 h-4 mr-1 ${isFetchingATR ? 'animate-spin' : ''}`} />
-                  {t('fetchATRButton')}
+                  {isOfflineMode ? '离线模式不可用' : t('fetchATRButton')}
                 </Button>
                 {currentATR && (
                   <span className="text-sm font-mono bg-muted px-2 py-1 rounded">
@@ -1104,6 +1215,17 @@ export function CalculatorForm() {
                   </span>
                 )}
               </div>
+              
+              {isOfflineMode && (
+                <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
+                  <div className="flex items-center gap-2">
+                    <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                    <span className="text-orange-700 dark:text-orange-300">
+                      ATR 数据获取在离线模式下不可用
+                    </span>
+                  </div>
+                </div>
+              )}
               
               {atrError && (
                 <div className="flex items-center gap-1 text-sm text-red-500">
@@ -1210,13 +1332,30 @@ export function CalculatorForm() {
                 <Label>{t('takeProfitMode')}</Label>
                 <Select
                   value={formData.takeProfitMode || 'PRICE'}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleInputChange('takeProfitMode', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                    if (e.target.value === 'ATR' && isOfflineMode) {
+                      return; // Prevent switching to ATR mode in offline mode
+                    }
+                    handleInputChange('takeProfitMode', e.target.value);
+                  }}
                 >
                   <option value="PRICE">{t('priceTakeProfit')}</option>
-                  <option value="ATR">{t('atrTakeProfit')}</option>
+                  <option value="ATR" disabled={isOfflineMode}>
+                    {t('atrTakeProfit')} {isOfflineMode && '(离线模式不可用)'}
+                  </option>
                   <option value="RR_RATIO">{t('rrRatioTakeProfit')}</option>
                   <option value="PIPS">{t('pipsTakeProfit')}</option>
                 </Select>
+                {isOfflineMode && formData.takeProfitMode === 'ATR' && (
+                  <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
+                    <div className="flex items-center gap-2">
+                      <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      <span className="text-orange-700 dark:text-orange-300">
+                        ATR 止盈在离线模式下不可用，请切换到其他止盈模式
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {formData.takeProfitMode === 'PRICE' && (
@@ -1360,17 +1499,30 @@ export function CalculatorForm() {
               type="checkbox"
               id="trailingEnabled"
               checked={trailingEnabled || false}
+              disabled={isOfflineMode}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                if (isOfflineMode) return; // Prevent enabling in offline mode
                 setTrailingEnabled(e.target.checked);
                 // 步骤4.3：保存trailing配置（追加）
                 saveTrailing();
               }}
-              className="w-4 h-4"
+              className={`w-4 h-4 ${isOfflineMode ? 'opacity-50 cursor-not-allowed' : ''}`}
             />
-            <Label htmlFor="trailingEnabled" className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              {t('trailingStopSettings')}
+            <Label htmlFor="trailingEnabled" className={`text-sm font-semibold text-muted-foreground uppercase tracking-wide ${isOfflineMode ? 'opacity-50' : ''}`}>
+              {t('trailingStopSettings')} {isOfflineMode && '(离线模式不可用)'}
             </Label>
           </div>
+          
+          {isOfflineMode && (
+            <div className="p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
+              <div className="flex items-center gap-2">
+                <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                <span className="text-orange-700 dark:text-orange-300">
+                  移动止损需要实时数据支持，在离线模式下不可用
+                </span>
+              </div>
+            </div>
+          )}
           
           {trailingEnabled && (
             <div className="space-y-4 pl-6 border-l-2 border-blue-200 dark:border-blue-800">

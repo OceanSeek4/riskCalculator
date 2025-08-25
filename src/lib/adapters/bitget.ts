@@ -1,5 +1,6 @@
 import { httpGet } from '../http'
-import type { ExchangeAdapter, InstType, Ticker, MarketMeta } from './types'
+import { getStaticMarketMeta, getDefaultTicker, getDefaultKlines } from './static/fallback'
+import type { ExchangeAdapter, Ticker, MarketMeta } from './types'
 
 export const bitget: ExchangeAdapter = {
   toExchangeSymbol(s) { 
@@ -8,20 +9,25 @@ export const bitget: ExchangeAdapter = {
 
   async fetchTicker(symbol, type): Promise<Ticker> {
     const sym = this.toExchangeSymbol(symbol, type)
-    if (type === 'USDT_PERP') {
-      const d = await httpGet(`https://api.bitget.com/api/v2/mix/market/ticker?productType=USDT-FUTURES&symbol=${sym}`)
-      const x = d.data?.[0]
-      if (!x) {
-        throw new Error(`No ticker data for ${sym} on Bitget USDT-FUTURES`)
+    try {
+      if (type === 'USDT_PERP') {
+        const d = await httpGet(`https://api.bitget.com/api/v2/mix/market/ticker?productType=USDT-FUTURES&symbol=${sym}`)
+        const x = d.data?.[0]
+        if (!x) {
+          throw new Error(`No ticker data for ${sym} on Bitget USDT-FUTURES`)
+        }
+        return { last: +x.lastPr, mark: x.markPrice ? +x.markPrice : undefined, ts: +x.ts }
+      } else {
+        const d = await httpGet(`https://api.bitget.com/api/v2/spot/market/tickers?symbol=${sym}`)
+        const x = d.data?.[0]
+        if (!x) {
+          throw new Error(`No ticker data for ${sym} on Bitget Spot`)
+        }
+        return { last: +x.lastPr, ts: +x.ts }
       }
-      return { last: +x.lastPr, mark: x.markPrice ? +x.markPrice : undefined, ts: +x.ts }
-    } else {
-      const d = await httpGet(`https://api.bitget.com/api/v2/spot/market/tickers?symbol=${sym}`)
-      const x = d.data?.[0]
-      if (!x) {
-        throw new Error(`No ticker data for ${sym} on Bitget Spot`)
-      }
-      return { last: +x.lastPr, ts: +x.ts }
+    } catch (error) {
+      console.warn(`Bitget fetchTicker failed, using fallback for ${sym}:`, error)
+      return getDefaultTicker(sym)
     }
   },
 
@@ -53,54 +59,62 @@ export const bitget: ExchangeAdapter = {
       // 按时间戳升序排序，确保时间序列正确
       return klines.sort((a: any, b: any) => a.t - b.t);
     } catch (error) {
-      console.error(`Bitget fetchKlines error for ${sym} ${interval}:`, error)
-      throw error
+      console.warn(`Bitget fetchKlines failed, using fallback for ${sym}:`, error)
+      return getDefaultKlines(sym)
     }
   },
 
   async fetchMarketMeta(symbol, type): Promise<MarketMeta> {
     const sym = this.toExchangeSymbol(symbol, type)
-    if (type === 'USDT_PERP') {
-      const d = await httpGet(`https://api.bitget.com/api/v2/mix/market/contracts?productType=USDT-FUTURES&symbol=${sym}`)
-      const s = d.data?.[0]
-      if (!s) {
-        throw new Error(`Symbol ${sym} not found on Bitget USDT-FUTURES`)
+    try {
+      if (type === 'USDT_PERP') {
+        const d = await httpGet(`https://api.bitget.com/api/v2/mix/market/contracts?productType=USDT-FUTURES&symbol=${sym}`)
+        const s = d.data?.[0]
+        if (!s) {
+          throw new Error(`Symbol ${sym} not found on Bitget USDT-FUTURES`)
+        }
+        // Convert pricePlace (decimal places) to tickSize value
+        const pricePlaces = s.pricePlace != null ? +s.pricePlace : 1
+        const tick = Math.pow(10, -pricePlaces).toString()
+        
+        // Convert sizePlace (decimal places) to stepSize value  
+        const sizePlaces = s.sizePlace != null ? +s.sizePlace : 3
+        const step = Math.pow(10, -sizePlaces).toString()
+        
+        return { 
+          symbol: sym,
+          tickSize: tick, 
+          stepSize: step, 
+          minQty: s.minTradeNum ?? '0.001', 
+          minNotional: '5', 
+          leverageMax: s.maxLeverage ? +s.maxLeverage : 100,
+          mmr: '0.004'
+        }
+      } else {
+        const d = await httpGet(`https://api.bitget.com/api/v2/spot/public/symbols`)
+        const s = d.data?.find((x:any)=> x.symbol === sym) ?? d.data?.[0]
+        if (!s) {
+          throw new Error(`Symbol ${sym} not found on Bitget Spot`)
+        }
+        const tick = (s?.pricePrecision != null) ? Math.pow(10, -s.pricePrecision).toString() : '0.01'
+        const step = (s?.quantityPrecision != null) ? Math.pow(10, -s.quantityPrecision).toString() : '0.0001'
+        return { 
+          symbol: sym,
+          tickSize: tick, 
+          stepSize: step, 
+          minQty: s?.minTradeNum ?? '0.001', 
+          minNotional: s?.minTradeUSDT ?? '5', 
+          leverageMax: 1,
+          mmr: '0.001'
+        }
       }
-      // Convert pricePlace (decimal places) to tickSize value
-      const pricePlaces = s.pricePlace != null ? +s.pricePlace : 1
-      const tick = Math.pow(10, -pricePlaces).toString()
-      
-      // Convert sizePlace (decimal places) to stepSize value  
-      const sizePlaces = s.sizePlace != null ? +s.sizePlace : 3
-      const step = Math.pow(10, -sizePlaces).toString()
-      
-      return { 
-        symbol: sym,
-        tickSize: tick, 
-        stepSize: step, 
-        minQty: s.minTradeNum ?? '0.001', 
-        minNotional: '5', 
-        leverageMax: s.maxLeverage ? +s.maxLeverage : 100,
-        mmr: '0.004' // Default maintenance margin rate
+    } catch (error) {
+      console.warn(`Bitget fetchMarketMeta failed, using fallback for ${sym}:`, error)
+      const fallback = getStaticMarketMeta('BITGET', sym, type)
+      if (!fallback) {
+        throw new Error(`Symbol ${sym} not supported on Bitget ${type} (offline mode)`)
       }
-    } else {
-      const d = await httpGet(`https://api.bitget.com/api/v2/spot/public/symbols`)
-      const s = d.data?.find((x:any)=> x.symbol === sym) ?? d.data?.[0]
-      if (!s) {
-        throw new Error(`Symbol ${sym} not found on Bitget Spot`)
-      }
-      // 防守型解析
-      const tick = (s?.pricePrecision != null) ? Math.pow(10, -s.pricePrecision).toString() : '0.01'
-      const step = (s?.quantityPrecision != null) ? Math.pow(10, -s.quantityPrecision).toString() : '0.0001'
-      return { 
-        symbol: sym,
-        tickSize: tick, 
-        stepSize: step, 
-        minQty: s?.minTradeNum ?? '0.001', 
-        minNotional: s?.minTradeUSDT ?? '5', 
-        leverageMax: 1,
-        mmr: '0.001' // Lower maintenance margin for spot
-      }
+      return fallback
     }
   },
 

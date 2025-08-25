@@ -32,13 +32,13 @@ export function ThemeToggle() {
   const getThemeLabel = () => {
     switch (theme) {
       case 'light':
-        return 'Light';
+        return '浅色';
       case 'dark':
-        return 'Dark';
+        return '深色';
       case 'system':
-        return 'System';
+        return '跟随系统';
       default:
-        return 'Light';
+        return '浅色';
     }
   };
 
@@ -48,7 +48,7 @@ export function ThemeToggle() {
       size="sm"
       onClick={handleThemeChange}
       className="gap-2 text-xs"
-      title={`Current theme: ${getThemeLabel()} (${resolvedTheme})`}
+      title={`当前主题: ${getThemeLabel()} (${resolvedTheme === 'light' ? '浅色' : resolvedTheme === 'dark' ? '深色' : '系统'})`}
     >
       {getThemeIcon()}
       <span className="hidden sm:inline">{getThemeLabel()}</span>

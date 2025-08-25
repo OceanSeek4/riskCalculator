@@ -1,5 +1,6 @@
 import { httpGet } from '../http'
-import type { ExchangeAdapter, InstType, Ticker, MarketMeta } from './types'
+import { getStaticMarketMeta, getDefaultTicker, getDefaultKlines } from './static/fallback'
+import type { ExchangeAdapter, Ticker, MarketMeta } from './types'
 
 export const okx: ExchangeAdapter = {
   toExchangeSymbol(s, type) {
@@ -35,12 +36,17 @@ export const okx: ExchangeAdapter = {
 
   async fetchTicker(symbol, type): Promise<Ticker> {
     const instId = this.toExchangeSymbol(symbol, type)
-    const data = await httpGet(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`)
-    const d = data.data?.[0]
-    if (!d) {
-      throw new Error(`No ticker data for ${instId} on OKX`)
+    try {
+      const data = await httpGet(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`)
+      const d = data.data?.[0]
+      if (!d) {
+        throw new Error(`No ticker data for ${instId} on OKX`)
+      }
+      return { last: Number(d.last), ts: Number(d.ts) }
+    } catch (error) {
+      console.warn(`OKX fetchTicker failed, using fallback for ${instId}:`, error)
+      return getDefaultTicker(instId)
     }
-    return { last: Number(d.last), ts: Number(d.ts) }
   },
 
   async fetchKlines(symbol, type, interval, limit) {
@@ -66,8 +72,8 @@ export const okx: ExchangeAdapter = {
       // 按时间戳升序排序，确保时间序列正确
       return klines.sort((a: any, b: any) => a.t - b.t);
     } catch (error) {
-      console.error(`OKX fetchKlines error for ${instId} ${interval}:`, error)
-      throw error
+      console.warn(`OKX fetchKlines failed, using fallback for ${instId}:`, error)
+      return getDefaultKlines(instId)
     }
   },
 
@@ -101,19 +107,28 @@ export const okx: ExchangeAdapter = {
       }
     }
     
-    const data = await httpGet(`https://www.okx.com/api/v5/public/instruments?instType=${instType}&uly=${base}-${quote}`)
-    const s = data.data.find((x:any)=> x.instId === instId) ?? data.data[0]
-    if (!s) {
-      throw new Error(`Symbol ${instId} not found on OKX ${instType}`)
-    }
-    return { 
-      symbol: instId,
-      tickSize: s.tickSz ?? '0.01', 
-      stepSize: s.lotSz ?? '0.001', 
-      minQty: s.minSz ?? '0.001', 
-      minNotional: '5', 
-      leverageMax: 125,
-      mmr: '0.004' // Default maintenance margin rate
+    try {
+      const data = await httpGet(`https://www.okx.com/api/v5/public/instruments?instType=${instType}&uly=${base}-${quote}`)
+      const s = data.data.find((x:any)=> x.instId === instId) ?? data.data[0]
+      if (!s) {
+        throw new Error(`Symbol ${instId} not found on OKX ${instType}`)
+      }
+      return { 
+        symbol: instId,
+        tickSize: s.tickSz ?? '0.01', 
+        stepSize: s.lotSz ?? '0.001', 
+        minQty: s.minSz ?? '0.001', 
+        minNotional: '5', 
+        leverageMax: 125,
+        mmr: '0.004'
+      }
+    } catch (error) {
+      console.warn(`OKX fetchMarketMeta failed, using fallback for ${instId}:`, error)
+      const fallback = getStaticMarketMeta('OKX', instId, type)
+      if (!fallback) {
+        throw new Error(`Symbol ${instId} not supported on OKX ${instType} (offline mode)`)
+      }
+      return fallback
     }
   },
 

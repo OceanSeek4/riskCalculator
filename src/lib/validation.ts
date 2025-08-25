@@ -120,6 +120,13 @@ export const settingsSchema = z.object({
   // Advanced
   autoFetchATR: z.boolean().default(true),
   showAdvancedOptions: z.boolean().default(false),
+  
+  // Offline mode settings
+  defaultOfflineMode: z.boolean().default(false),
+  offlineStopMode: z.enum(['PRICE', 'PIPS']).default('PIPS'),
+  offlineTakeProfitMode: z.enum(['PRICE', 'RR_RATIO', 'PIPS']).default('RR_RATIO'),
+  offlineOrderType: z.enum(['LIMIT']).default('LIMIT'),
+  offlineTrailingEnabled: z.boolean().default(false),
 });
 
 export type SettingsData = z.infer<typeof settingsSchema>;

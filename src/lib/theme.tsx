@@ -28,8 +28,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       let newTheme: 'light' | 'dark' | 'system';
 
       if (settings.theme === 'system') {
-        // Use system theme as a unique blue-white theme
-        newTheme = 'system';
+        // Check system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        newTheme = prefersDark ? 'dark' : 'light';
       } else {
         newTheme = settings.theme;
       }
@@ -46,7 +47,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
     updateTheme();
 
-    // No need to listen for system theme changes since 'system' is now a fixed theme
+    // Listen for system theme changes when in system mode
+    if (settings.theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => updateTheme();
+      mediaQuery.addEventListener('change', handleChange);
+      
+      return () => {
+        mediaQuery.removeEventListener('change', handleChange);
+      };
+    }
   }, [settings.theme]);
 
   const value: ThemeContextType = {

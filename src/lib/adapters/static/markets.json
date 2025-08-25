@@ -59,6 +59,86 @@
         "leverageMax": 75,
         "mmr": "0.01"
       }
+    },
+    "ADAUSDT": {
+      "spot": {
+        "symbol": "ADAUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "ADAUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "SOLUSDT": {
+      "spot": {
+        "symbol": "SOLUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "SOLUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "XRPUSDT": {
+      "spot": {
+        "symbol": "XRPUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "XRPUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "DOTUSDT": {
+      "spot": {
+        "symbol": "DOTUSDT",
+        "tickSize": "0.001",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "DOTUSDT",
+        "tickSize": "0.001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
     }
   },
   "BYBIT": {
@@ -90,6 +170,50 @@
         "tickSize": "0.0001",
         "stepSize": "1",
         "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
+    },
+    "ADAUSDT": {
+      "linear": {
+        "symbol": "ADAUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
+    },
+    "SOLUSDT": {
+      "linear": {
+        "symbol": "SOLUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "XRPUSDT": {
+      "linear": {
+        "symbol": "XRPUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
+    },
+    "DOTUSDT": {
+      "linear": {
+        "symbol": "DOTUSDT",
+        "tickSize": "0.001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
         "minNotional": "5",
         "leverageMax": 50,
         "mmr": "0.02"
@@ -156,6 +280,86 @@
         "leverageMax": 75,
         "mmr": "0.01"
       }
+    },
+    "ADAUSDT": {
+      "spot": {
+        "symbol": "ADAUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "ADAUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "SOLUSDT": {
+      "spot": {
+        "symbol": "SOLUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "SOLUSDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "XRPUSDT": {
+      "spot": {
+        "symbol": "XRPUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "XRPUSDT",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "5",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "DOTUSDT": {
+      "spot": {
+        "symbol": "DOTUSDT",
+        "tickSize": "0.001",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "5",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "DOTUSDT",
+        "tickSize": "0.001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "5",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
     }
   },
   "OKX": {
@@ -214,6 +418,86 @@
         "tickSize": "0.0001",
         "stepSize": "1",
         "minQty": "1",
+        "minNotional": "1",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
+    },
+    "ADA-USDT": {
+      "spot": {
+        "symbol": "ADA-USDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "ADA-USDT-SWAP",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "1",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
+    },
+    "SOL-USDT": {
+      "spot": {
+        "symbol": "SOL-USDT",
+        "tickSize": "0.01",
+        "stepSize": "0.001",
+        "minQty": "0.001",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "SOL-USDT-SWAP",
+        "tickSize": "0.01",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "1",
+        "leverageMax": 75,
+        "mmr": "0.01"
+      }
+    },
+    "XRP-USDT": {
+      "spot": {
+        "symbol": "XRP-USDT",
+        "tickSize": "0.0001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "XRP-USDT-SWAP",
+        "tickSize": "0.0001",
+        "stepSize": "1",
+        "minQty": "1",
+        "minNotional": "1",
+        "leverageMax": 50,
+        "mmr": "0.02"
+      }
+    },
+    "DOT-USDT": {
+      "spot": {
+        "symbol": "DOT-USDT",
+        "tickSize": "0.001",
+        "stepSize": "0.01",
+        "minQty": "0.01",
+        "minNotional": "1",
+        "leverageMax": 1,
+        "mmr": "0"
+      },
+      "usdm": {
+        "symbol": "DOT-USDT-SWAP",
+        "tickSize": "0.001",
+        "stepSize": "0.1",
+        "minQty": "0.1",
         "minNotional": "1",
         "leverageMax": 50,
         "mmr": "0.02"

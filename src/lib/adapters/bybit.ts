@@ -1,4 +1,5 @@
 import { httpGet } from '../http'
+import { getStaticMarketMeta, getDefaultTicker, getDefaultKlines } from './static/fallback'
 import type { ExchangeAdapter, InstType, Ticker, MarketMeta } from './types'
 
 export const bybit: ExchangeAdapter = {
@@ -9,12 +10,17 @@ export const bybit: ExchangeAdapter = {
   async fetchTicker(symbol, type): Promise<Ticker> {
     const sym = this.toExchangeSymbol(symbol, type)
     const category = type === 'USDT_PERP' ? 'linear' : 'spot'
-    const data = await httpGet(`https://api.bybit.com/v5/market/tickers?category=${category}&symbol=${sym}`)
-    const d = data.result.list[0]
-    if (!d) {
-      throw new Error(`No ticker data for ${sym} on Bybit ${category}`)
+    try {
+      const data = await httpGet(`https://api.bybit.com/v5/market/tickers?category=${category}&symbol=${sym}`)
+      const d = data.result.list[0]
+      if (!d) {
+        throw new Error(`No ticker data for ${sym} on Bybit ${category}`)
+      }
+      return { last: Number(d.lastPrice), mark: d.markPrice ? Number(d.markPrice) : undefined, ts: Date.now() }
+    } catch (error) {
+      console.warn(`Bybit fetchTicker failed, using fallback for ${sym}:`, error)
+      return getDefaultTicker(sym)
     }
-    return { last: Number(d.lastPrice), mark: d.markPrice ? Number(d.markPrice) : undefined, ts: Date.now() }
   },
 
   async fetchKlines(symbol, type, interval, limit) {
@@ -39,36 +45,40 @@ export const bybit: ExchangeAdapter = {
       }));
       
       // 反转数组使其按时间升序排列（最老的数据在前）
-      const sortedKlines = klines.reverse();
-      
-      // 添加调试信息（仅在大时间框架时）
-
-      
-      return sortedKlines;
+      return klines.reverse();
     } catch (error) {
-      console.error(`Bybit fetchKlines error for ${sym} ${interval}:`, error)
-      throw error
+      console.warn(`Bybit fetchKlines failed, using fallback for ${sym}:`, error)
+      return getDefaultKlines(sym)
     }
   },
 
   async fetchMarketMeta(symbol, type): Promise<MarketMeta> {
     const sym = this.toExchangeSymbol(symbol, type)
     const category = type === 'USDT_PERP' ? 'linear' : 'spot'
-    const data = await httpGet(`https://api.bybit.com/v5/market/instruments-info?category=${category}&symbol=${sym}`)
-    const s = data.result.list[0]
-    if (!s) {
-      throw new Error(`Symbol ${sym} not found on Bybit ${category}`)
-    }
-    const lot = s.lotSizeFilter
-    const pf = s.priceFilter
-    return { 
-      symbol: sym,
-      tickSize: pf?.tickSize ?? '0.01', 
-      stepSize: lot?.qtyStep ?? '0.001', 
-      minQty: lot?.minOrderQty ?? '0.001', 
-      minNotional: s?.minNotionalValue ?? '5', 
-      leverageMax: Number(s?.leverageFilter?.maxLeverage ?? 100),
-      mmr: '0.004' // Default maintenance margin rate
+    try {
+      const data = await httpGet(`https://api.bybit.com/v5/market/instruments-info?category=${category}&symbol=${sym}`)
+      const s = data.result.list[0]
+      if (!s) {
+        throw new Error(`Symbol ${sym} not found on Bybit ${category}`)
+      }
+      const lot = s.lotSizeFilter
+      const pf = s.priceFilter
+      return { 
+        symbol: sym,
+        tickSize: pf?.tickSize ?? '0.01', 
+        stepSize: lot?.qtyStep ?? '0.001', 
+        minQty: lot?.minOrderQty ?? '0.001', 
+        minNotional: s?.minNotionalValue ?? '5', 
+        leverageMax: Number(s?.leverageFilter?.maxLeverage ?? 100),
+        mmr: '0.004'
+      }
+    } catch (error) {
+      console.warn(`Bybit fetchMarketMeta failed, using fallback for ${sym}:`, error)
+      const fallback = getStaticMarketMeta('BYBIT', sym, type)
+      if (!fallback) {
+        throw new Error(`Symbol ${sym} not supported on Bybit ${category} (offline mode)`)
+      }
+      return fallback
     }
   },
 

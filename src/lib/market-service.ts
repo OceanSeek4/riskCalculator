@@ -1,7 +1,23 @@
 import { binance, bybit, okx, bitget, type Exchange, type InstType } from './adapters'
 import { calculateATR, type KlineData } from '@/lib/core'
+import { getDefaultTicker, getDefaultKlines } from './adapters/static/fallback'
 
 const ADAPTERS: Record<Exchange, any> = { BINANCE: binance, BYBIT: bybit, OKX: okx, BITGET: bitget }
+
+// Check if offline mode is enabled
+function isOfflineMode(): boolean {
+  try {
+    // Access the store to check offline status
+    const settingsStorage = localStorage.getItem('settings-storage');
+    if (settingsStorage) {
+      const parsed = JSON.parse(settingsStorage);
+      return parsed.state?.isOfflineMode || false;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 // 获取当前市价
 export async function getCurrentPrice(
@@ -9,6 +25,22 @@ export async function getCurrentPrice(
   symbol: string,
   instType: InstType = 'SPOT'
 ): Promise<number> {
+  // Check if offline mode is enabled
+  if (isOfflineMode()) {
+    console.log('Offline mode enabled, using static price data');
+    // Convert symbol format for OKX
+    let exchangeSymbol = symbol;
+    if (exchange === 'OKX' && !symbol.includes('-')) {
+      const adapter = ADAPTERS[exchange];
+      if (adapter && adapter.toExchangeSymbol) {
+        exchangeSymbol = adapter.toExchangeSymbol(symbol, instType);
+      }
+    }
+    
+    const ticker = getDefaultTicker(exchangeSymbol);
+    return ticker.last;
+  }
+
   try {
     const adapter = ADAPTERS[exchange]
     if (!adapter) {
@@ -39,6 +71,23 @@ export async function getOHLCVData(
   limit: number = 100,
   instType: InstType = 'SPOT'
 ): Promise<Array<{ t:number,o:number,h:number,l:number,c:number,v:number }>> {
+  // Check if offline mode is enabled
+  if (isOfflineMode()) {
+    console.log('Offline mode enabled, using static kline data');
+    // Convert symbol format for OKX
+    let exchangeSymbol = symbol;
+    if (exchange === 'OKX' && !symbol.includes('-')) {
+      const adapter = ADAPTERS[exchange];
+      if (adapter && adapter.toExchangeSymbol) {
+        exchangeSymbol = adapter.toExchangeSymbol(symbol, instType);
+      }
+    }
+    
+    const klines = getDefaultKlines(exchangeSymbol);
+    // Return only the requested number of klines
+    return klines.slice(-limit);
+  }
+
   try {
     const adapter = ADAPTERS[exchange]
     if (!adapter) {
