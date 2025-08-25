@@ -68,6 +68,8 @@ const resources = {
       failedToFetchMA: 'Failed to fetch MA',
       maStopExplanation: 'Uses Simple Moving Average as stop loss level',
       emaStopExplanation: 'Uses Exponential Moving Average as stop loss level',
+      stopPipsHelp: 'Enter stop loss distance in pips from entry price',
+      takeProfitPipsHelp: 'Enter take profit distance in pips from entry price',
       
       // Take Profit
       takeProfitSettings: 'Take Profit Settings',
@@ -545,6 +547,8 @@ const resources = {
       failedToFetchMA: '获取均线失败',
       maStopExplanation: '使用简单移动平均线作为止损位',
       emaStopExplanation: '使用指数移动平均线作为止损位',
+      stopPipsHelp: '输入距离入场价格的止损点差',
+      takeProfitPipsHelp: '输入距离入场价格的止盈点差',
       
       // Take Profit
       takeProfitSettings: '止盈设置',

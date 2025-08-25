@@ -15,7 +15,7 @@ import { setNetworkCallbacks } from '@/lib/http';
 function App() {
   const { t } = useTranslation();
   const { syncWithSettings } = useCalculatorStore();
-  const { settings, incrementNetworkFailure, resetNetworkFailures } = useSettingsStore();
+  const { settings, incrementNetworkFailure, resetNetworkFailures, initializeOfflineMode } = useSettingsStore();
 
   // Set up network callbacks for automatic offline detection
   useEffect(() => {
@@ -24,6 +24,11 @@ function App() {
       () => resetNetworkFailures()
     );
   }, [incrementNetworkFailure, resetNetworkFailures]);
+
+  // Initialize offline mode from persisted settings on app startup
+  useEffect(() => {
+    initializeOfflineMode();
+  }, [initializeOfflineMode]);
 
   // Ensure calculator is always synced with current settings on app startup
   useEffect(() => {

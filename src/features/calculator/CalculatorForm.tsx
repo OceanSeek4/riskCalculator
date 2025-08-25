@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { ComboInput } from '@/components/ui/combo-input';
-import { RefreshCw, AlertCircle, Bookmark, Calculator, WifiOff } from 'lucide-react';
+import { RefreshCw, AlertCircle, Bookmark, Calculator, WifiOff, Check, X } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
 import { validateNumberString, validateStopPrice, type CalculatorFormData } from '@/lib/validation';
@@ -52,9 +52,31 @@ export function CalculatorForm() {
     loadTrailingState,
   } = useCalculatorStore();
 
-  const { settings, isOfflineMode } = useSettingsStore();
+  const { 
+    settings, 
+    isOfflineMode,
+    showNotification,
+    notificationMessage,
+    notificationType,
+    setNotification,
+    clearNotification
+  } = useSettingsStore();
   const { presets, loadPreset } = usePresetStore();
   const { t } = useTranslation();
+  
+
+  
+  // Auto-clear notification after different durations based on type
+  useEffect(() => {
+    if (showNotification) {
+      const duration = notificationType === 'success' ? 4000 : 
+                       notificationType === 'error' ? 5000 : 3000;
+      const timer = setTimeout(() => {
+        clearNotification();
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [showNotification, notificationType, clearNotification]);
   
   const [marketMeta, setMarketMeta] = useState<any>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -88,75 +110,64 @@ export function CalculatorForm() {
 
   // Sync calculator with settings on component mount and settings changes
   useEffect(() => {
-    syncWithSettings(settings);
+
+    syncWithSettings(settings, isOfflineMode);
     // The syncWithSettings now handles trailing config from settings,
     // but we still need to update the side when it changes
     if (formData.side) {
       updateTrailingConfig({ side: formData.side });
     }
-  }, [settings, syncWithSettings, formData.side, updateTrailingConfig]);
+  }, [settings, syncWithSettings, formData.side, updateTrailingConfig, isOfflineMode]);
 
-  // Auto-switch modes based on online/offline state using settings defaults
+
+  // 监听离线模式切换，强制重置订单类型和价格
+  const prevOfflineModeRef = useRef(isOfflineMode);
   useEffect(() => {
-    if (isOfflineMode) {
-      // 切换到离线模式：完全按照设置保存中的离线模式配置进行切换
-      setFormData(currentData => {
-        const updates: Partial<CalculatorFormData> = {};
-        
-        // 1. 订单类型：强制切换到离线设置中的订单类型
-        if (currentData.orderType !== settings.offlineOrderType) {
-          updates.orderType = settings.offlineOrderType;
-        }
-        
-        // 2. 入场价格：对于离线模式，始终使用设置中的默认价格
-        if (settings.offlineOrderType === 'LIMIT') {
-          updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
-        } else if (settings.offlineOrderType === 'MARKET') {
-          updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
-        }
-        
-        // 3. 止损模式：切换到离线止损模式
-        if (currentData.stopMode !== settings.offlineStopMode) {
-          updates.stopMode = settings.offlineStopMode;
-        }
-        
-        // 4. 止盈模式：切换到离线止盈模式
-        if (currentData.takeProfitMode !== settings.offlineTakeProfitMode) {
-          updates.takeProfitMode = settings.offlineTakeProfitMode;
-        }
-        
-        // 5. 止盈开关：如果离线止盈模式是RR_RATIO，确保启用止盈
-        if (settings.offlineTakeProfitMode === 'RR_RATIO' && !currentData.useTakeProfit) {
-          updates.useTakeProfit = true;
-        }
-        
-        // 如果有更新，返回新的数据，否则返回原数据
-        return Object.keys(updates).length > 0 ? { ...currentData, ...updates } : currentData;
-      });
+    const wasOffline = prevOfflineModeRef.current;
+    const isNowOffline = isOfflineMode;
+    
+    // 当切换到离线模式时，强制重置订单类型和价格
+    if (!wasOffline && isNowOffline) {
+      // 切换到离线模式：强制设置为限价单和默认价格
+      const updates = {
+        orderType: settings.offlineOrderType || 'LIMIT',
+        entryPrice: settings.offlineDefaultEntryPrice || '100000'
+      };
+      setFormData(updates);
       
-      // 6. 移动止损：按照离线设置处理
-      if (trailingEnabled !== settings.offlineTrailingEnabled) {
-        setTrailingEnabled(settings.offlineTrailingEnabled);
-      }
+      // 显示切换通知
+      setTimeout(() => {
+        setNotification('已切换到离线模式，订单类型和价格已重置为离线设置', 'info');
+      }, 100);
+    }
+    // 当切换回在线模式时，恢复在线默认设置
+    else if (wasOffline && !isNowOffline) {
+      // 切换到在线模式：恢复在线默认订单类型
+      const updates = {
+        orderType: settings.defaultOrderType || 'MARKET'
+      };
+      setFormData(updates);
       
-    } else {
-      // 切换到在线模式：智能恢复，避免强制覆盖用户选择
-      // 在线模式下不强制修改任何设置，让用户自己选择
-      
-      // 唯一的例外：移动止损恢复到用户设置偏好
-      if (trailingEnabled !== settings.defaultTrailingEnabled) {
-        setTrailingEnabled(settings.defaultTrailingEnabled);
+      // 显示切换通知
+      setTimeout(() => {
+        setNotification('已切换到在线模式，订单类型已恢复为在线设置', 'success');
+      }, 100);
+    }
+    
+    // 更新ref
+    prevOfflineModeRef.current = isNowOffline;
+  }, [isOfflineMode, settings.offlineOrderType, settings.offlineDefaultEntryPrice, settings.defaultOrderType, setFormData, setNotification]);
+
+  // 确保离线模式下的入场价格设置（保持现有逻辑作为后备）
+  useEffect(() => {
+    if (isOfflineMode && formData.orderType === 'LIMIT') {
+      // 如果是离线模式且订单类型是LIMIT，确保有正确的默认价格
+      const defaultPrice = settings.offlineDefaultEntryPrice || '100000';
+      if (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '') {
+        handleInputChange('entryPrice', defaultPrice);
       }
     }
-  }, [isOfflineMode, settings.offlineOrderType, settings.offlineDefaultEntryPrice, settings.offlineStopMode, settings.offlineTakeProfitMode, settings.offlineTrailingEnabled, settings.defaultTrailingEnabled, trailingEnabled]);
-
-  // 额外的安全检查：确保离线模式下始终有价格设定
-  // 这个useEffect作为后备机制，确保即使主要的切换逻辑遗漏，价格也会被正确设置
-  useEffect(() => {
-    if (isOfflineMode && (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '')) {
-      handleInputChange('entryPrice', settings.offlineDefaultEntryPrice || '100000');
-    }
-  }, [isOfflineMode, formData.entryPrice, settings.offlineDefaultEntryPrice]);
+  }, [isOfflineMode, formData.orderType, formData.entryPrice, settings.offlineDefaultEntryPrice]);
 
   // 步骤4.3：初始化时水合持久化数据（追加）
   useEffect(() => {
@@ -869,17 +880,57 @@ export function CalculatorForm() {
             </div>
             <CardTitle className="text-xl">{t('calculator')}</CardTitle>
           </div>
-          {isOfflineMode && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-full text-xs">
+          <div className={`flex items-center gap-2 px-3 py-1 border rounded-full text-xs ${
+            isOfflineMode 
+              ? 'bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800'
+              : 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
+          }`}>
+            {isOfflineMode ? (
               <WifiOff className="w-3 h-3 text-orange-600 dark:text-orange-400" />
-              <span className="text-orange-700 dark:text-orange-300 font-medium">
-                离线模式
-              </span>
-            </div>
-          )}
+            ) : (
+              <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+            )}
+            <span className={`font-medium ${
+              isOfflineMode 
+                ? 'text-orange-700 dark:text-orange-300'
+                : 'text-green-700 dark:text-green-300'
+            }`}>
+              {isOfflineMode ? '离线模式' : '在线模式'}
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Notification display */}
+        {showNotification && (
+          <div className={`
+            p-4 rounded-lg border-l-4 flex items-center gap-3 animate-in slide-in-from-top-2 duration-300
+            ${notificationType === 'success' ? 'bg-green-50 dark:bg-green-950/50 border-green-500 text-green-800 dark:text-green-200' : 
+              notificationType === 'error' ? 'bg-red-50 dark:bg-red-950/50 border-red-500 text-red-800 dark:text-red-200' : 
+              'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-800 dark:text-blue-200'}
+          `}>
+            <div className="flex-shrink-0">
+              {notificationType === 'success' && <Check className="w-5 h-5 text-green-600 dark:text-green-400" />}
+              {notificationType === 'error' && <X className="w-5 h-5 text-red-600 dark:text-red-400" />}
+              {notificationType === 'info' && <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-sm">
+                {notificationType === 'success' ? '成功' : 
+                 notificationType === 'error' ? '错误' : 
+                 '提示'}
+              </p>
+              <p className="text-sm opacity-90 mt-1">{notificationMessage}</p>
+            </div>
+            <button
+              onClick={clearNotification}
+              className="flex-shrink-0 p-1 rounded-full hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        
         {/* 防御性渲染：检查必要数据是否就绪 */}
         {(!formData.exchange || !formData.symbol || !formData.contractMode) && !marketMeta && (
           <div className="text-center py-8">
@@ -1007,15 +1058,21 @@ export function CalculatorForm() {
             <Select
               value={formData.orderType || 'MARKET'}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                // 防止在离线模式下选择市价单
                 if (e.target.value === 'MARKET' && isOfflineMode) {
-                  return; // Prevent switching to market order in offline mode
+                  // 显示通知并阻止切换
+                  setTimeout(() => {
+                    setNotification('离线模式下无法使用市价单，请使用限价单', 'info');
+                  }, 100);
+                  return; // 不执行切换
                 }
+                
                 handleInputChange('orderType', e.target.value);
                 
                 // Set initial price when switching to LIMIT order in offline mode
                 if (e.target.value === 'LIMIT' && isOfflineMode) {
                   if (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '') {
-                    handleInputChange('entryPrice', '100000');
+                    handleInputChange('entryPrice', settings.offlineDefaultEntryPrice || '100000');
                   }
                 }
               }}
@@ -1030,7 +1087,17 @@ export function CalculatorForm() {
                 <div className="flex items-center gap-2">
                   <WifiOff className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                   <span className="text-orange-700 dark:text-orange-300">
-                    市价单在离线模式下不可用，已自动切换为限价单
+                    市价单在离线模式下不可用，请切换到限价单
+                  </span>
+                </div>
+              </div>
+            )}
+            {isOfflineMode && formData.orderType === 'LIMIT' && (
+              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-blue-700 dark:text-blue-300">
+                    离线模式：使用默认价格，无法获取实时市场价格
                   </span>
                 </div>
               </div>
@@ -1040,13 +1107,13 @@ export function CalculatorForm() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>{formData.orderType === 'LIMIT' ? t('limitPrice') : t('entryPrice')}</Label>
-              {formData.orderType === 'LIMIT' && (
+              {formData.orderType === 'LIMIT' && !isOfflineMode && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={fetchCurrentPrice}
-                  disabled={isFetchingPrice || !formData.exchange || !formData.symbol || isOfflineMode}
+                  disabled={isFetchingPrice || !formData.exchange || !formData.symbol}
                   className="h-6 px-2 text-xs"
                 >
                   {isFetchingPrice ? (
@@ -1054,8 +1121,6 @@ export function CalculatorForm() {
                       <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                       {t('fetchingPrice')}
                     </>
-                  ) : isOfflineMode ? (
-                    '离线不可用'
                   ) : (
                     t('getCurrentPrice')
                   )}
@@ -1106,6 +1171,12 @@ export function CalculatorForm() {
             />
             {formErrors.entryPrice && (
               <p className="text-sm text-red-500 mt-1">{formErrors.entryPrice}</p>
+            )}
+            {isOfflineMode && formData.orderType === 'LIMIT' && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                离线模式下使用固定价格，无法获取实时市场数据
+              </p>
             )}
             {priceError && (
               <p className="text-sm text-red-500 mt-1">{priceError}</p>
@@ -1276,7 +1347,7 @@ export function CalculatorForm() {
                 <p className="text-sm text-red-500 mt-1">{formErrors.stopPips}</p>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                Enter stop loss distance in pips from entry price
+                {t('stopPipsHelp')}
               </p>
               {formData.stopPips && getEffectiveEntryPrice() && marketMeta && (
                 <div className="mt-2 p-2 bg-muted rounded text-sm">
@@ -1455,7 +1526,7 @@ export function CalculatorForm() {
                     <p className="text-sm text-red-500 mt-1">{formErrors.takeProfitPips}</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    Enter take profit distance in pips from entry price
+                    {t('takeProfitPipsHelp')}
                   </p>
                   {formData.takeProfitPips && getEffectiveEntryPrice() && marketMeta && (
                     <div className="mt-2 p-2 bg-muted rounded text-sm">

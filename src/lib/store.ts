@@ -15,7 +15,7 @@ interface CalculatorState {
   formData: Partial<CalculatorFormData>;
   setFormData: (data: Partial<CalculatorFormData>) => void;
   resetFormData: () => void;
-  syncWithSettings: (settings: SettingsData) => void;
+  syncWithSettings: (settings: SettingsData, isOfflineMode?: boolean) => void;
   
   // Calculation result
   result: CalcResult | null;
@@ -82,6 +82,7 @@ interface SettingsState {
   setOfflineMode: (offline: boolean, reason?: string) => void;
   incrementNetworkFailure: () => void;
   resetNetworkFailures: () => void;
+  initializeOfflineMode: () => void;
   
   // Notification state
   showNotification: boolean;
@@ -240,10 +241,11 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
     formData: { ...state.formData, ...data }
   })),
   resetFormData: () => set({ formData: defaultFormData }),
-  syncWithSettings: (settings) => set((state) => {
-    // Get offline mode state from settings store
-    const settingsStore = useSettingsStore.getState();
-    const isOfflineMode = settingsStore.isOfflineMode;
+  syncWithSettings: (settings, providedIsOfflineMode) => set((state) => {
+    // Get offline mode state from settings store or use provided value
+    const isOfflineMode = providedIsOfflineMode !== undefined 
+      ? providedIsOfflineMode 
+      : useSettingsStore.getState().isOfflineMode;
     
     // Create trailing config from settings using current side or default to LONG
     const currentSide = state.formData.side || 'LONG';
@@ -436,6 +438,18 @@ export const useSettingsStore = create<SettingsState>()(
       // Offline mode state - initialize with default setting
       isOfflineMode: defaultSettings.defaultOfflineMode,
       offlineReason: defaultSettings.defaultOfflineMode ? '默认启用离线模式' : null,
+      
+      // Initialize offline mode state from persisted settings
+      initializeOfflineMode: () => {
+        const state = get();
+        const shouldBeOffline = state.settings.defaultOfflineMode;
+        if (state.isOfflineMode !== shouldBeOffline) {
+          set({
+            isOfflineMode: shouldBeOffline,
+            offlineReason: shouldBeOffline ? '根据设置默认启用离线模式' : null
+          });
+        }
+      },
       networkFailureCount: 0,
       lastNetworkAttempt: null,
       setOfflineMode: (offline, reason) => set((state) => {

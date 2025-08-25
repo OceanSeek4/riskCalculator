@@ -1067,14 +1067,13 @@ export function SettingsForm() {
                   <Select
                     value={settings.offlineOrderType}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
-                      handleInputChange('offlineOrderType', e.target.value as 'LIMIT' | 'MARKET')
+                      handleInputChange('offlineOrderType', e.target.value as 'LIMIT')
                     }
                   >
-                    <option value="LIMIT">限价单 (Limit Order) - 推荐</option>
-                    <option value="MARKET">市价单 (Market Order) - 离线模式无实时价格</option>
+                    <option value="LIMIT">限价单 (Limit Order)</option>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">
-                    离线模式下推荐使用限价单，避免实时价格依赖
+                    离线模式下只能使用限价单，因为无法获取实时市场价格
                   </p>
                 </div>
                 
