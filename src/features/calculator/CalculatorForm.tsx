@@ -853,12 +853,22 @@ export function CalculatorForm() {
         accountEquity: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.accountEquity : undefined,
         riskPercent: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.riskPercent : undefined,
         includeFees: formData.includeFees || false,
+        // Maker/Taker fees
+        feeOpenMaker: formData.feeOpenMaker || '0.0002',
+        feeOpenTaker: formData.feeOpenTaker || '0.0006',
+        feeCloseMaker: formData.feeCloseMaker || '0.0002',
+        feeCloseTaker: formData.feeCloseTaker || '0.0006',
+        slippageOpen: formData.slippageOpen || '0.0005',
+        slippageClose: formData.slippageClose || '0.0005',
+        // Backward compatibility
         feeOpen: formData.feeOpen || '0.0004',
         feeClose: formData.feeClose || '0.0004',
         slippage: formData.slippage || '0.0005',
         leverage: formData.leverage,
         contractMode: formData.contractMode!,
         marketMeta,
+        orderType: formData.orderType,
+        feeType: formData.feeType,
         rrRatios: settings.rrRatios,
       };
       
@@ -1088,6 +1098,11 @@ export function CalculatorForm() {
                 
                 handleInputChange('orderType', e.target.value);
                 
+                // Set default fee type when switching to LIMIT order
+                if (e.target.value === 'LIMIT') {
+                  handleInputChange('feeType', 'MAKER_OPEN_TAKER_CLOSE');
+                }
+                
                 // Set initial price when switching to LIMIT order in offline mode
                 if (e.target.value === 'LIMIT' && isOfflineMode) {
                   if (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '') {
@@ -1122,6 +1137,87 @@ export function CalculatorForm() {
               </div>
             )}
           </div>
+          
+          {/* Fee Type Selection - Only for LIMIT orders */}
+          {formData.orderType === 'LIMIT' && (
+            <div>
+              <Label>费率类型</Label>
+              <Select
+                value={formData.feeType || 'MAKER'}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                  handleInputChange('feeType', e.target.value as 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY')
+                }
+              >
+                <option value="MAKER">全部Maker (开平仓都挂单, 0.02%, 无滑点)</option>
+                <option value="TAKER">全部Taker (开平仓都吃单, 0.06%, 有滑点)</option>
+                <option value="MAKER_OPEN_TAKER_CLOSE">开仓Maker + 止损Taker (开仓挂单, 止损吃单, 止盈无滑点)</option>
+                <option value="MAKER_OPEN_ONLY">仅开仓Maker (开仓挂单, 止盈止损吃单)</option>
+              </Select>
+              <div className="text-xs text-muted-foreground mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="space-y-1">
+                  <div>
+                    💡 {formData.feeType === 'MAKER' ? '全部使用Maker费率，低成本且无滑点' : 
+                         formData.feeType === 'TAKER' ? '全部使用Taker费率，高成本且有滑点' :
+                         formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? '开仓使用Maker低费率，止损快速出场，止盈无滑点' :
+                         '仅开仓使用Maker，止盈止损都使用Taker快速执行'}
+                  </div>
+                  <div className="text-xs opacity-75">
+                    {formData.feeType === 'MAKER' && (
+                      <>
+                        <strong>开仓:</strong> Maker 0.02%, 无滑点<br/>
+                        <strong>止损:</strong> Maker 0.02%, 无滑点
+                      </>
+                    )}
+                    {formData.feeType === 'TAKER' && (
+                      <>
+                        <strong>开仓:</strong> Taker 0.06%, 有滑点<br/>
+                        <strong>止损:</strong> Taker 0.06%, 有滑点
+                      </>
+                    )}
+                    {formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' && (
+                      <>
+                        <strong>开仓:</strong> Maker 0.02%, 无滑点 (挂单入场)<br/>
+                        <strong>止损:</strong> Taker 0.06%, 有滑点 (市价出场)<br/>
+                        <strong>止盈:</strong> 无滑点 (限价单出场)<br/>
+                        <span className="text-green-600 dark:text-green-400">✓ 推荐：开仓成本低，止损速度快，止盈无滑点</span>
+                      </>
+                    )}
+                    {formData.feeType === 'MAKER_OPEN_ONLY' && (
+                      <>
+                        <strong>开仓:</strong> Maker 0.02%, 无滑点 (挂单入场)<br/>
+                        <strong>止损:</strong> Taker 0.06%, 有滑点 (市价出场)<br/>
+                        <strong>止盈:</strong> Taker 0.06%, 有滑点 (市价出场)<br/>
+                        <span className="text-blue-600 dark:text-blue-400">ℹ️ 适合短线交易：开仓挂单等好价，出场市价保证成交</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Strategic explanation */}
+                <div className="text-xs p-2 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded mt-2">
+                  <div className="text-yellow-800 dark:text-yellow-200">
+                    <strong>🎯 策略建议:</strong>
+                    {formData.feeType === 'MAKER' && ' 适合低频交易，追求最低成本的长期持仓策略'}
+                    {formData.feeType === 'TAKER' && ' 适合快进快出的短线交易，优先考虑执行速度'}
+                    {formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' && ' 适合大部分情况：开仓时耐心等待更好价格，止损时迅速出场，止盈时无滑点成本'}
+                    {formData.feeType === 'MAKER_OPEN_ONLY' && ' 适合短线交易者：开仓时耐心等待最佳价格，出场时优先考虑执行速度和可靠性'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Market Order Fee Info */}
+          {formData.orderType === 'MARKET' && (
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-yellow-600 dark:text-yellow-400">📊</span>
+                <span className="text-yellow-800 dark:text-yellow-200 font-medium">
+                  市价单自动使用 Taker 费率 (0.06%) 和滑点成本
+                </span>
+              </div>
+            </div>
+          )}
           
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -1855,42 +1951,107 @@ export function CalculatorForm() {
             </label>
 
             {formData.includeFees && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+              <div className="space-y-3 mt-3">
+                {/* Opening Fees */}
                 <div>
-                  <Label className="text-xs">{t('openFee')}</Label>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={formData.feeOpen || settings.defaultFeeOpen}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                      handleInputChange('feeOpen', e.target.value)
-                    }
-                    className="text-xs h-8"
-                  />
+                  <div className="text-xs font-medium text-muted-foreground mb-2 border-b pb-1">
+                    开仓费率 & 滑点 (Opening)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-xs text-green-600 dark:text-green-400">Maker 开仓</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={formData.feeOpenMaker || settings.defaultFeeOpenMaker}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('feeOpenMaker', e.target.value)
+                        }
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-orange-600 dark:text-orange-400">Taker 开仓</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={formData.feeOpenTaker || settings.defaultFeeOpenTaker}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('feeOpenTaker', e.target.value)
+                        }
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">开仓滑点</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={formData.slippageOpen || settings.defaultSlippageOpen}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('slippageOpen', e.target.value)
+                        }
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Closing Fees */}
                 <div>
-                  <Label className="text-xs">{t('closeFee')}</Label>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={formData.feeClose || settings.defaultFeeClose}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                      handleInputChange('feeClose', e.target.value)
-                    }
-                    className="text-xs h-8"
-                  />
+                  <div className="text-xs font-medium text-muted-foreground mb-2 border-b pb-1">
+                    平仓费率 & 滑点 (Closing)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <Label className="text-xs text-green-600 dark:text-green-400">Maker 平仓</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={formData.feeCloseMaker || settings.defaultFeeCloseMaker}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('feeCloseMaker', e.target.value)
+                        }
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-orange-600 dark:text-orange-400">Taker 平仓</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={formData.feeCloseTaker || settings.defaultFeeCloseTaker}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('feeCloseTaker', e.target.value)
+                        }
+                        className="text-xs h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">平仓滑点</Label>
+                      <Input
+                        type="number"
+                        step="0.0001"
+                        value={formData.slippageClose || settings.defaultSlippageClose}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                          handleInputChange('slippageClose', e.target.value)
+                        }
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-xs">{t('slippage')}</Label>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={formData.slippage || settings.defaultSlippage}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                      handleInputChange('slippage', e.target.value)
-                    }
-                    className="text-xs h-8"
-                  />
+                
+                {/* Quick Info */}
+                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded">
+                  💡 {formData.orderType === 'MARKET' 
+                    ? 'Market订单自动使用Taker费率和滑点' 
+                    : (formData.feeType === 'MAKER' 
+                       ? 'Limit订单全部使用Maker费率（无滑点）'
+                       : formData.feeType === 'TAKER'
+                       ? 'Limit订单全部使用Taker费率（有滑点）' 
+                       : 'Limit订单混合费率：开仓Maker，止损Taker')
+                  }
                 </div>
               </div>
             )}

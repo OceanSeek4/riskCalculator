@@ -323,6 +323,24 @@ export function SettingsForm() {
             </div>
             
             <div>
+              <Label>默认费率类型</Label>
+              <Select
+                value={settings.defaultFeeType}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                  handleInputChange('defaultFeeType', e.target.value as 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY')
+                }
+              >
+                <option value="MAKER">全部Maker (开仓平仓都挂单)</option>
+                <option value="TAKER">全部Taker (开仓平仓都吃单)</option>
+                <option value="MAKER_OPEN_TAKER_CLOSE">开仓Maker 止损Taker</option>
+                <option value="MAKER_OPEN_ONLY">仅开仓Maker (开仓挂单, 止盈止损吃单)</option>
+              </Select>
+              <p className="text-sm text-gray-600 mt-1">
+                默认的费率类型选择，影响限价单的手续费计算方式
+              </p>
+            </div>
+            
+            <div>
               <Label>{t('defaultLeverage')}</Label>
               <Input
                 type="number"
@@ -405,51 +423,144 @@ export function SettingsForm() {
           <div className="text-sm text-muted-foreground mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800">
             <p className="flex items-center gap-1 mb-1">
               <span className="text-blue-600 dark:text-blue-400">💡</span>
-              <strong>{t('feeSettingsHelp')}</strong>
+              <strong>Maker/Taker 费率设置</strong>
             </p>
             <p className="ml-5 text-blue-700 dark:text-blue-300 text-xs">
-              {t('feeSettingsDescription')}
+              Maker订单 (挂单) 通常享有更低费率，Taker订单 (吃单) 费率较高。滑点设置独立控制开仓和平仓的市场冲击成本。
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label>{t('openFee')}</Label>
-              <Input
-                type="number"
-                step="0.0001"
-                value={settings.defaultFeeOpen}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                  handleInputChange('defaultFeeOpen', e.target.value)
-                }
-                placeholder={t('enterValue') + ' (0.0004 = 0.04%)'}
-              />
+          {/* Opening Fees */}
+          <div className="space-y-3">
+            <h4 className="text-md font-medium text-muted-foreground border-b pb-1">
+              开仓费率 (Opening Fees)
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>开仓 Maker 费率</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={settings.defaultFeeOpenMaker}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultFeeOpenMaker', e.target.value)
+                  }
+                  placeholder="0.0002 (0.02%)"
+                />
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  挂单费率 (通常更低)
+                </p>
+              </div>
+              
+              <div>
+                <Label>开仓 Taker 费率</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={settings.defaultFeeOpenTaker}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultFeeOpenTaker', e.target.value)
+                  }
+                  placeholder="0.0006 (0.06%)"
+                />
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  吃单费率 (通常更高)
+                </p>
+              </div>
+              
+              <div>
+                <Label>开仓滑点</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={settings.defaultSlippageOpen}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultSlippageOpen', e.target.value)
+                  }
+                  placeholder="0.0005 (0.05%)"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  市价单市场冲击成本
+                </p>
+              </div>
             </div>
-            
-            <div>
-              <Label>{t('closeFee')}</Label>
-              <Input
-                type="number"
-                step="0.0001"
-                value={settings.defaultFeeClose}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                  handleInputChange('defaultFeeClose', e.target.value)
-                }
-                placeholder={t('enterValue') + ' (0.0004 = 0.04%)'}
-              />
+          </div>
+
+          {/* Closing Fees */}
+          <div className="space-y-3">
+            <h4 className="text-md font-medium text-muted-foreground border-b pb-1">
+              平仓费率 (Closing Fees)
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label>平仓 Maker 费率</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={settings.defaultFeeCloseMaker}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultFeeCloseMaker', e.target.value)
+                  }
+                  placeholder="0.0002 (0.02%)"
+                />
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  挂单费率 (通常更低)
+                </p>
+              </div>
+              
+              <div>
+                <Label>平仓 Taker 费率</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={settings.defaultFeeCloseTaker}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultFeeCloseTaker', e.target.value)
+                  }
+                  placeholder="0.0006 (0.06%)"
+                />
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  吃单费率 (通常更高)
+                </p>
+              </div>
+              
+              <div>
+                <Label>平仓滑点</Label>
+                <Input
+                  type="number"
+                  step="0.0001"
+                  value={settings.defaultSlippageClose}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultSlippageClose', e.target.value)
+                  }
+                  placeholder="0.0005 (0.05%)"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  市价单市场冲击成本
+                </p>
+              </div>
             </div>
-            
-            <div>
-              <Label>{t('slippage')}</Label>
-              <Input
-                type="number"
-                step="0.0001"
-                value={settings.defaultSlippage}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                  handleInputChange('defaultSlippage', e.target.value)
-                }
-                placeholder={t('enterValue') + ' (0.0005 = 0.05%)'}
-              />
+          </div>
+          
+          {/* Exchange Fee Examples */}
+          <div className="text-xs text-muted-foreground bg-gray-50 dark:bg-gray-800 p-3 rounded border">
+            <p className="font-medium mb-2 text-gray-700 dark:text-gray-300">主流交易所费率参考:</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <span className="font-medium">Binance:</span> Maker 0.02%, Taker 0.04%
+              </div>
+              <div>
+                <span className="font-medium">Bybit:</span> Maker 0.02%, Taker 0.055%
+              </div>
+              <div>
+                <span className="font-medium">OKX:</span> Maker 0.02%, Taker 0.05%
+              </div>
+              <div>
+                <span className="font-medium">Bitget:</span> Maker 0.02%, Taker 0.06%
+              </div>
+            </div>
+            <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 p-2 bg-blue-50 dark:bg-blue-900 rounded">
+              <span className="font-medium">🎯 默认设置:</span> Maker 开平仓 0.02%, Taker 开平仓 0.06%, 滑点 0.05%
             </div>
           </div>
         </div>
@@ -1174,7 +1285,7 @@ export function SettingsForm() {
                 }
                 className="rounded border-gray-300"
               />
-              <span className="text-sm">{t('defaultIncludeFees')}</span>
+              <span className="text-sm">默认包含费率和滑点 (Default Include Fees & Slippage)</span>
             </label>
           </div>
         </div>

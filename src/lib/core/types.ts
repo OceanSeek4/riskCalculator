@@ -53,6 +53,14 @@ export interface CalcInput {
   accountEquity?: string;
   riskPercent?: string;
   includeFees: boolean;
+  // Maker/Taker fee structure
+  feeOpenMaker: string;
+  feeOpenTaker: string;
+  feeCloseMaker: string;
+  feeCloseTaker: string;
+  slippageOpen: string;
+  slippageClose: string;
+  // Backward compatibility
   feeOpen: string;
   feeClose: string;
   slippage: string;
@@ -60,6 +68,7 @@ export interface CalcInput {
   contractMode: ContractMode;
   marketMeta: MarketMeta;
   orderType?: OrderType;
+  feeType?: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY';
   rrRatios: number[];
 }
 

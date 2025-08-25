@@ -38,6 +38,13 @@ export const calculatorFormSchema = z.object({
   
   // Fees and costs
   includeFees: z.boolean().default(false),
+  feeOpenMaker: z.string().default('0.0002'),
+  feeOpenTaker: z.string().default('0.0006'),
+  feeCloseMaker: z.string().default('0.0002'),
+  feeCloseTaker: z.string().default('0.0006'),
+  slippageOpen: z.string().default('0.0005'),
+  slippageClose: z.string().default('0.0005'),
+  // Backward compatibility fields
   feeOpen: z.string().default('0.0004'),
   feeClose: z.string().default('0.0004'),
   slippage: z.string().default('0.0005'),
@@ -47,6 +54,9 @@ export const calculatorFormSchema = z.object({
   
   // Order type
   orderType: z.enum(['MARKET', 'LIMIT']).default('MARKET'),
+  
+  // Fee type selection (for limit orders)
+  feeType: z.enum(['MAKER', 'TAKER', 'MAKER_OPEN_TAKER_CLOSE', 'MAKER_OPEN_ONLY']).default('MAKER_OPEN_TAKER_CLOSE'),
   
   // Auto-leverage settings
   autoLeverage: z.boolean().default(false),
@@ -68,6 +78,7 @@ export const settingsSchema = z.object({
   defaultUseTakeProfit: z.boolean().default(false),
   defaultRiskMode: z.enum(['FIXED_USDT', 'ACCOUNT_PERCENT']).default('FIXED_USDT'),
   defaultOrderType: z.enum(['MARKET', 'LIMIT']).default('MARKET'),
+  defaultFeeType: z.enum(['MAKER', 'TAKER', 'MAKER_OPEN_TAKER_CLOSE', 'MAKER_OPEN_ONLY']).default('MAKER_OPEN_TAKER_CLOSE'),
   defaultLeverage: z.number().min(1).max(200).default(10),
   
   // Default risk settings
@@ -76,10 +87,17 @@ export const settingsSchema = z.object({
   defaultRiskAmount: z.string().default('100'),
   
   // Default fees
+  defaultFeeOpenMaker: z.string().default('0.0002'),
+  defaultFeeOpenTaker: z.string().default('0.0006'),
+  defaultFeeCloseMaker: z.string().default('0.0002'),
+  defaultFeeCloseTaker: z.string().default('0.0006'),
+  defaultSlippageOpen: z.string().default('0.0005'),
+  defaultSlippageClose: z.string().default('0.0005'),
+  defaultIncludeFees: z.boolean().default(false),
+  // Backward compatibility fields
   defaultFeeOpen: z.string().default('0.0004'),
   defaultFeeClose: z.string().default('0.0004'),
   defaultSlippage: z.string().default('0.0005'),
-  defaultIncludeFees: z.boolean().default(false),
   
   // ATR settings
   defaultAtrPeriod: z.number().default(14),

@@ -1,5 +1,5 @@
 import { SafeDecimal, roundDownToStep, roundToTick, validateMinRequirements, formatPriceByTickSize, formatQuantityByStepSize } from './math.js';
-import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode, WarningKey, TakeProfitMode } from './types.js';
+import { CalcInput, CalcResult, Side, ContractMode, ValidationError, DecimalError, RiskMode, WarningKey, TakeProfitMode, OrderType } from './types.js';
 
 /**
  * Calculate stop price based on ATR
@@ -69,7 +69,8 @@ export function calculateTakeProfitPrice(
   positionSize?: SafeDecimal,
   feeOpen?: SafeDecimal,
   feeClose?: SafeDecimal,
-  slippage?: SafeDecimal,
+  slippageOpen?: SafeDecimal,
+  slippageClose?: SafeDecimal,
   includeFees?: boolean,
   takeProfitPips?: string,
   tickSize?: SafeDecimal
@@ -102,7 +103,7 @@ export function calculateTakeProfitPrice(
       const ratio = SafeDecimal.from(rrRatio);
       const requiredReward = totalStopRisk.safeMul(ratio).safeDiv(positionSize); // Convert back to per-unit for price calculation
       
-      if (!includeFees || !feeOpen || !feeClose || !slippage) {
+      if (!includeFees || !feeOpen || !feeClose || !slippageOpen || !slippageClose) {
         // Simple calculation without fees
         return side === 'LONG'
           ? entryPrice.safeAdd(requiredReward)
@@ -112,14 +113,14 @@ export function calculateTakeProfitPrice(
       // Calculate target price accounting for all fees and slippage
       // Use the same logic as calculateTargets function
       if (side === 'LONG') {
-        // target_price = (entry_price * (1 + fee_open + slippage) + required_reward) / (1 - fee_close - slippage)
-        const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen).safeAdd(slippage)).safeAdd(requiredReward);
-        const denominator = SafeDecimal.one().safeSub(feeClose).safeSub(slippage);
+        // target_price = (entry_price * (1 + fee_open + slippage_open) + required_reward) / (1 - fee_close - slippage_close)
+        const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen).safeAdd(slippageOpen)).safeAdd(requiredReward);
+        const denominator = SafeDecimal.one().safeSub(feeClose).safeSub(slippageClose);
         return numerator.safeDiv(denominator);
       } else {
-        // target_price = (entry_price * (1 - fee_open - slippage) - required_reward) / (1 + fee_close + slippage)
-        const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippage)).safeSub(requiredReward);
-        const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippage);
+        // target_price = (entry_price * (1 - fee_open - slippage_open) - required_reward) / (1 + fee_close + slippage_close)
+        const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippageOpen)).safeSub(requiredReward);
+        const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippageClose);
         return numerator.safeDiv(denominator);
       }
       
@@ -148,9 +149,10 @@ export function calculateTakeProfitPrice(
  * Calculate risk per unit (BTC) including fees and slippage
  * @param entryPrice Entry price
  * @param stopPrice Stop price
- * @param feeOpen Opening fee rate
- * @param feeClose Closing fee rate
- * @param slippage Slippage rate
+ * @param feeOpen Opening fee rate (maker/taker will be determined by orderType)
+ * @param feeClose Closing fee rate (maker/taker will be determined by orderType)
+ * @param slippageOpen Opening slippage rate
+ * @param slippageClose Closing slippage rate
  * @param includeFees Whether to include fees in risk calculation
  * @param side Trading side
  * @returns Risk per unit
@@ -160,7 +162,8 @@ export function calculateRiskPerUnit(
   stopPrice: SafeDecimal,
   feeOpen: SafeDecimal,
   feeClose: SafeDecimal,
-  slippage: SafeDecimal,
+  slippageOpen: SafeDecimal,
+  slippageClose: SafeDecimal,
   includeFees: boolean,
   side: Side
 ): SafeDecimal {
@@ -179,13 +182,13 @@ export function calculateRiskPerUnit(
   
   // Calculate fees and slippage per unit:
   // - Opening fee per unit = entry price × fee rate
-  // - Opening slippage per unit = entry price × slippage rate
+  // - Opening slippage per unit = entry price × opening slippage rate
   // - Closing fee per unit = stop price × close fee rate  
-  // - Closing slippage per unit = stop price × slippage rate
+  // - Closing slippage per unit = stop price × closing slippage rate
   const entryFeePerUnit = entryPrice.safeMul(feeOpen);
-  const entrySlippagePerUnit = entryPrice.safeMul(slippage);
+  const entrySlippagePerUnit = entryPrice.safeMul(slippageOpen);
   const exitFeePerUnit = stopPrice.safeMul(feeClose);
-  const exitSlippagePerUnit = stopPrice.safeMul(slippage);
+  const exitSlippagePerUnit = stopPrice.safeMul(slippageClose);
   
   // Total risk per unit = price difference + entry fee + entry slippage + exit fee + exit slippage
   return priceRisk.safeAdd(entryFeePerUnit).safeAdd(entrySlippagePerUnit).safeAdd(exitFeePerUnit).safeAdd(exitSlippagePerUnit);
@@ -258,7 +261,8 @@ export function calculateTargets(
   side: Side,
   feeOpen: SafeDecimal,
   feeClose: SafeDecimal,
-  slippage: SafeDecimal,
+  slippageOpen: SafeDecimal,
+  slippageClose: SafeDecimal,
   includeFees: boolean,
   totalStopRisk: SafeDecimal,
   positionSize: SafeDecimal,
@@ -272,26 +276,26 @@ export function calculateTargets(
   
   // Add breakeven target (0 net profit) as first target when fees/slippage are included
   // Breakeven means: price profit exactly covers all trading costs (fees + slippage), net P&L = 0
-  if (includeFees && (!feeOpen.isZero() || !feeClose.isZero() || !slippage.isZero())) {
+  if (includeFees && (!feeOpen.isZero() || !feeClose.isZero() || !slippageOpen.isZero() || !slippageClose.isZero())) {
     let breakevenPrice: SafeDecimal;
     
     if (side === 'LONG') {
       // For LONG: breakeven where price gain covers all costs
-      // Net P&L = 0: (breakeven_price - entry) = entry*fee_open + entry*slippage + breakeven_price*fee_close + breakeven_price*slippage
-      // Rearranging: breakeven_price - entry = entry*(fee_open + slippage) + breakeven_price*(fee_close + slippage)
-      // breakeven_price * (1 - fee_close - slippage) = entry + entry*(fee_open + slippage)
-      // breakeven_price = entry * (1 + fee_open + slippage) / (1 - fee_close - slippage)
-      const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen).safeAdd(slippage));
-      const denominator = SafeDecimal.one().safeSub(feeClose).safeSub(slippage);
+      // Net P&L = 0: (breakeven_price - entry) = entry*fee_open + entry*slippage_open + breakeven_price*fee_close + breakeven_price*slippage_close
+      // Rearranging: breakeven_price - entry = entry*(fee_open + slippage_open) + breakeven_price*(fee_close + slippage_close)
+      // breakeven_price * (1 - fee_close - slippage_close) = entry + entry*(fee_open + slippage_open)
+      // breakeven_price = entry * (1 + fee_open + slippage_open) / (1 - fee_close - slippage_close)
+      const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen).safeAdd(slippageOpen));
+      const denominator = SafeDecimal.one().safeSub(feeClose).safeSub(slippageClose);
       breakevenPrice = numerator.safeDiv(denominator);
     } else {
       // For SHORT: breakeven where price gain covers all costs
-      // Net P&L = 0: (entry - breakeven_price) = entry*fee_open + entry*slippage + breakeven_price*fee_close + breakeven_price*slippage
-      // Rearranging: entry - breakeven_price = entry*(fee_open + slippage) + breakeven_price*(fee_close + slippage)
-      // breakeven_price * (1 + fee_close + slippage) = entry - entry*(fee_open + slippage)
-      // breakeven_price = entry * (1 - fee_open - slippage) / (1 + fee_close + slippage)
-      const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippage));
-      const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippage);
+      // Net P&L = 0: (entry - breakeven_price) = entry*fee_open + entry*slippage_open + breakeven_price*fee_close + breakeven_price*slippage_close
+      // Rearranging: entry - breakeven_price = entry*(fee_open + slippage_open) + breakeven_price*(fee_close + slippage_close)
+      // breakeven_price * (1 + fee_close + slippage_close) = entry - entry*(fee_open + slippage_open)
+      // breakeven_price = entry * (1 - fee_open - slippage_open) / (1 + fee_close + slippage_close)
+      const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippageOpen));
+      const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippageClose);
       breakevenPrice = numerator.safeDiv(denominator);
     }
     
@@ -329,20 +333,20 @@ export function calculateTargets(
     
     let targetPrice: SafeDecimal;
     if (side === 'LONG') {
-      // For LONG: net_profit = (target_price - entry_price) - entry_price*fee_open - entry_price*slippage - target_price*fee_close - target_price*slippage
-      // Required equation: (target_price - entry_price) - entry_price*(fee_open + slippage) - target_price*(fee_close + slippage) = required_reward
-      // Rearranging: target_price * (1 - fee_close - slippage) = entry_price + required_reward + entry_price*(fee_open + slippage)
-      // target_price = (entry_price * (1 + fee_open + slippage) + required_reward) / (1 - fee_close - slippage)
-      const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen).safeAdd(slippage)).safeAdd(requiredReward);
-      const denominator = SafeDecimal.one().safeSub(feeClose).safeSub(slippage);
+      // For LONG: net_profit = (target_price - entry_price) - entry_price*fee_open - entry_price*slippage_open - target_price*fee_close - target_price*slippage_close
+      // Required equation: (target_price - entry_price) - entry_price*(fee_open + slippage_open) - target_price*(fee_close + slippage_close) = required_reward
+      // Rearranging: target_price * (1 - fee_close - slippage_close) = entry_price + required_reward + entry_price*(fee_open + slippage_open)
+      // target_price = (entry_price * (1 + fee_open + slippage_open) + required_reward) / (1 - fee_close - slippage_close)
+      const numerator = entryPrice.safeMul(SafeDecimal.one().safeAdd(feeOpen).safeAdd(slippageOpen)).safeAdd(requiredReward);
+      const denominator = SafeDecimal.one().safeSub(feeClose).safeSub(slippageClose);
       targetPrice = numerator.safeDiv(denominator);
     } else {
-      // For SHORT: net_profit = (entry_price - target_price) - entry_price*fee_open - entry_price*slippage - target_price*fee_close - target_price*slippage
-      // Required equation: (entry_price - target_price) - entry_price*(fee_open + slippage) - target_price*(fee_close + slippage) = required_reward
-      // Rearranging: target_price * (1 + fee_close + slippage) = entry_price - required_reward - entry_price*(fee_open + slippage)
-      // target_price = (entry_price * (1 - fee_open - slippage) - required_reward) / (1 + fee_close + slippage)
-      const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippage)).safeSub(requiredReward);
-      const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippage);
+      // For SHORT: net_profit = (entry_price - target_price) - entry_price*fee_open - entry_price*slippage_open - target_price*fee_close - target_price*slippage_close
+      // Required equation: (entry_price - target_price) - entry_price*(fee_open + slippage_open) - target_price*(fee_close + slippage_close) = required_reward
+      // Rearranging: target_price * (1 + fee_close + slippage_close) = entry_price - required_reward - entry_price*(fee_open + slippage_open)
+      // target_price = (entry_price * (1 - fee_open - slippage_open) - required_reward) / (1 + fee_close + slippage_close)
+      const numerator = entryPrice.safeMul(SafeDecimal.one().safeSub(feeOpen).safeSub(slippageOpen)).safeSub(requiredReward);
+      const denominator = SafeDecimal.one().safeAdd(feeClose).safeAdd(slippageClose);
       targetPrice = numerator.safeDiv(denominator);
     }
     
@@ -436,12 +440,22 @@ export function calculatePosition(input: CalcInput): CalcResult {
     accountEquity: accountEquityStr,
     riskPercent: riskPercentStr,
     includeFees,
+    // Maker/Taker fees
+    feeOpenMaker: feeOpenMakerStr,
+    feeOpenTaker: feeOpenTakerStr,
+    feeCloseMaker: feeCloseMakerStr,
+    feeCloseTaker: feeCloseTakerStr,
+    slippageOpen: slippageOpenStr,
+    slippageClose: slippageCloseStr,
+    // Backward compatibility (keep for existing integrations)
     feeOpen: feeOpenStr,
     feeClose: feeCloseStr,
     slippage: slippageStr,
     leverage,
     contractMode,
-    marketMeta
+    marketMeta,
+    orderType,
+    feeType
   } = input;
 
   const warnings: string[] = [];
@@ -451,9 +465,47 @@ export function calculatePosition(input: CalcInput): CalcResult {
     // Convert inputs to SafeDecimal
     const entryPrice = SafeDecimal.from(entryPriceStr);
     const riskAmount = calculateRiskAmount(riskMode, riskUSDTStr, accountEquityStr, riskPercentStr);
-    const feeOpen = SafeDecimal.from(feeOpenStr);
-    const feeClose = SafeDecimal.from(feeCloseStr);
-    const slippage = SafeDecimal.from(slippageStr);
+    
+    // Determine which fees to use based on order type and manual selection
+    const useOrderType = orderType || 'MARKET';
+    const useFeeType = useOrderType === 'MARKET' ? 'TAKER' : (feeType || 'MAKER');
+    
+    // Handle different fee combinations for opening, stop loss, and take profit
+    let openFeeType: 'MAKER' | 'TAKER';
+    let stopLossFeeType: 'MAKER' | 'TAKER';
+    let takeProfitFeeType: 'MAKER' | 'TAKER';
+    
+    if (useFeeType === 'MAKER_OPEN_TAKER_CLOSE') {
+      openFeeType = 'MAKER';
+      stopLossFeeType = 'TAKER';
+      takeProfitFeeType = 'MAKER'; // Take profit should have no slippage in this mode
+    } else if (useFeeType === 'MAKER_OPEN_ONLY') {
+      openFeeType = 'MAKER';
+      stopLossFeeType = 'TAKER';
+      takeProfitFeeType = 'TAKER';
+    } else {
+      openFeeType = useFeeType === 'MAKER' ? 'MAKER' : 'TAKER';
+      stopLossFeeType = useFeeType === 'MAKER' ? 'MAKER' : 'TAKER';
+      takeProfitFeeType = useFeeType === 'MAKER' ? 'MAKER' : 'TAKER';
+    }
+    
+    // For calculations, we still need a single close fee for stop loss calculations
+    const closeFeeType = stopLossFeeType;
+    
+    const feeOpen = openFeeType === 'MAKER'
+      ? SafeDecimal.from(feeOpenMakerStr || '0.0002') 
+      : SafeDecimal.from(feeOpenTakerStr || '0.0006');
+    const feeClose = closeFeeType === 'MAKER'
+      ? SafeDecimal.from(feeCloseMakerStr || '0.0002') 
+      : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+    
+    // Set slippage: Maker orders have no slippage, Taker orders have slippage
+    const slippageOpen = openFeeType === 'MAKER' 
+      ? SafeDecimal.from('0') 
+      : SafeDecimal.from(slippageOpenStr || '0.0005');
+    const slippageClose = closeFeeType === 'MAKER' 
+      ? SafeDecimal.from('0') 
+      : SafeDecimal.from(slippageCloseStr || '0.0005');
     
     const tickSize = SafeDecimal.from(marketMeta.tickSize);
     const stepSize = SafeDecimal.from(marketMeta.stepSize);
@@ -513,7 +565,8 @@ export function calculatePosition(input: CalcInput): CalcResult {
           undefined, // positionSize - not used for non-RR modes
           undefined, // feeOpen - not used for non-RR modes
           undefined, // feeClose - not used for non-RR modes
-          undefined, // slippage - not used for non-RR modes
+          undefined, // slippageOpen - not used for non-RR modes
+          undefined, // slippageClose - not used for non-RR modes
           undefined, // includeFees - not used for non-RR modes
           takeProfitPips,
           tickSize
@@ -543,7 +596,8 @@ export function calculatePosition(input: CalcInput): CalcResult {
       stopPrice,
       feeOpen,
       feeClose,
-      slippage,
+      slippageOpen,
+      slippageClose,
       includeFees,
       side
     );
@@ -704,9 +758,9 @@ export function calculatePosition(input: CalcInput): CalcResult {
       // 数量 × 平仓价格 × 平仓手续费率
       closeFeeAmount = qtyRounded.safeMul(stopPrice).safeMul(feeClose);
       // 开仓滑点成本
-      openSlippageAmount = qtyRounded.safeMul(entryPrice).safeMul(slippage);
+      openSlippageAmount = qtyRounded.safeMul(entryPrice).safeMul(slippageOpen);
       // 止损平仓滑点成本
-      closeSlippageAmount = qtyRounded.safeMul(stopPrice).safeMul(slippage);
+      closeSlippageAmount = qtyRounded.safeMul(stopPrice).safeMul(slippageClose);
       
       stopLossRisk = stopLossRisk.safeAdd(openFeeAmount).safeAdd(closeFeeAmount).safeAdd(openSlippageAmount).safeAdd(closeSlippageAmount);
     }
@@ -722,7 +776,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
       openFeeAmountFormatted: openFeeAmount.toLocaleString(),
       closeFeeAmount: closeFeeAmount.toString(),
       closeFeeAmountFormatted: closeFeeAmount.toLocaleString(),
-      ...(slippage && !slippage.isZero() ? {
+      ...(((slippageOpen && !slippageOpen.isZero()) || (slippageClose && !slippageClose.isZero())) ? {
         slippageAmount: openSlippageAmount.safeAdd(closeSlippageAmount).toString(),
         slippageAmountFormatted: openSlippageAmount.safeAdd(closeSlippageAmount).toLocaleString(),
       } : {})
@@ -731,6 +785,12 @@ export function calculatePosition(input: CalcInput): CalcResult {
     // Calculate RR_RATIO take profit price now that we have stopLossRisk
     if (useTakeProfit && takeProfitMode === 'RR_RATIO' && !takeProfitPriceCalculated) {
       try {
+        // For RR_RATIO take profit, use appropriate fee and slippage for take profit
+        const takeProfitCloseSlippage = takeProfitFeeType === 'MAKER' ? SafeDecimal.from('0') : slippageClose;
+        const takeProfitCloseFee = takeProfitFeeType === 'MAKER'
+          ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
+          : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+          
         takeProfitPriceCalculated = calculateTakeProfitPrice(
           entryPrice,
           takeProfitMode,
@@ -742,8 +802,9 @@ export function calculatePosition(input: CalcInput): CalcResult {
           stopLossRisk,
           qtyRounded,
           feeOpen,
-          feeClose,
-          slippage,
+          takeProfitCloseFee, // Use take profit specific fee
+          slippageOpen,
+          takeProfitCloseSlippage, // Use take profit specific slippage
           includeFees
         );
         
@@ -778,14 +839,18 @@ export function calculatePosition(input: CalcInput): CalcResult {
       // 开仓手续费 (成本，负数)
       const profitOpenFeeAmount = includeFees ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(entryPrice).safeMul(feeOpen)) : SafeDecimal.from('0');
       
-      // 止盈平仓手续费 (成本，负数)
-      const profitCloseFeeAmount = includeFees ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(feeClose)) : SafeDecimal.from('0');
+      // 止盈平仓手续费 (成本，负数) - 使用止盈费率类型
+      const takeProfitFee = takeProfitFeeType === 'MAKER'
+        ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
+        : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+      const profitCloseFeeAmount = includeFees ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(takeProfitFee)) : SafeDecimal.from('0');
       
       // 开仓滑点成本 (成本，负数)
-      const profitOpenSlippageAmount = includeFees && slippage && !slippage.isZero() ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(entryPrice).safeMul(slippage)) : SafeDecimal.from('0');
+      const profitOpenSlippageAmount = includeFees && slippageOpen && !slippageOpen.isZero() ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(entryPrice).safeMul(slippageOpen)) : SafeDecimal.from('0');
       
-      // 平仓滑点成本 (成本，负数) - 止盈时也有滑点
-      const profitCloseSlippageAmount = includeFees && slippage && !slippage.isZero() ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(slippage)) : SafeDecimal.from('0');
+      // 止盈滑点成本 (成本，负数) - 止盈时的滑点成本根据费率类型决定
+      const takeProfitSlippage = takeProfitFeeType === 'MAKER' ? SafeDecimal.from('0') : (slippageClose || SafeDecimal.from('0.0005'));
+      const profitCloseSlippageAmount = includeFees && takeProfitSlippage && !takeProfitSlippage.isZero() ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(takeProfitSlippage)) : SafeDecimal.from('0');
       
       // 总盈利 = 价格盈利 - 各种成本
       takeProfitProfit = priceProfitTotal.safeAdd(profitOpenFeeAmount).safeAdd(profitCloseFeeAmount).safeAdd(profitOpenSlippageAmount).safeAdd(profitCloseSlippageAmount);
@@ -798,7 +863,7 @@ export function calculatePosition(input: CalcInput): CalcResult {
         openFeeAmountFormatted: profitOpenFeeAmount.toLocaleString(),
         closeFeeAmount: profitCloseFeeAmount.toString(),
         closeFeeAmountFormatted: profitCloseFeeAmount.toLocaleString(),
-        ...(includeFees && slippage && !slippage.isZero() ? {
+        ...(includeFees && ((slippageOpen && !slippageOpen.isZero()) || (slippageClose && !slippageClose.isZero())) ? {
           slippageAmount: profitOpenSlippageAmount.safeAdd(profitCloseSlippageAmount).toString(),
           slippageAmountFormatted: profitOpenSlippageAmount.safeAdd(profitCloseSlippageAmount).toLocaleString(),
         } : {})
@@ -813,7 +878,8 @@ export function calculatePosition(input: CalcInput): CalcResult {
       side, 
       feeOpen, 
       feeClose, 
-      slippage, 
+      slippageOpen,
+      slippageClose,
       includeFees, 
       stopLossRisk, 
       qtyRounded, 
@@ -842,7 +908,9 @@ export function calculatePosition(input: CalcInput): CalcResult {
       totalFees,
       openFee,
       closeFee,
-      includeFees
+      includeFees,
+      orderType,
+      feeType
     });
     
     return {
@@ -905,6 +973,8 @@ function generateOrderSummary(params: {
   openFee?: SafeDecimal;
   closeFee?: SafeDecimal;
   includeFees: boolean;
+  orderType?: OrderType;
+  feeType?: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY';
 }): string {
   const {
     side,
@@ -922,12 +992,31 @@ function generateOrderSummary(params: {
     totalFees,
     openFee,
     closeFee,
-    includeFees
+    includeFees,
+    orderType,
+    feeType
   } = params;
   
   let summary = `${side} ${marketMeta.symbol}\n`;
   summary += `Entry: ${entryPrice} | Stop: ${stopPrice}\n`;
   summary += `Qty: ${qtyRounded} | Notional: ${notional} USDT\n`;
+  
+  // Add order type and fee type information
+  if (orderType) {
+    const orderTypeText = orderType === 'MARKET' ? '市价单' : '限价单';
+    summary += `Order Type: ${orderTypeText}`;
+    
+    if (orderType === 'LIMIT' && feeType) {
+      const feeTypeMap = {
+        'MAKER': ' (全部Maker)',
+        'TAKER': ' (全部Taker)',
+        'MAKER_OPEN_TAKER_CLOSE': ' (开仓Maker,止损Taker)',
+        'MAKER_OPEN_ONLY': ' (仅开仓Maker)'
+      };
+      summary += feeTypeMap[feeType] || '';
+    }
+    summary += '\n';
+  }
   
   if (contractMode !== 'SPOT' && leverage && initialMargin) {
     summary += `Leverage: ${leverage}x | Margin: ${initialMargin} USDT\n`;

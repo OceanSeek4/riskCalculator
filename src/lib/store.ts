@@ -113,9 +113,17 @@ const defaultFormData: Partial<CalculatorFormData> = {
   stopMode: 'ATR',         // 在线模式默认使用ATR止损
   riskMode: 'ACCOUNT_PERCENT',
   orderType: 'MARKET',     // 在线模式默认使用市价单
+  feeType: 'MAKER_OPEN_TAKER_CLOSE', // 限价单默认开仓Maker，止损Taker
   leverage: 10,
   atrPeriod: 14,
   atrTimeframe: '15m',
+  feeOpenMaker: '0.0002',
+  feeOpenTaker: '0.0006',
+  feeCloseMaker: '0.0002',
+  feeCloseTaker: '0.0006',
+  slippageOpen: '0.0005',
+  slippageClose: '0.0005',
+  // Backward compatibility
   feeOpen: '0.0006',
   feeClose: '0.0006',
   slippage: '0.0005',
@@ -189,10 +197,18 @@ const defaultSettings: SettingsData = {
   defaultUseTakeProfit: true,          // 默认启用止盈
   defaultRiskMode: 'ACCOUNT_PERCENT',
   defaultOrderType: 'MARKET',          // 在线模式默认市价单
+  defaultFeeType: 'MAKER_OPEN_TAKER_CLOSE', // 默认开仓Maker，止损Taker
   defaultLeverage: 10,
   defaultAccountEquity: '100000',
   defaultRiskPercent: '2',
   defaultRiskAmount: '1000',
+  defaultFeeOpenMaker: '0.0002',
+  defaultFeeOpenTaker: '0.0006',
+  defaultFeeCloseMaker: '0.0002',
+  defaultFeeCloseTaker: '0.0006',
+  defaultSlippageOpen: '0.0005',
+  defaultSlippageClose: '0.0005',
+  // Backward compatibility
   defaultFeeOpen: '0.0006',
   defaultFeeClose: '0.0006',
   defaultSlippage: '0.0005',
@@ -255,6 +271,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
     const stopMode = isOfflineMode ? settings.offlineStopMode : settings.defaultStopMode;
     const takeProfitMode = isOfflineMode ? settings.offlineTakeProfitMode : settings.defaultTakeProfitMode;
     const orderType = isOfflineMode ? settings.offlineOrderType : settings.defaultOrderType;
+    const feeType = settings.defaultFeeType;
     const trailingEnabled = isOfflineMode ? settings.offlineTrailingEnabled : settings.defaultTrailingEnabled;
     
     return {
@@ -273,6 +290,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         takeProfitPips: settings.defaultTakeProfitPips,
         riskMode: settings.defaultRiskMode,
         orderType,
+        feeType: feeType,
         leverage: settings.defaultLeverage,
         accountEquity: settings.defaultAccountEquity,
         riskPercent: settings.defaultRiskPercent,
@@ -281,6 +299,13 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         atrTimeframe: settings.defaultAtrTimeframe,
         atrMultiplier: settings.defaultAtrMultiplier,
         includeFees: settings.defaultIncludeFees,
+        feeOpenMaker: settings.defaultFeeOpenMaker,
+        feeOpenTaker: settings.defaultFeeOpenTaker,
+        feeCloseMaker: settings.defaultFeeCloseMaker,
+        feeCloseTaker: settings.defaultFeeCloseTaker,
+        slippageOpen: settings.defaultSlippageOpen,
+        slippageClose: settings.defaultSlippageClose,
+        // Backward compatibility
         feeOpen: settings.defaultFeeOpen,
         feeClose: settings.defaultFeeClose,
         slippage: settings.defaultSlippage,
