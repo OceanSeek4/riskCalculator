@@ -99,101 +99,64 @@ export function CalculatorForm() {
   // Auto-switch modes based on online/offline state using settings defaults
   useEffect(() => {
     if (isOfflineMode) {
-      // 切换到离线模式：批量更新所有离线设置
-      
-      const updates: Partial<CalculatorFormData> = {};
-      const wasMarketOrder = formData.orderType === 'MARKET';
-      
-      // Always force to offline order type when in offline mode
-      if (formData.orderType !== settings.offlineOrderType) {
-        updates.orderType = settings.offlineOrderType;
+      // 切换到离线模式：完全按照设置保存中的离线模式配置进行切换
+      setFormData(currentData => {
+        const updates: Partial<CalculatorFormData> = {};
         
-        // Set offline price when switching to LIMIT order or when switching from MARKET
-        if (settings.offlineOrderType === 'LIMIT') {
-          // Always set the default price when switching to offline mode with LIMIT order
-          updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
-        } else if (settings.offlineOrderType === 'MARKET' && wasMarketOrder) {
-          // If offline uses MARKET and was already MARKET, keep current price or clear it
-          // The real-time price fetching will be disabled anyway in offline mode
-          if (!formData.entryPrice || formData.entryPrice === '0') {
-            updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
-          }
+        // 1. 订单类型：强制切换到离线设置中的订单类型
+        if (currentData.orderType !== settings.offlineOrderType) {
+          updates.orderType = settings.offlineOrderType;
         }
-      }
+        
+        // 2. 入场价格：对于离线模式，始终使用设置中的默认价格
+        if (settings.offlineOrderType === 'LIMIT') {
+          updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
+        } else if (settings.offlineOrderType === 'MARKET') {
+          updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
+        }
+        
+        // 3. 止损模式：切换到离线止损模式
+        if (currentData.stopMode !== settings.offlineStopMode) {
+          updates.stopMode = settings.offlineStopMode;
+        }
+        
+        // 4. 止盈模式：切换到离线止盈模式
+        if (currentData.takeProfitMode !== settings.offlineTakeProfitMode) {
+          updates.takeProfitMode = settings.offlineTakeProfitMode;
+        }
+        
+        // 5. 止盈开关：如果离线止盈模式是RR_RATIO，确保启用止盈
+        if (settings.offlineTakeProfitMode === 'RR_RATIO' && !currentData.useTakeProfit) {
+          updates.useTakeProfit = true;
+        }
+        
+        // 如果有更新，返回新的数据，否则返回原数据
+        return Object.keys(updates).length > 0 ? { ...currentData, ...updates } : currentData;
+      });
       
-      // Switch other settings to offline defaults
-      if (formData.stopMode !== settings.offlineStopMode) {
-        updates.stopMode = settings.offlineStopMode;
-      }
-      
-      if (formData.takeProfitMode !== settings.offlineTakeProfitMode) {
-        updates.takeProfitMode = settings.offlineTakeProfitMode;
-      }
-      
-      // Enable take profit if using RR_RATIO mode in offline
-      if (settings.offlineTakeProfitMode === 'RR_RATIO' && !formData.useTakeProfit) {
-        updates.useTakeProfit = true;
-      }
-      
-      // Batch update all changes at once
-      if (Object.keys(updates).length > 0) {
-        setFormData(updates);
-      }
-      
-      // Handle trailing stops separately as it uses different setter
+      // 6. 移动止损：按照离线设置处理
       if (trailingEnabled !== settings.offlineTrailingEnabled) {
         setTrailingEnabled(settings.offlineTrailingEnabled);
       }
       
     } else {
-      // 切换到在线模式：批量更新所有在线设置
+      // 切换到在线模式：智能恢复，避免强制覆盖用户选择
+      // 在线模式下不强制修改任何设置，让用户自己选择
       
-      const updates: Partial<CalculatorFormData> = {};
-      
-      // Switch to online defaults
-      if (formData.orderType !== settings.defaultOrderType) {
-        const wasLimitOrder = formData.orderType === 'LIMIT';
-        updates.orderType = settings.defaultOrderType;
-        
-        // Handle price when switching from LIMIT to MARKET in online mode
-        if (settings.defaultOrderType === 'MARKET' && wasLimitOrder) {
-          // Clear the entry price when switching to MARKET order
-          // Real-time price fetching will handle setting the correct price
-          updates.entryPrice = '';
-        }
-        // Note: LIMIT to LIMIT or MARKET to LIMIT transitions keep the existing price
-      }
-      
-      if (formData.stopMode !== settings.defaultStopMode) {
-        updates.stopMode = settings.defaultStopMode;
-      }
-      
-      if (formData.takeProfitMode !== settings.defaultTakeProfitMode) {
-        updates.takeProfitMode = settings.defaultTakeProfitMode;
-      }
-      
-      if (formData.useTakeProfit !== settings.defaultUseTakeProfit) {
-        updates.useTakeProfit = settings.defaultUseTakeProfit;
-      }
-      
-      // Batch update all changes at once
-      if (Object.keys(updates).length > 0) {
-        setFormData(updates);
-      }
-      
-      // Handle trailing stops separately
+      // 唯一的例外：移动止损恢复到用户设置偏好
       if (trailingEnabled !== settings.defaultTrailingEnabled) {
         setTrailingEnabled(settings.defaultTrailingEnabled);
       }
     }
-  }, [isOfflineMode, settings, formData.orderType, formData.stopMode, formData.takeProfitMode, formData.useTakeProfit, trailingEnabled]);
+  }, [isOfflineMode, settings.offlineOrderType, settings.offlineDefaultEntryPrice, settings.offlineStopMode, settings.offlineTakeProfitMode, settings.offlineTrailingEnabled, settings.defaultTrailingEnabled, trailingEnabled]);
 
-  // Additional safety check for setting initial price in offline mode
+  // 额外的安全检查：确保离线模式下始终有价格设定
+  // 这个useEffect作为后备机制，确保即使主要的切换逻辑遗漏，价格也会被正确设置
   useEffect(() => {
-    if (isOfflineMode && formData.orderType === 'LIMIT' && (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '')) {
+    if (isOfflineMode && (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '')) {
       handleInputChange('entryPrice', settings.offlineDefaultEntryPrice || '100000');
     }
-  }, [isOfflineMode, formData.orderType, settings.offlineDefaultEntryPrice]);
+  }, [isOfflineMode, formData.entryPrice, settings.offlineDefaultEntryPrice]);
 
   // 步骤4.3：初始化时水合持久化数据（追加）
   useEffect(() => {
