@@ -18,9 +18,11 @@ export function SettingsForm() {
     notificationMessage,
     notificationType,
     setNotification,
-    clearNotification
+    clearNotification,
+    isOfflineMode,
+    initializeOfflineMode
   } = useSettingsStore();
-  const { setFormData } = useCalculatorStore();
+  const { setFormData, syncWithSettings } = useCalculatorStore();
   const { t, i18n } = useTranslation();
 
   // Loading state for save operation
@@ -52,28 +54,14 @@ export function SettingsForm() {
     
     try {
       // Settings are automatically persisted via Zustand persist middleware
-      // Apply new defaults to calculator form - this will update the displayed values
-      setFormData({
-        exchange: settings.defaultExchange,
-        symbol: settings.defaultSymbol,
-        contractMode: settings.defaultContractMode,
-        stopMode: settings.defaultStopMode,
-        riskMode: settings.defaultRiskMode,
-        orderType: settings.defaultOrderType,
-        leverage: settings.defaultLeverage,
-        accountEquity: settings.defaultAccountEquity,
-        riskPercent: settings.defaultRiskPercent,
-        riskAmount: settings.defaultRiskAmount,
-        atrPeriod: settings.defaultAtrPeriod,
-        atrTimeframe: settings.defaultAtrTimeframe,
-        atrMultiplier: settings.defaultAtrMultiplier,
-        feeOpen: settings.defaultFeeOpen,
-        feeClose: settings.defaultFeeClose,
-        slippage: settings.defaultSlippage,
-        includeFees: settings.defaultIncludeFees,
-        stopPips: settings.defaultStopPips,
-        takeProfitPips: settings.defaultTakeProfitPips,
-      });
+      
+      // Initialize offline mode state in case defaultOfflineMode was changed
+      initializeOfflineMode();
+      
+      // Use syncWithSettings to properly apply settings considering current offline mode
+      // Note: we need to get the current offline mode after initialization
+      const currentOfflineMode = useSettingsStore.getState().isOfflineMode;
+      syncWithSettings(settings, currentOfflineMode);
       
       // Add a small delay to show the saving state
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -116,6 +104,14 @@ export function SettingsForm() {
       try {
         // Reset settings
         resetSettings();
+        
+        // Initialize offline mode state after reset
+        initializeOfflineMode();
+        
+        // Sync calculator with reset settings
+        const currentOfflineMode = useSettingsStore.getState().isOfflineMode;
+        const currentSettings = useSettingsStore.getState().settings;
+        syncWithSettings(currentSettings, currentOfflineMode);
         
         // Add a small delay to show the reset process
         await new Promise(resolve => setTimeout(resolve, 300));
