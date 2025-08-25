@@ -8,7 +8,7 @@ import { ComboInput } from '@/components/ui/combo-input';
 import { RefreshCw, AlertCircle, Bookmark, Calculator, WifiOff } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
-import { validateNumberString, validateStopPrice } from '@/lib/validation';
+import { validateNumberString, validateStopPrice, type CalculatorFormData } from '@/lib/validation';
 import { getCurrentPrice, getATRValue, getMAValue, formatPrice, checkSymbolSupport, getSupportedTimeframes, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
@@ -96,43 +96,104 @@ export function CalculatorForm() {
     }
   }, [settings, syncWithSettings, formData.side, updateTrailingConfig]);
 
-  // Auto-switch away from data-dependent modes when offline mode is enabled
+  // Auto-switch modes based on online/offline state using settings defaults
   useEffect(() => {
     if (isOfflineMode) {
-      // Switch order type away from MARKET
-      if (formData.orderType === 'MARKET') {
-        handleInputChange('orderType', 'LIMIT');
-        // Set initial price when switching from MARKET to LIMIT
-        setTimeout(() => {
-          if (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '') {
-            handleInputChange('entryPrice', '100000');
+      // 切换到离线模式：批量更新所有离线设置
+      
+      const updates: Partial<CalculatorFormData> = {};
+      const wasMarketOrder = formData.orderType === 'MARKET';
+      
+      // Always force to offline order type when in offline mode
+      if (formData.orderType !== settings.offlineOrderType) {
+        updates.orderType = settings.offlineOrderType;
+        
+        // Set offline price when switching to LIMIT order or when switching from MARKET
+        if (settings.offlineOrderType === 'LIMIT') {
+          // Always set the default price when switching to offline mode with LIMIT order
+          updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
+        } else if (settings.offlineOrderType === 'MARKET' && wasMarketOrder) {
+          // If offline uses MARKET and was already MARKET, keep current price or clear it
+          // The real-time price fetching will be disabled anyway in offline mode
+          if (!formData.entryPrice || formData.entryPrice === '0') {
+            updates.entryPrice = settings.offlineDefaultEntryPrice || '100000';
           }
-        }, 0);
+        }
       }
       
-      // Switch stop mode away from ATR
-      if (formData.stopMode === 'ATR') {
-        handleInputChange('stopMode', 'PRICE');
+      // Switch other settings to offline defaults
+      if (formData.stopMode !== settings.offlineStopMode) {
+        updates.stopMode = settings.offlineStopMode;
       }
       
-      // Switch take profit mode away from ATR
-      if (formData.takeProfitMode === 'ATR') {
-        handleInputChange('takeProfitMode', 'PRICE');
+      if (formData.takeProfitMode !== settings.offlineTakeProfitMode) {
+        updates.takeProfitMode = settings.offlineTakeProfitMode;
       }
       
-      // Disable trailing stops
-      if (trailingEnabled) {
-        setTrailingEnabled(false);
+      // Enable take profit if using RR_RATIO mode in offline
+      if (settings.offlineTakeProfitMode === 'RR_RATIO' && !formData.useTakeProfit) {
+        updates.useTakeProfit = true;
+      }
+      
+      // Batch update all changes at once
+      if (Object.keys(updates).length > 0) {
+        setFormData(updates);
+      }
+      
+      // Handle trailing stops separately as it uses different setter
+      if (trailingEnabled !== settings.offlineTrailingEnabled) {
+        setTrailingEnabled(settings.offlineTrailingEnabled);
+      }
+      
+    } else {
+      // 切换到在线模式：批量更新所有在线设置
+      
+      const updates: Partial<CalculatorFormData> = {};
+      
+      // Switch to online defaults
+      if (formData.orderType !== settings.defaultOrderType) {
+        const wasLimitOrder = formData.orderType === 'LIMIT';
+        updates.orderType = settings.defaultOrderType;
+        
+        // Handle price when switching from LIMIT to MARKET in online mode
+        if (settings.defaultOrderType === 'MARKET' && wasLimitOrder) {
+          // Clear the entry price when switching to MARKET order
+          // Real-time price fetching will handle setting the correct price
+          updates.entryPrice = '';
+        }
+        // Note: LIMIT to LIMIT or MARKET to LIMIT transitions keep the existing price
+      }
+      
+      if (formData.stopMode !== settings.defaultStopMode) {
+        updates.stopMode = settings.defaultStopMode;
+      }
+      
+      if (formData.takeProfitMode !== settings.defaultTakeProfitMode) {
+        updates.takeProfitMode = settings.defaultTakeProfitMode;
+      }
+      
+      if (formData.useTakeProfit !== settings.defaultUseTakeProfit) {
+        updates.useTakeProfit = settings.defaultUseTakeProfit;
+      }
+      
+      // Batch update all changes at once
+      if (Object.keys(updates).length > 0) {
+        setFormData(updates);
+      }
+      
+      // Handle trailing stops separately
+      if (trailingEnabled !== settings.defaultTrailingEnabled) {
+        setTrailingEnabled(settings.defaultTrailingEnabled);
       }
     }
-  }, [isOfflineMode, formData.orderType, formData.stopMode, formData.takeProfitMode, trailingEnabled]);
+  }, [isOfflineMode, settings, formData.orderType, formData.stopMode, formData.takeProfitMode, formData.useTakeProfit, trailingEnabled]);
 
-  // Separate effect for setting initial price in offline mode (to avoid dependency loop)
+  // Additional safety check for setting initial price in offline mode
   useEffect(() => {
     if (isOfflineMode && formData.orderType === 'LIMIT' && (!formData.entryPrice || formData.entryPrice === '0' || formData.entryPrice === '')) {
-      handleInputChange('entryPrice', '100000');
+      handleInputChange('entryPrice', settings.offlineDefaultEntryPrice || '100000');
     }
-  }, [isOfflineMode, formData.orderType]);
+  }, [isOfflineMode, formData.orderType, settings.offlineDefaultEntryPrice]);
 
   // 步骤4.3：初始化时水合持久化数据（追加）
   useEffect(() => {

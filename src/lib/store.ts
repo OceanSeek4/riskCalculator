@@ -103,15 +103,15 @@ interface PresetState {
   loadPreset: (id: string) => Partial<CalculatorFormData> | null;
 }
 
-// Default form values
+// Default form values - 在线模式默认配置
 const defaultFormData: Partial<CalculatorFormData> = {
   exchange: 'BINANCE',
   symbol: 'BTCUSDT',
   contractMode: 'USDT_PERP',
   side: 'LONG',
-  stopMode: 'ATR',
+  stopMode: 'ATR',         // 在线模式默认使用ATR止损
   riskMode: 'ACCOUNT_PERCENT',
-  orderType: 'MARKET',
+  orderType: 'MARKET',     // 在线模式默认使用市价单
   leverage: 10,
   atrPeriod: 14,
   atrTimeframe: '15m',
@@ -178,16 +178,16 @@ const defaultTrailingState: TrailingState = {
   indicators: {},
 };
 
-// Default settings
+// Default settings - 在线模式默认配置
 const defaultSettings: SettingsData = {
   defaultExchange: 'BINANCE',
   defaultSymbol: 'BTCUSDT',
   defaultContractMode: 'USDT_PERP',
-  defaultStopMode: 'ATR',
-  defaultTakeProfitMode: 'RR_RATIO',
-  defaultUseTakeProfit: true,
+  defaultStopMode: 'ATR',              // 在线模式默认ATR止损
+  defaultTakeProfitMode: 'RR_RATIO',   // 默认盈亏比目标
+  defaultUseTakeProfit: true,          // 默认启用止盈
   defaultRiskMode: 'ACCOUNT_PERCENT',
-  defaultOrderType: 'MARKET',
+  defaultOrderType: 'MARKET',          // 在线模式默认市价单
   defaultLeverage: 10,
   defaultAccountEquity: '100000',
   defaultRiskPercent: '2',
@@ -223,11 +223,12 @@ const defaultSettings: SettingsData = {
   language: 'zh',
   autoFetchATR: true,
   showAdvancedOptions: true,
-  // Offline mode settings
+  // Offline mode settings - 确保项目默认启动为在线模式
   defaultOfflineMode: false,
   offlineStopMode: 'PIPS',
   offlineTakeProfitMode: 'RR_RATIO',
   offlineOrderType: 'LIMIT',
+  offlineDefaultEntryPrice: '100000',
   offlineTrailingEnabled: false,
 };
 

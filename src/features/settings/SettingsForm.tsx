@@ -1063,6 +1063,41 @@ export function SettingsForm() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                  <Label>离线默认订单类型 (Offline Order Type)</Label>
+                  <Select
+                    value={settings.offlineOrderType}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                      handleInputChange('offlineOrderType', e.target.value as 'LIMIT' | 'MARKET')
+                    }
+                  >
+                    <option value="LIMIT">限价单 (Limit Order) - 推荐</option>
+                    <option value="MARKET">市价单 (Market Order) - 离线模式无实时价格</option>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    离线模式下推荐使用限价单，避免实时价格依赖
+                  </p>
+                </div>
+                
+                <div>
+                  <Label>限价单默认入场价格 (Default Limit Price)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={settings.offlineDefaultEntryPrice || '100000'}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                      handleInputChange('offlineDefaultEntryPrice', e.target.value)
+                    }
+                    placeholder="100000"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    切换到离线模式时限价单的默认价格设置
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <Label>离线默认止损模式 (Offline Stop Mode)</Label>
                   <Select
                     value={settings.offlineStopMode}

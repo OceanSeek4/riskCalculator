@@ -125,7 +125,8 @@ export const settingsSchema = z.object({
   defaultOfflineMode: z.boolean().default(false),
   offlineStopMode: z.enum(['PRICE', 'PIPS']).default('PIPS'),
   offlineTakeProfitMode: z.enum(['PRICE', 'RR_RATIO', 'PIPS']).default('RR_RATIO'),
-  offlineOrderType: z.enum(['LIMIT']).default('LIMIT'),
+  offlineOrderType: z.enum(['LIMIT', 'MARKET']).default('LIMIT'),
+  offlineDefaultEntryPrice: z.string().default('100000'),
   offlineTrailingEnabled: z.boolean().default(false),
 });
 
