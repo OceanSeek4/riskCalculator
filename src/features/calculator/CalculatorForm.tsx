@@ -38,6 +38,18 @@ export function CalculatorForm() {
     setATRError,
     maError,
     setMAError,
+    // Price locking
+    isPriceLocked,
+    setIsPriceLocked,
+    lockedPrice,
+    setLockedPrice,
+    // Real-time price state
+    realTimePrice,
+    setRealTimePrice,
+    lastPriceUpdate,
+    setLastPriceUpdate,
+    priceChange,
+    setPriceChange,
     // Trailing exits
     trailingEnabled,
     setTrailingEnabled,
@@ -84,14 +96,16 @@ export function CalculatorForm() {
   const [priceError, setPriceError] = useState<string>('');
   const [supportedIntervals, setSupportedIntervals] = useState<string[]>([]);
   
+  // Quick update state for limit orders
+  const [isQuickUpdating, setIsQuickUpdating] = useState(false);
+  const [isQuickUpdateClicked, setIsQuickUpdateClicked] = useState(false);
+  const [quickUpdateSuccess, setQuickUpdateSuccess] = useState(false);
+  
   // Candle management for trailing exits
   const [candleManager, setCandleManager] = useState<CandleManager | null>(null);
   const [isInitializingCandles, setIsInitializingCandles] = useState(false);
   const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined);
-  const [realTimePrice, setRealTimePrice] = useState<string>('');
-  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [priceTimer, setPriceTimer] = useState<NodeJS.Timeout | null>(null);
-  const [priceChange, setPriceChange] = useState<'up' | 'down' | 'same' | null>(null);
   
   // For PIPS mode - store locked prices during calculation
   const [lockedPipsStopPrice, setLockedPipsStopPrice] = useState<string | null>(null);
@@ -102,6 +116,31 @@ export function CalculatorForm() {
   const formatPercentageDisplay = (decimalValue: string) => {
     const percentage = (parseFloat(decimalValue) * 100).toFixed(3);
     return parseFloat(percentage).toString();
+  };
+
+  // Price locking handlers
+  const handleLockPrice = () => {
+    if (formData.orderType === 'MARKET' && realTimePrice) {
+      setLockedPrice(realTimePrice);
+      setIsPriceLocked(true);
+      setFormData({ entryPrice: realTimePrice });
+    }
+  };
+
+  const handleUnlockPrice = () => {
+    setIsPriceLocked(false);
+    setLockedPrice(null);
+    // Resume real-time price updates
+    if (formData.orderType === 'MARKET' && realTimePrice) {
+      setFormData({ entryPrice: realTimePrice });
+    }
+  };
+
+  const handleManualPriceChange = (newPrice: string) => {
+    if (isPriceLocked) {
+      setLockedPrice(newPrice);
+    }
+    setFormData({ entryPrice: newPrice });
   };
   
   // Reset price change indicator after 2 seconds
@@ -264,6 +303,7 @@ export function CalculatorForm() {
   }, [formData.exchange, formData.enableRebate, settings.defaultRebateBinance, settings.defaultRebateBybit, settings.defaultRebateBitget, settings.defaultRebateOkx]);
 
   // Real-time price updates for market orders
+  // Note: This only updates the display price. Automatic result recalculation is handled in ResultCard.tsx
   useEffect(() => {
     // Clear existing timer
     if (priceTimer) {
@@ -278,10 +318,10 @@ export function CalculatorForm() {
       // Initial fetch
       fetchRealTimePrice();
       
-      // Set up interval for real-time updates (every 3 seconds)
+      // Set up interval for real-time price updates (every 2 seconds to match auto-recalculation)
       const timer = setInterval(() => {
         fetchRealTimePrice();
-      }, 3000);
+      }, 2000);
       
       setPriceTimer(timer);
       
@@ -712,8 +752,14 @@ export function CalculatorForm() {
 
   // Helper function to get the effective entry price for calculations
   const getEffectiveEntryPrice = (): string => {
-    if (formData.orderType === 'MARKET' && realTimePrice) {
-      return realTimePrice;
+    if (formData.orderType === 'MARKET') {
+      // If price is locked, use locked price; otherwise use real-time price
+      if (isPriceLocked && lockedPrice) {
+        return lockedPrice;
+      }
+      if (realTimePrice) {
+        return realTimePrice;
+      }
     }
     return formData.entryPrice || '';
   };
@@ -748,8 +794,8 @@ export function CalculatorForm() {
 
       setRealTimePrice(newPrice);
       setLastPriceUpdate(new Date());
-      // Only update form data if it's a market order
-      if (formData.orderType === 'MARKET') {
+      // Only update form data if it's a market order and price is not locked
+      if (formData.orderType === 'MARKET' && !isPriceLocked) {
         setFormData({ entryPrice: newPrice });
       }
       setPriceError('');
@@ -785,11 +831,38 @@ export function CalculatorForm() {
     }
   };
 
-  const handleCalculate = async () => {
+  // Quick update function for limit orders - reuses calculation logic
+  const handleQuickUpdate = async () => {
     if (!validateForm() || !marketMeta) return;
     
-    setIsCalculating(true);
+    // Trigger click animation
+    setIsQuickUpdateClicked(true);
+    setTimeout(() => setIsQuickUpdateClicked(false), 200); // Reset after 200ms
+    
+    setIsQuickUpdating(true);
     setCalculationError(null);
+    setQuickUpdateSuccess(false);
+    
+    try {
+      await performCalculation();
+      
+      // Trigger success animation
+      setQuickUpdateSuccess(true);
+      setTimeout(() => setQuickUpdateSuccess(false), 1500); // Show success for 1.5s
+      
+      // Show success notification for quick update
+      setTimeout(() => {
+        setNotification('计算结果已更新', 'success');
+      }, 100);
+    } catch (error) {
+      // Error handling is done in performCalculation
+    } finally {
+      setIsQuickUpdating(false);
+    }
+  };
+
+  // Core calculation logic that can be shared between handleCalculate and handleQuickUpdate
+  const performCalculation = async () => {
     
     // For market orders, fetch the latest price and lock it for calculation
     let lockedEntryPrice = formData.entryPrice!;
@@ -910,6 +983,18 @@ export function CalculatorForm() {
       }, 100);
     } catch (error) {
       setCalculationError(error instanceof Error ? error.message : t('calculationFailed'));
+      throw error; // Re-throw so caller can handle it
+    }
+  };
+
+  const handleCalculate = async () => {
+    if (!validateForm() || !marketMeta) return;
+    
+    setIsCalculating(true);
+    setCalculationError(null);
+    
+    try {
+      await performCalculation();
     } finally {
       setIsCalculating(false);
     }
@@ -1124,6 +1209,12 @@ export function CalculatorForm() {
                 
                 handleInputChange('orderType', e.target.value);
                 
+                // Reset price lock when switching order type
+                if (isPriceLocked) {
+                  setIsPriceLocked(false);
+                  setLockedPrice(null);
+                }
+                
                 // Set default fee type when switching to LIMIT order
                 if (e.target.value === 'LIMIT') {
                   handleInputChange('feeType', 'MAKER_OPEN_TAKER_CLOSE');
@@ -1292,26 +1383,105 @@ export function CalculatorForm() {
                 </div>
               )}
             </div>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.entryPrice || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('entryPrice', e.target.value)}
-              placeholder={formData.orderType === 'LIMIT' ? t('enterLimitPrice') : t('enterExpectedEntryPrice')}
-              className={`${formErrors.entryPrice ? 'border-red-500' : ''} ${
-                formData.orderType === 'MARKET' 
-                  ? `cursor-not-allowed ${
-                      priceChange === 'up' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' :
-                      priceChange === 'down' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' :
-                      'bg-muted'
-                    } transition-colors duration-500`
-                  : ''
-              }`}
-              disabled={formData.orderType === 'MARKET'}
-              readOnly={formData.orderType === 'MARKET'}
-            />
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                step="0.01"
+                value={formData.entryPrice || ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  if (formData.orderType === 'MARKET' && isPriceLocked) {
+                    handleManualPriceChange(e.target.value);
+                  } else {
+                    handleInputChange('entryPrice', e.target.value);
+                  }
+                }}
+                placeholder={formData.orderType === 'LIMIT' ? t('enterLimitPrice') : t('enterExpectedEntryPrice')}
+                className={`flex-1 ${formErrors.entryPrice ? 'border-red-500' : ''} ${
+                  formData.orderType === 'MARKET' && !isPriceLocked
+                    ? `cursor-not-allowed ${
+                        priceChange === 'up' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' :
+                        priceChange === 'down' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' :
+                        'bg-muted'
+                      } transition-colors duration-500`
+                    : isPriceLocked ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'
+                    : ''
+                }`}
+                disabled={formData.orderType === 'MARKET' && !isPriceLocked}
+                readOnly={formData.orderType === 'MARKET' && !isPriceLocked}
+              />
+              
+              {/* Price Lock Button for Market Orders */}
+              {formData.orderType === 'MARKET' && realTimePrice && (
+                <Button
+                  type="button"
+                  variant={isPriceLocked ? "default" : "outline"}
+                  size="sm"
+                  onClick={isPriceLocked ? handleUnlockPrice : handleLockPrice}
+                  className={`min-w-[80px] ${
+                    isPriceLocked 
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                  title={isPriceLocked ? t('unlockPrice') || '解锁价格' : t('lockPrice') || '锁定价格'}
+                >
+                  {isPriceLocked ? (
+                    <>
+                      🔒 已锁定
+                    </>
+                  ) : (
+                    <>
+                      🔓 锁定
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              {/* Quick Update Button for Limit Orders */}
+              {formData.orderType === 'LIMIT' && result && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleQuickUpdate}
+                  disabled={isQuickUpdating || !marketMeta}
+                  className={`min-w-[80px] transition-all duration-200 ${
+                    quickUpdateSuccess
+                      ? 'bg-green-100 border-green-400 text-green-800 dark:bg-green-950 dark:border-green-600 dark:text-green-200 scale-105 shadow-lg'
+                      : isQuickUpdateClicked 
+                        ? 'scale-95 bg-blue-100 border-blue-500 shadow-inner dark:bg-blue-900 dark:border-blue-500' 
+                        : isQuickUpdating 
+                          ? 'bg-blue-50 border-blue-400 text-blue-800 dark:bg-blue-950 dark:border-blue-600 dark:text-blue-200 animate-pulse scale-100' 
+                          : 'border-blue-300 hover:bg-blue-50 hover:border-blue-400 text-blue-700 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950 scale-100'
+                  }`}
+                  title="使用当前价格快速更新计算结果"
+                >
+                  {quickUpdateSuccess ? (
+                    <>
+                      <span className="animate-bounce">✅</span>
+                      {' '}已更新
+                    </>
+                  ) : isQuickUpdating ? (
+                    <span className="animate-pulse">更新中</span>
+                  ) : (
+                    <>
+                      <span className={`transition-transform duration-200 ${isQuickUpdateClicked ? 'scale-110 rotate-180' : 'scale-100 rotate-0'}`}>
+                        🔄
+                      </span>
+                      {' '}快速更新
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
             {formErrors.entryPrice && (
               <p className="text-sm text-red-500 mt-1">{formErrors.entryPrice}</p>
+            )}
+            {/* Quick update help text for limit orders */}
+            {formData.orderType === 'LIMIT' && result && !isOfflineMode && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                <span>💡</span>
+                修改价格后点击"快速更新"可立即重新计算，无需重新点击"计算仓位"
+              </p>
             )}
             {isOfflineMode && formData.orderType === 'LIMIT' && (
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -1324,9 +1494,15 @@ export function CalculatorForm() {
             )}
             {formData.orderType === 'MARKET' && (
               <>
-                <p className="text-xs text-muted-foreground mt-1">
-                  📈 {t('marketOrderNote')} - {t('realTimePriceUpdated')}
-                </p>
+                {isPriceLocked ? (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-center gap-1">
+                    🔒 价格已锁定在 ${lockedPrice} - 点击"解锁"按钮恢复实时价格更新
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    📈 {t('marketOrderNote')} - {t('realTimePriceUpdated')}
+                  </p>
+                )}
                 {isOfflineMode && (
                   <div className="mt-2 p-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded text-sm">
                     <div className="flex items-center gap-2">

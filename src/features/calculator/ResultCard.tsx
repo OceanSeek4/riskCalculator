@@ -2,25 +2,160 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Copy, AlertTriangle, TrendingUp, DollarSign, Calculator, Target } from 'lucide-react';
-import { useCalculatorStore } from '@/lib/store';
+import { useCalculatorStore, useSettingsStore } from '@/lib/store';
 import { useTranslation } from 'react-i18next';
-import { calculateExpectedPnL } from '@/lib/core';
-import { getCurrentPrice } from '@/lib/market-service';
+import { calculateExpectedPnL, calculatePosition } from '@/lib/core';
+import { getCurrentPrice, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 
 export function ResultCard() {
   const { 
     result, 
+    setResult,
     formData,
     currentATR,
     trailingEnabled,
     trailingConfig,
     trailingState,
+    isPriceLocked,
+    lockedPrice,
+    realTimePrice,
+    setRealTimePrice,
+    lastPriceUpdate,
+    setLastPriceUpdate,
+    priceChange,
   } = useCalculatorStore();
   
   // Get current price from CalculatorForm's state if available
   const [currentPrice, setCurrentPrice] = React.useState<number | undefined>(undefined);
+  const [marketMeta, setMarketMeta] = React.useState<any>(null);
   const { t } = useTranslation();
+  const { settings } = useSettingsStore();
+  
+  // Fetch market meta when form data changes
+  React.useEffect(() => {
+    const fetchMarketMeta = async () => {
+      if (formData.exchange && formData.symbol && formData.contractMode) {
+        try {
+          const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const meta = await getMarketMeta(formData.exchange as Exchange, formData.symbol, instType);
+          setMarketMeta(meta);
+        } catch (error) {
+          console.error('Failed to fetch market meta:', error);
+          setMarketMeta(null);
+        }
+      } else {
+        setMarketMeta(null);
+      }
+    };
+    
+    fetchMarketMeta();
+  }, [formData.exchange, formData.symbol, formData.contractMode]);
+  
+  // Auto recalculation timer for market orders
+  React.useEffect(() => {
+    let recalcTimer: NodeJS.Timeout | null = null;
+    
+    // Helper function to perform recalculation
+    const performRecalculation = async () => {
+      // Only recalculate if:
+      // 1. It's a market order
+      // 2. Price is not locked
+      // 3. We have all required data
+      if (formData.orderType === 'MARKET' && 
+          !isPriceLocked && 
+          result &&
+          marketMeta &&
+          formData.exchange && 
+          formData.symbol &&
+          formData.side &&
+          formData.contractMode &&
+          formData.stopMode) {
+        
+        try {
+          // Get current price for recalculation
+          const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const currentPrice = await getCurrentPrice(formData.exchange as Exchange, formData.symbol, instType);
+          const currentPriceStr = currentPrice.toString();
+          
+          // Update real-time price in store (this also updates the form entry price for market orders)
+          setRealTimePrice(currentPriceStr);
+          setLastPriceUpdate(new Date());
+          
+          // Create calculation input with current price
+          const input = {
+            side: formData.side,
+            entryPrice: currentPriceStr,
+            stopPrice: formData.stopMode === 'PRICE' ? formData.stopPrice : undefined,
+            atr: formData.stopMode === 'ATR' ? currentATR || undefined : undefined,
+            atrMultiplier: formData.stopMode === 'ATR' ? formData.atrMultiplier : undefined,
+            stopPips: formData.stopMode === 'PIPS' ? formData.stopPips : undefined,
+            stopMode: formData.stopMode,
+            // Take profit settings
+            useTakeProfit: formData.useTakeProfit || false,
+            takeProfitMode: formData.takeProfitMode,
+            takeProfitPrice: formData.takeProfitMode === 'PRICE' ? formData.takeProfitPrice : undefined,
+            takeProfitATRMultiplier: formData.takeProfitMode === 'ATR' ? formData.takeProfitATRMultiplier : undefined,
+            takeProfitRRRatio: formData.takeProfitMode === 'RR_RATIO' ? formData.takeProfitRRRatio : undefined,
+            takeProfitPips: formData.takeProfitMode === 'PIPS' ? formData.takeProfitPips : undefined,
+            riskMode: formData.riskMode || 'FIXED_USDT',
+            riskUSDT: formData.riskMode === 'FIXED_USDT' ? formData.riskAmount : undefined,
+            accountEquity: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.accountEquity : undefined,
+            riskPercent: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.riskPercent : undefined,
+            includeFees: formData.includeFees || false,
+            // Maker/Taker fees
+            feeOpenMaker: formData.feeOpenMaker || '0.0002',
+            feeOpenTaker: formData.feeOpenTaker || '0.0006',
+            feeCloseMaker: formData.feeCloseMaker || '0.0002',
+            feeCloseTaker: formData.feeCloseTaker || '0.0006',
+            slippageOpen: formData.slippageOpen || '0.0005',
+            slippageClose: formData.slippageClose || '0.0005',
+            // Rebate settings
+            enableRebate: formData.enableRebate || false,
+            rebatePercent: formData.rebatePercent || '0',
+            // Backward compatibility
+            feeOpen: formData.feeOpen || '0.0004',
+            feeClose: formData.feeClose || '0.0004',
+            slippage: formData.slippage || '0.0005',
+            leverage: formData.leverage,
+            contractMode: formData.contractMode,
+            marketMeta,
+            orderType: formData.orderType,
+            feeType: formData.feeType,
+            rrRatios: settings.rrRatios,
+          };
+          
+          const newResult = calculatePosition(input);
+          setResult(newResult);
+        } catch (error) {
+          // Don't update result if calculation fails
+          console.error('Failed to recalculate with current price:', error);
+        }
+      }
+    };
+    
+    // Set up auto recalculation only for market orders that are not locked
+    if (formData.orderType === 'MARKET' && 
+        !isPriceLocked && 
+        result &&
+        marketMeta &&
+        formData.exchange && 
+        formData.symbol) {
+      
+      // Initial recalculation
+      performRecalculation();
+      
+      // Set up interval for every 2 seconds
+      recalcTimer = setInterval(performRecalculation, 2000);
+    }
+    
+    // Cleanup
+    return () => {
+      if (recalcTimer) {
+        clearInterval(recalcTimer);
+      }
+    };
+  }, [isPriceLocked, formData.orderType, formData.exchange, formData.symbol, result?.entryPrice, marketMeta, currentATR, formData.side, formData.contractMode, formData.stopMode, formData.stopPrice, formData.atrMultiplier, formData.stopPips, formData.useTakeProfit, formData.takeProfitMode, formData.takeProfitPrice, formData.takeProfitATRMultiplier, formData.takeProfitRRRatio, formData.takeProfitPips, formData.riskMode, formData.riskAmount, formData.accountEquity, formData.riskPercent, formData.includeFees, formData.feeOpenMaker, formData.feeOpenTaker, formData.feeCloseMaker, formData.feeCloseTaker, formData.slippageOpen, formData.slippageClose, formData.enableRebate, formData.rebatePercent, formData.feeOpen, formData.feeClose, formData.slippage, formData.leverage, formData.feeType, settings.rrRatios]);
   
   // Fetch current price when trailing is enabled
   React.useEffect(() => {
@@ -350,10 +485,33 @@ export function ResultCard() {
       {/* Main Position Card */}
       <Card className="animate-in slide-in-from-top-2 duration-300 hover:shadow-lg transition-shadow duration-200">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5" />
-            {t('positionResults')}
-          </CardTitle>
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              {t('positionResults')}
+            </CardTitle>
+            
+            {/* Price Lock Status Indicator */}
+            {formData.orderType === 'MARKET' && (
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                isPriceLocked 
+                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700'
+                  : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border border-green-300 dark:border-green-700 animate-pulse'
+              }`}>
+                {isPriceLocked ? (
+                  <>
+                    <span>🔒</span>
+                    <span>已锁定</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔄</span>
+                    <span>每2秒更新</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           
           {/* Enhanced Entry Price Display */}
           <div 
@@ -380,14 +538,23 @@ export function ResultCard() {
               </div>
               <div className="text-right">
                 {formData.orderType === 'MARKET' && result.entryPrice && (
-                  <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    {t('lockedAtCalculation')}
+                  <div className="flex items-center gap-1 text-xs">
+                    {isPriceLocked ? (
+                      <>
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <span className="text-yellow-600 dark:text-yellow-400">价格已锁定</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-green-600 dark:text-green-400">实时价格</span>
+                      </>
+                    )}
                   </div>
                 )}
                 {formData.orderType === 'LIMIT' && (
                   <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     {t('limitOrder')}
                   </div>
                 )}
@@ -396,22 +563,61 @@ export function ResultCard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
+          {/* Price Lock Status Banner for Market Orders */}
+          {formData.orderType === 'MARKET' && (
+            <div className={`p-3 rounded-lg border text-sm ${
+              isPriceLocked 
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-300'
+                : 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-700 dark:text-green-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-base">
+                  {isPriceLocked ? '🔒' : '📈'}
+                </span>
+                <div>
+                  {isPriceLocked ? (
+                    <>
+                      <strong>计算结果已锁定</strong> - 基于锁定价格 ${lockedPrice}
+                      <div className="text-xs mt-1 opacity-80">
+                        计算结果不会因价格变动而更新，适合详细分析和决策
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <strong>实时动态计算</strong> - 结果根据当前市场价格自动更新
+                      <div className="text-xs mt-1 opacity-80">
+                        计算结果会随价格变动实时刷新，点击左侧"锁定"按钮可固定结果
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {/* Key Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div 
-              className="p-4 bg-muted/50 rounded-lg animate-in slide-in-from-left-2 duration-400 hover:bg-muted/70 transition-colors duration-200 cursor-pointer"
+              className={`p-4 bg-muted/50 rounded-lg animate-in slide-in-from-left-2 duration-400 hover:bg-muted/70 transition-colors duration-200 cursor-pointer ${
+                formData.orderType === 'MARKET' && !isPriceLocked ? 'ring-2 ring-green-200 dark:ring-green-800 ring-pulse' : ''
+              }`}
               onClick={() => handleCopyValue(result.qtyRoundedFormatted, 'Position Quantity')}
               title={t('clickToCopy')}
             >
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t('roundedQuantity')}</p>
-              <p className="text-xl font-bold font-mono mt-1">{result.qtyRoundedFormatted}</p>
+              <p className={`text-xl font-bold font-mono mt-1 ${
+                formData.orderType === 'MARKET' && !isPriceLocked ? 'animate-pulse' : ''
+              }`}>{result.qtyRoundedFormatted}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {t('rawQuantityPrefix')}: {parseFloat(result.qtyRaw).toFixed(8)}
               </p>
             </div>
-            <div className="p-4 bg-muted/50 rounded-lg animate-in slide-in-from-right-2 duration-400 hover:bg-muted/70 transition-colors duration-200 cursor-pointer">
+            <div className={`p-4 bg-muted/50 rounded-lg animate-in slide-in-from-right-2 duration-400 hover:bg-muted/70 transition-colors duration-200 cursor-pointer ${
+              formData.orderType === 'MARKET' && !isPriceLocked ? 'ring-2 ring-green-200 dark:ring-green-800 ring-pulse' : ''
+            }`}>
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t('notionalValue')}</p>
-              <p className="text-xl font-bold mt-1">${parseFloat(result.notional).toLocaleString()}</p>
+              <p className={`text-xl font-bold mt-1 ${
+                formData.orderType === 'MARKET' && !isPriceLocked ? 'animate-pulse' : ''
+              }`}>${parseFloat(result.notional).toLocaleString()}</p>
             </div>
           </div>
 

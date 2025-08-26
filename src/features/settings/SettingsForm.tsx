@@ -106,10 +106,20 @@ export function SettingsForm() {
   };
 
   const handleReset = async () => {
-    if (confirm(t('resetConfirm'))) {
+    const confirmReset = window.confirm(
+      t('resetConfirm') || 'Are you sure you want to reset all settings to default values? This action cannot be undone.'
+    );
+    
+    if (confirmReset) {
       try {
+        console.log('Resetting settings...'); // Debug log
+        
         // Reset settings
         resetSettings();
+        
+        // Force a re-render by getting fresh state
+        const freshState = useSettingsStore.getState();
+        console.log('Settings after reset:', freshState.settings); // Debug log
         
         // Initialize offline mode state after reset
         initializeOfflineMode();
@@ -124,6 +134,8 @@ export function SettingsForm() {
         
         // Show success notification
         setNotification(t('settingsReset') || 'Settings reset to defaults successfully!', 'success');
+        
+        console.log('Reset completed successfully'); // Debug log
         
         // Scroll to top to ensure user sees the notification at the top of the card
         setTimeout(() => {

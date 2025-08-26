@@ -54,6 +54,20 @@ interface CalculatorState {
   maError: string | null;
   setMAError: (error: string | null) => void;
   
+  // Price locking state for market orders
+  isPriceLocked: boolean;
+  setIsPriceLocked: (locked: boolean) => void;
+  lockedPrice: string | null;
+  setLockedPrice: (price: string | null) => void;
+  
+  // Real-time price state
+  realTimePrice: string;
+  setRealTimePrice: (price: string) => void;
+  lastPriceUpdate: Date | null;
+  setLastPriceUpdate: (date: Date | null) => void;
+  priceChange: 'up' | 'down' | 'same' | null;
+  setPriceChange: (change: 'up' | 'down' | 'same' | null) => void;
+  
   // Trailing exits state
   trailingEnabled: boolean;
   setTrailingEnabled: (enabled: boolean) => void;
@@ -376,6 +390,20 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   maError: null,
   setMAError: (error) => set({ maError: error }),
   
+  // Price locking state for market orders
+  isPriceLocked: false,
+  setIsPriceLocked: (locked) => set({ isPriceLocked: locked }),
+  lockedPrice: null,
+  setLockedPrice: (price) => set({ lockedPrice: price }),
+  
+  // Real-time price state
+  realTimePrice: '',
+  setRealTimePrice: (price) => set({ realTimePrice: price }),
+  lastPriceUpdate: null,
+  setLastPriceUpdate: (date) => set({ lastPriceUpdate: date }),
+  priceChange: null,
+  setPriceChange: (change) => set({ priceChange: change }),
+  
   // Trailing exits state
   trailingEnabled: false,
   setTrailingEnabled: (enabled) => set({ trailingEnabled: enabled }),
@@ -557,9 +585,9 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'settings-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
       migrate: (persistedState: any, version: number) => {
-        // Version 0 to 1: Update symbol list with new defaults
+        // Version 0 to 1: Update symbol list with new defaults and add missing fields
         if (version < 1) {
           const state = persistedState as any;
           if (state && state.settings) {
@@ -568,8 +596,64 @@ export const useSettingsStore = create<SettingsState>()(
                 JSON.stringify(state.settings.symbolList) === JSON.stringify(['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'SUIUSDT'])) {
               state.settings.symbolList = ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'];
             }
+            
+            // Add missing rebate settings if they don't exist
+            if (state.settings.defaultEnableRebate === undefined) {
+              state.settings.defaultEnableRebate = defaultSettings.defaultEnableRebate;
+            }
+            if (state.settings.defaultRebateBinance === undefined) {
+              state.settings.defaultRebateBinance = defaultSettings.defaultRebateBinance;
+            }
+            if (state.settings.defaultRebateBybit === undefined) {
+              state.settings.defaultRebateBybit = defaultSettings.defaultRebateBybit;
+            }
+            if (state.settings.defaultRebateBitget === undefined) {
+              state.settings.defaultRebateBitget = defaultSettings.defaultRebateBitget;
+            }
+            if (state.settings.defaultRebateOkx === undefined) {
+              state.settings.defaultRebateOkx = defaultSettings.defaultRebateOkx;
+            }
+            
+            // Add missing fee settings if they don't exist
+            if (state.settings.defaultFeeOpenMaker === undefined) {
+              state.settings.defaultFeeOpenMaker = defaultSettings.defaultFeeOpenMaker;
+            }
+            if (state.settings.defaultFeeOpenTaker === undefined) {
+              state.settings.defaultFeeOpenTaker = defaultSettings.defaultFeeOpenTaker;
+            }
+            if (state.settings.defaultFeeCloseMaker === undefined) {
+              state.settings.defaultFeeCloseMaker = defaultSettings.defaultFeeCloseMaker;
+            }
+            if (state.settings.defaultFeeCloseTaker === undefined) {
+              state.settings.defaultFeeCloseTaker = defaultSettings.defaultFeeCloseTaker;
+            }
+            if (state.settings.defaultSlippageOpen === undefined) {
+              state.settings.defaultSlippageOpen = defaultSettings.defaultSlippageOpen;
+            }
+            if (state.settings.defaultSlippageClose === undefined) {
+              state.settings.defaultSlippageClose = defaultSettings.defaultSlippageClose;
+            }
+            
+            // Add missing fee type setting if it doesn't exist
+            if (state.settings.defaultFeeType === undefined) {
+              state.settings.defaultFeeType = defaultSettings.defaultFeeType;
+            }
           }
         }
+        
+        // Version 1 to 2: Ensure all fee and rebate settings are present
+        if (version < 2) {
+          const state = persistedState as any;
+          if (state && state.settings) {
+            // Ensure all new fields have default values
+            Object.keys(defaultSettings).forEach(key => {
+              if (state.settings[key] === undefined) {
+                state.settings[key] = defaultSettings[key as keyof typeof defaultSettings];
+              }
+            });
+          }
+        }
+        
         return persistedState;
       },
     }
