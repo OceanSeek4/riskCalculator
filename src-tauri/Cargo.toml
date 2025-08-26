@@ -1,8 +1,8 @@
 [package]
 authors = ["you"]
-description = "A Tauri App"
+description = "RiskFixer - 固定风险仓位计算器"
 edition = "2021"
-name = "position-risk-calculator"
+name = "riskfixer"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

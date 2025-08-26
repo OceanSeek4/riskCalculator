@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "position-risk-calculator",
+  "productName": "riskfixer",
   "version": "0.1.0",
   "identifier": "com.ocean.position-risk-calculator",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "position-risk-calculator",
+        "title": "RiskFixer - 固定风险仓位计算器",
         "width": 800,
         "height": 600
       }
@@ -30,6 +30,22 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "dmg": {
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        },
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        }
+      }
+    }
   }
 }
