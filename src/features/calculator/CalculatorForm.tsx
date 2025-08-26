@@ -1148,8 +1148,8 @@ export function CalculatorForm() {
                   handleInputChange('feeType', e.target.value as 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY')
                 }
               >
-                <option value="MAKER">全部Maker (开平仓都挂单, 0.02%, 无滑点)</option>
-                <option value="TAKER">全部Taker (开平仓都吃单, 0.06%, 有滑点)</option>
+                <option value="MAKER">全部Maker (开平仓都挂单, {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点)</option>
+                <option value="TAKER">全部Taker (开平仓都吃单, {(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%, 有滑点)</option>
                 <option value="MAKER_OPEN_TAKER_CLOSE">开仓Maker + 止损Taker (开仓挂单, 止损吃单, 止盈无滑点)</option>
                 <option value="MAKER_OPEN_ONLY">仅开仓Maker (开仓挂单, 止盈止损吃单)</option>
               </Select>
@@ -1164,29 +1164,29 @@ export function CalculatorForm() {
                   <div className="text-xs opacity-75">
                     {formData.feeType === 'MAKER' && (
                       <>
-                        <strong>开仓:</strong> Maker 0.02%, 无滑点<br/>
-                        <strong>止损:</strong> Maker 0.02%, 无滑点
+                        <strong>开仓:</strong> Maker {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点<br/>
+                        <strong>止损:</strong> Maker {(parseFloat(settings.defaultFeeCloseMaker) * 100).toFixed(3)}%, 无滑点
                       </>
                     )}
                     {formData.feeType === 'TAKER' && (
                       <>
-                        <strong>开仓:</strong> Taker 0.06%, 有滑点<br/>
-                        <strong>止损:</strong> Taker 0.06%, 有滑点
+                        <strong>开仓:</strong> Taker {(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%, 有滑点<br/>
+                        <strong>止损:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点
                       </>
                     )}
                     {formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' && (
                       <>
-                        <strong>开仓:</strong> Maker 0.02%, 无滑点 (挂单入场)<br/>
-                        <strong>止损:</strong> Taker 0.06%, 有滑点 (市价出场)<br/>
+                        <strong>开仓:</strong> Maker {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点 (挂单入场)<br/>
+                        <strong>止损:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点 (市价出场)<br/>
                         <strong>止盈:</strong> 无滑点 (限价单出场)<br/>
                         <span className="text-green-600 dark:text-green-400">✓ 推荐：开仓成本低，止损速度快，止盈无滑点</span>
                       </>
                     )}
                     {formData.feeType === 'MAKER_OPEN_ONLY' && (
                       <>
-                        <strong>开仓:</strong> Maker 0.02%, 无滑点 (挂单入场)<br/>
-                        <strong>止损:</strong> Taker 0.06%, 有滑点 (市价出场)<br/>
-                        <strong>止盈:</strong> Taker 0.06%, 有滑点 (市价出场)<br/>
+                        <strong>开仓:</strong> Maker {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点 (挂单入场)<br/>
+                        <strong>止损:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点 (市价出场)<br/>
+                        <strong>止盈:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点 (市价出场)<br/>
                         <span className="text-blue-600 dark:text-blue-400">ℹ️ 适合短线交易：开仓挂单等好价，出场市价保证成交</span>
                       </>
                     )}
@@ -1213,7 +1213,7 @@ export function CalculatorForm() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-yellow-600 dark:text-yellow-400">📊</span>
                 <span className="text-yellow-800 dark:text-yellow-200 font-medium">
-                  市价单自动使用 Taker 费率 (0.06%) 和滑点成本
+                  市价单自动使用 Taker 费率 ({(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%) 和滑点成本
                 </span>
               </div>
             </div>
@@ -1959,38 +1959,50 @@ export function CalculatorForm() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <Label className="text-xs text-green-600 dark:text-green-400">Maker 开仓</Label>
+                      <Label className="text-xs text-green-600 dark:text-green-400">Maker 开仓 (%)</Label>
                       <Input
                         type="number"
-                        step="0.0001"
-                        value={formData.feeOpenMaker || settings.defaultFeeOpenMaker}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          handleInputChange('feeOpenMaker', e.target.value)
-                        }
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={(parseFloat(formData.feeOpenMaker || settings.defaultFeeOpenMaker) * 100).toFixed(3)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const percentValue = parseFloat(e.target.value) || 0;
+                          const decimalValue = (percentValue / 100).toFixed(5);
+                          handleInputChange('feeOpenMaker', decimalValue);
+                        }}
                         className="text-xs h-8"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-orange-600 dark:text-orange-400">Taker 开仓</Label>
+                      <Label className="text-xs text-orange-600 dark:text-orange-400">Taker 开仓 (%)</Label>
                       <Input
                         type="number"
-                        step="0.0001"
-                        value={formData.feeOpenTaker || settings.defaultFeeOpenTaker}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          handleInputChange('feeOpenTaker', e.target.value)
-                        }
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={(parseFloat(formData.feeOpenTaker || settings.defaultFeeOpenTaker) * 100).toFixed(3)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const percentValue = parseFloat(e.target.value) || 0;
+                          const decimalValue = (percentValue / 100).toFixed(5);
+                          handleInputChange('feeOpenTaker', decimalValue);
+                        }}
                         className="text-xs h-8"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">开仓滑点</Label>
+                      <Label className="text-xs">开仓滑点 (%)</Label>
                       <Input
                         type="number"
-                        step="0.0001"
-                        value={formData.slippageOpen || settings.defaultSlippageOpen}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          handleInputChange('slippageOpen', e.target.value)
-                        }
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={(parseFloat(formData.slippageOpen || settings.defaultSlippageOpen) * 100).toFixed(3)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const percentValue = parseFloat(e.target.value) || 0;
+                          const decimalValue = (percentValue / 100).toFixed(5);
+                          handleInputChange('slippageOpen', decimalValue);
+                        }}
                         className="text-xs h-8"
                       />
                     </div>
@@ -2004,38 +2016,50 @@ export function CalculatorForm() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <Label className="text-xs text-green-600 dark:text-green-400">Maker 平仓</Label>
+                      <Label className="text-xs text-green-600 dark:text-green-400">Maker 平仓 (%)</Label>
                       <Input
                         type="number"
-                        step="0.0001"
-                        value={formData.feeCloseMaker || settings.defaultFeeCloseMaker}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          handleInputChange('feeCloseMaker', e.target.value)
-                        }
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={(parseFloat(formData.feeCloseMaker || settings.defaultFeeCloseMaker) * 100).toFixed(3)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const percentValue = parseFloat(e.target.value) || 0;
+                          const decimalValue = (percentValue / 100).toFixed(5);
+                          handleInputChange('feeCloseMaker', decimalValue);
+                        }}
                         className="text-xs h-8"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-orange-600 dark:text-orange-400">Taker 平仓</Label>
+                      <Label className="text-xs text-orange-600 dark:text-orange-400">Taker 平仓 (%)</Label>
                       <Input
                         type="number"
-                        step="0.0001"
-                        value={formData.feeCloseTaker || settings.defaultFeeCloseTaker}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          handleInputChange('feeCloseTaker', e.target.value)
-                        }
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={(parseFloat(formData.feeCloseTaker || settings.defaultFeeCloseTaker) * 100).toFixed(3)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const percentValue = parseFloat(e.target.value) || 0;
+                          const decimalValue = (percentValue / 100).toFixed(5);
+                          handleInputChange('feeCloseTaker', decimalValue);
+                        }}
                         className="text-xs h-8"
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">平仓滑点</Label>
+                      <Label className="text-xs">平仓滑点 (%)</Label>
                       <Input
                         type="number"
-                        step="0.0001"
-                        value={formData.slippageClose || settings.defaultSlippageClose}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          handleInputChange('slippageClose', e.target.value)
-                        }
+                        step="0.001"
+                        min="0"
+                        max="1"
+                        value={(parseFloat(formData.slippageClose || settings.defaultSlippageClose) * 100).toFixed(3)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const percentValue = parseFloat(e.target.value) || 0;
+                          const decimalValue = (percentValue / 100).toFixed(5);
+                          handleInputChange('slippageClose', decimalValue);
+                        }}
                         className="text-xs h-8"
                       />
                     </div>
@@ -2045,12 +2069,12 @@ export function CalculatorForm() {
                 {/* Quick Info */}
                 <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded">
                   💡 {formData.orderType === 'MARKET' 
-                    ? 'Market订单自动使用Taker费率和滑点' 
+                    ? `Market订单自动使用Taker费率(${(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%)和滑点` 
                     : (formData.feeType === 'MAKER' 
-                       ? 'Limit订单全部使用Maker费率（无滑点）'
+                       ? `Limit订单全部使用Maker费率(${(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%)（无滑点）`
                        : formData.feeType === 'TAKER'
-                       ? 'Limit订单全部使用Taker费率（有滑点）' 
-                       : 'Limit订单混合费率：开仓Maker，止损Taker')
+                       ? `Limit订单全部使用Taker费率(${(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%)（有滑点）` 
+                       : `Limit订单混合费率：开仓Maker(${(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%)，止损Taker(${(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%)`)
                   }
                 </div>
               </div>

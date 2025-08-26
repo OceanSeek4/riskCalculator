@@ -437,15 +437,19 @@ export function SettingsForm() {
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label>开仓 Maker 费率</Label>
+                <Label>开仓 Maker 费率 (%)</Label>
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={settings.defaultFeeOpenMaker}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                    handleInputChange('defaultFeeOpenMaker', e.target.value)
-                  }
-                  placeholder="0.0002 (0.02%)"
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  value={(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const percentValue = parseFloat(e.target.value) || 0;
+                    const decimalValue = (percentValue / 100).toFixed(5);
+                    handleInputChange('defaultFeeOpenMaker', decimalValue);
+                  }}
+                  placeholder="0.020"
                 />
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   挂单费率 (通常更低)
@@ -453,15 +457,19 @@ export function SettingsForm() {
               </div>
               
               <div>
-                <Label>开仓 Taker 费率</Label>
+                <Label>开仓 Taker 费率 (%)</Label>
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={settings.defaultFeeOpenTaker}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                    handleInputChange('defaultFeeOpenTaker', e.target.value)
-                  }
-                  placeholder="0.0006 (0.06%)"
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  value={(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const percentValue = parseFloat(e.target.value) || 0;
+                    const decimalValue = (percentValue / 100).toFixed(5);
+                    handleInputChange('defaultFeeOpenTaker', decimalValue);
+                  }}
+                  placeholder="0.060"
                 />
                 <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                   吃单费率 (通常更高)
@@ -469,15 +477,19 @@ export function SettingsForm() {
               </div>
               
               <div>
-                <Label>开仓滑点</Label>
+                <Label>开仓滑点 (%)</Label>
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={settings.defaultSlippageOpen}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                    handleInputChange('defaultSlippageOpen', e.target.value)
-                  }
-                  placeholder="0.0005 (0.05%)"
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  value={(parseFloat(settings.defaultSlippageOpen) * 100).toFixed(3)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const percentValue = parseFloat(e.target.value) || 0;
+                    const decimalValue = (percentValue / 100).toFixed(5);
+                    handleInputChange('defaultSlippageOpen', decimalValue);
+                  }}
+                  placeholder="0.050"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   市价单市场冲击成本
@@ -493,15 +505,19 @@ export function SettingsForm() {
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label>平仓 Maker 费率</Label>
+                <Label>平仓 Maker 费率 (%)</Label>
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={settings.defaultFeeCloseMaker}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                    handleInputChange('defaultFeeCloseMaker', e.target.value)
-                  }
-                  placeholder="0.0002 (0.02%)"
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  value={(parseFloat(settings.defaultFeeCloseMaker) * 100).toFixed(3)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const percentValue = parseFloat(e.target.value) || 0;
+                    const decimalValue = (percentValue / 100).toFixed(5);
+                    handleInputChange('defaultFeeCloseMaker', decimalValue);
+                  }}
+                  placeholder="0.020"
                 />
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                   挂单费率 (通常更低)
@@ -509,15 +525,19 @@ export function SettingsForm() {
               </div>
               
               <div>
-                <Label>平仓 Taker 费率</Label>
+                <Label>平仓 Taker 费率 (%)</Label>
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={settings.defaultFeeCloseTaker}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                    handleInputChange('defaultFeeCloseTaker', e.target.value)
-                  }
-                  placeholder="0.0006 (0.06%)"
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  value={(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const percentValue = parseFloat(e.target.value) || 0;
+                    const decimalValue = (percentValue / 100).toFixed(5);
+                    handleInputChange('defaultFeeCloseTaker', decimalValue);
+                  }}
+                  placeholder="0.060"
                 />
                 <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                   吃单费率 (通常更高)
@@ -525,15 +545,19 @@ export function SettingsForm() {
               </div>
               
               <div>
-                <Label>平仓滑点</Label>
+                <Label>平仓滑点 (%)</Label>
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={settings.defaultSlippageClose}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                    handleInputChange('defaultSlippageClose', e.target.value)
-                  }
-                  placeholder="0.0005 (0.05%)"
+                  step="0.001"
+                  min="0"
+                  max="1"
+                  value={(parseFloat(settings.defaultSlippageClose) * 100).toFixed(3)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const percentValue = parseFloat(e.target.value) || 0;
+                    const decimalValue = (percentValue / 100).toFixed(5);
+                    handleInputChange('defaultSlippageClose', decimalValue);
+                  }}
+                  placeholder="0.050"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   市价单市场冲击成本
