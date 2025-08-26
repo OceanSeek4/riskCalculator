@@ -90,8 +90,74 @@ export function ResultCard() {
     summary += `${t('side')}: ${t(side.toLowerCase())}\n`;
     summary += `${t('orderType')}: ${formData.orderType === 'MARKET' ? t('marketOrder') : t('limitOrder')}\n`;
     
+    // Add fee type for limit orders
+    if (formData.orderType === 'LIMIT' && formData.feeType) {
+      const feeTypeMap = {
+        'MAKER': '(全部Maker)',
+        'TAKER': '(全部Taker)', 
+        'MAKER_OPEN_TAKER_CLOSE': '(开仓Maker,止损Taker)',
+        'MAKER_OPEN_ONLY': '(仅开仓Maker)'
+      };
+      summary += `费率策略: ${feeTypeMap[formData.feeType] || ''}\n`;
+    }
+    
+    // Add fee rates information
+    const formatFeeRate = (rate: string) => {
+      const percentage = (parseFloat(rate || '0') * 100).toFixed(3);
+      return parseFloat(percentage).toString() + '%';
+    };
+    
+    if (formData.orderType === 'LIMIT' && formData.feeType) {
+      summary += `\n💰 费率详情\n`;
+      
+      if (formData.feeType === 'MAKER') {
+        summary += `开仓: ${formatFeeRate(formData.feeOpenMaker || '0.0002')} (Maker)\n`;
+        summary += `止损: ${formatFeeRate(formData.feeCloseMaker || '0.0002')} (Maker)\n`;
+        summary += `止盈: ${formatFeeRate(formData.feeCloseMaker || '0.0002')} (Maker)\n`;
+        summary += `滑点: 0% (挂单无滑点)\n`;
+      } else if (formData.feeType === 'TAKER') {
+        summary += `开仓: ${formatFeeRate(formData.feeOpenTaker || '0.0006')} (Taker)\n`;
+        summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `止盈: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `滑点: ${formatFeeRate(formData.slippageOpen || '0.0005')} + ${formatFeeRate(formData.slippageClose || '0.0005')}\n`;
+      } else if (formData.feeType === 'MAKER_OPEN_TAKER_CLOSE') {
+        summary += `开仓: ${formatFeeRate(formData.feeOpenMaker || '0.0002')} (Maker)\n`;
+        summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `止盈: ${formatFeeRate(formData.feeCloseMaker || '0.0002')} (Maker)\n`;
+        summary += `滑点: 0% + ${formatFeeRate(formData.slippageClose || '0.0005')} + 0%\n`;
+      } else if (formData.feeType === 'MAKER_OPEN_ONLY') {
+        summary += `开仓: ${formatFeeRate(formData.feeOpenMaker || '0.0002')} (Maker)\n`;
+        summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `止盈: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `滑点: 0% + ${formatFeeRate(formData.slippageClose || '0.0005')}\n`;
+      }
+    } else if (formData.orderType === 'MARKET') {
+      summary += `\n💰 费率详情\n`;
+      summary += `开仓: ${formatFeeRate(formData.feeOpenTaker || '0.0006')} (市价Taker)\n`;
+      summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+      summary += `滑点: ${formatFeeRate(formData.slippageOpen || '0.0005')} + ${formatFeeRate(formData.slippageClose || '0.0005')}\n`;
+    }
+    
+    // Add rebate information if enabled
+    if (formData.enableRebate && formData.rebatePercent && parseFloat(formData.rebatePercent) > 0) {
+      summary += `\n🎁 返佣优惠: ${formData.rebatePercent}%\n`;
+      
+      // Calculate and show original rates
+      const rebateMultiplier = 1 - parseFloat(formData.rebatePercent) / 100;
+      const originalOpenMaker = (parseFloat(formData.feeOpenMaker || '0.0002') / rebateMultiplier).toString();
+      const originalOpenTaker = (parseFloat(formData.feeOpenTaker || '0.0006') / rebateMultiplier).toString();
+      const originalCloseMaker = (parseFloat(formData.feeCloseMaker || '0.0002') / rebateMultiplier).toString();
+      const originalCloseTaker = (parseFloat(formData.feeCloseTaker || '0.0006') / rebateMultiplier).toString();
+      
+      summary += `原始费率 (返佣前):\n`;
+      summary += `├─ 开仓Maker: ${formatFeeRate(originalOpenMaker)}\n`;
+      summary += `├─ 开仓Taker: ${formatFeeRate(originalOpenTaker)}\n`;
+      summary += `├─ 平仓Maker: ${formatFeeRate(originalCloseMaker)}\n`;
+      summary += `└─ 平仓Taker: ${formatFeeRate(originalCloseTaker)}\n`;
+    }
+    
     // Timestamp
-    summary += `${t('orderSummaryGeneratedAt')}: ${timestamp}\n`;
+    summary += `\n${t('orderSummaryGeneratedAt')}: ${timestamp}\n`;
     
     summary += `\n💼 ${t('positionResults').toUpperCase()}\n`;
     
@@ -418,6 +484,32 @@ export function ResultCard() {
                       </div>
                     )}
                     
+                    {/* 返佣细节 */}
+                    {result.riskBreakdown.rebateInfo && result.riskBreakdown.rebateInfo.enabled && parseFloat(result.riskBreakdown.rebateInfo.rebateSavings) > 0 && (
+                      <div className="bg-blue-50 dark:bg-blue-950 p-2 rounded border border-blue-200 dark:border-blue-800 mt-2">
+                        <div className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                          返佣优惠 ({result.riskBreakdown.rebateInfo.rebatePercent}%):
+                        </div>
+                        <div className="space-y-1 text-xs text-blue-600 dark:text-blue-400">
+                          <div className="flex justify-between">
+                            <span>原开仓费:</span>
+                            <span className="font-mono">${result.riskBreakdown.rebateInfo.originalOpenFeeAmountFormatted}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>原平仓费:</span>
+                            <span className="font-mono">${result.riskBreakdown.rebateInfo.originalCloseFeeAmountFormatted}</span>
+                          </div>
+                          <div className="flex justify-between font-medium">
+                            <span>返佣节省:</span>
+                            <span className="font-mono text-green-600">-${result.riskBreakdown.rebateInfo.rebateSavingsFormatted}</span>
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            (降低风险成本)
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="border-t border-red-300 dark:border-red-700 pt-1 mt-2">
                       <div className="flex justify-between font-medium">
                         <span>总计:</span>
@@ -555,6 +647,29 @@ export function ResultCard() {
                           <div className="flex justify-between">
                             <span>滑点成本:</span>
                             <span className="font-mono text-red-600">{result.profitBreakdown.slippageAmountFormatted}</span>
+                          </div>
+                        )}
+                        
+                        {/* 返佣细节 */}
+                        {result.profitBreakdown.rebateInfo && result.profitBreakdown.rebateInfo.enabled && parseFloat(result.profitBreakdown.rebateInfo.rebateSavings) > 0 && (
+                          <div className="bg-blue-50 dark:bg-blue-950 p-2 rounded border border-blue-200 dark:border-blue-800 mt-2">
+                            <div className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                              返佣优惠 ({result.profitBreakdown.rebateInfo.rebatePercent}%):
+                            </div>
+                            <div className="space-y-1 text-xs text-blue-600 dark:text-blue-400">
+                              <div className="flex justify-between">
+                                <span>原开仓费:</span>
+                                <span className="font-mono">{result.profitBreakdown.rebateInfo.originalOpenFeeAmountFormatted}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>原平仓费:</span>
+                                <span className="font-mono">{result.profitBreakdown.rebateInfo.originalCloseFeeAmountFormatted}</span>
+                              </div>
+                              <div className="flex justify-between font-medium">
+                                <span>返佣节省:</span>
+                                <span className="font-mono text-green-600">+${result.profitBreakdown.rebateInfo.rebateSavingsFormatted}</span>
+                              </div>
+                            </div>
                           </div>
                         )}
                         

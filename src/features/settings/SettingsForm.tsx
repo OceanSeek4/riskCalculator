@@ -28,6 +28,12 @@ export function SettingsForm() {
   // Loading state for save operation
   const [isSaving, setIsSaving] = useState(false);
 
+  // Format percentage display by removing trailing zeros
+  const formatPercentageDisplay = (decimalValue: string) => {
+    const percentage = (parseFloat(decimalValue) * 100).toFixed(3);
+    return parseFloat(percentage).toString();
+  };
+
   // Auto-clear notification after different durations based on type
   useEffect(() => {
     if (showNotification) {
@@ -443,7 +449,7 @@ export function SettingsForm() {
                   step="0.001"
                   min="0"
                   max="1"
-                  value={(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}
+                  value={formatPercentageDisplay(settings.defaultFeeOpenMaker)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const percentValue = parseFloat(e.target.value) || 0;
                     const decimalValue = (percentValue / 100).toFixed(5);
@@ -463,7 +469,7 @@ export function SettingsForm() {
                   step="0.001"
                   min="0"
                   max="1"
-                  value={(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}
+                  value={formatPercentageDisplay(settings.defaultFeeOpenTaker)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const percentValue = parseFloat(e.target.value) || 0;
                     const decimalValue = (percentValue / 100).toFixed(5);
@@ -483,7 +489,7 @@ export function SettingsForm() {
                   step="0.001"
                   min="0"
                   max="1"
-                  value={(parseFloat(settings.defaultSlippageOpen) * 100).toFixed(3)}
+                  value={formatPercentageDisplay(settings.defaultSlippageOpen)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const percentValue = parseFloat(e.target.value) || 0;
                     const decimalValue = (percentValue / 100).toFixed(5);
@@ -511,7 +517,7 @@ export function SettingsForm() {
                   step="0.001"
                   min="0"
                   max="1"
-                  value={(parseFloat(settings.defaultFeeCloseMaker) * 100).toFixed(3)}
+                  value={formatPercentageDisplay(settings.defaultFeeCloseMaker)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const percentValue = parseFloat(e.target.value) || 0;
                     const decimalValue = (percentValue / 100).toFixed(5);
@@ -531,7 +537,7 @@ export function SettingsForm() {
                   step="0.001"
                   min="0"
                   max="1"
-                  value={(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}
+                  value={formatPercentageDisplay(settings.defaultFeeCloseTaker)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const percentValue = parseFloat(e.target.value) || 0;
                     const decimalValue = (percentValue / 100).toFixed(5);
@@ -551,7 +557,7 @@ export function SettingsForm() {
                   step="0.001"
                   min="0"
                   max="1"
-                  value={(parseFloat(settings.defaultSlippageClose) * 100).toFixed(3)}
+                  value={formatPercentageDisplay(settings.defaultSlippageClose)}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                     const percentValue = parseFloat(e.target.value) || 0;
                     const decimalValue = (percentValue / 100).toFixed(5);
@@ -585,6 +591,134 @@ export function SettingsForm() {
             </div>
             <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 p-2 bg-blue-50 dark:bg-blue-900 rounded">
               <span className="font-medium">🎯 默认设置:</span> Maker 开平仓 0.02%, Taker 开平仓 0.06%, 滑点 0.05%
+            </div>
+          </div>
+        </div>
+
+        {/* Rebate Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+            返佣设置 (Rebate Settings)
+          </h3>
+          
+          <div className="space-y-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultEnableRebate}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultEnableRebate', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">默认启用返佣计算 (Enable rebate calculation)</span>
+            </label>
+            
+            <div className="text-sm text-muted-foreground mb-3 p-3 bg-yellow-50 dark:bg-yellow-950 rounded border border-yellow-200 dark:border-yellow-800">
+              <p className="flex items-center gap-1 mb-1">
+                <span className="text-yellow-600 dark:text-yellow-400">💰</span>
+                <strong>返佣说明</strong>
+              </p>
+              <p className="ml-5 text-yellow-700 dark:text-yellow-300 text-xs">
+                返佣可以降低实际手续费成本。实际费率 = 原始费率 × (1 - 返佣比例%)。例如：0.06% × (1 - 30%) = 0.042%
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Binance 返佣比例 (%)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="50"
+                  value={settings.defaultRebateBinance}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultRebateBinance', e.target.value)
+                  }
+                  placeholder="30"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  典型范围: 20-40%
+                </p>
+              </div>
+              
+              <div>
+                <Label>Bybit 返佣比例 (%)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="50"
+                  value={settings.defaultRebateBybit}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultRebateBybit', e.target.value)
+                  }
+                  placeholder="40"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  典型范围: 30-50%
+                </p>
+              </div>
+              
+              <div>
+                <Label>OKX 返佣比例 (%)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="50"
+                  value={settings.defaultRebateOkx}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultRebateOkx', e.target.value)
+                  }
+                  placeholder="30"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  典型范围: 20-40%
+                </p>
+              </div>
+              
+              <div>
+                <Label>Bitget 返佣比例 (%)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="50"
+                  value={settings.defaultRebateBitget}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('defaultRebateBitget', e.target.value)
+                  }
+                  placeholder="40"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  典型范围: 30-50%
+                </p>
+              </div>
+            </div>
+            
+            {/* Rebate Examples */}
+            <div className="text-xs text-muted-foreground bg-green-50 dark:bg-green-900 p-3 rounded border border-green-200 dark:border-green-800">
+              <p className="font-medium mb-2 text-green-700 dark:text-green-300">返佣效果示例:</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-green-700 dark:text-green-300">
+                <div>
+                  <span className="font-medium">30%返佣:</span> 0.060% → 0.042%
+                </div>
+                <div>
+                  <span className="font-medium">40%返佣:</span> 0.060% → 0.036%
+                </div>
+                <div>
+                  <span className="font-medium">20%返佣:</span> 0.020% → 0.016%
+                </div>
+                <div>
+                  <span className="font-medium">35%返佣:</span> 0.055% → 0.036%
+                </div>
+              </div>
+              <div className="text-xs text-green-600 dark:text-green-400 mt-2 p-2 bg-green-100 dark:bg-green-800 rounded">
+                <span className="font-medium">💡 提示:</span> 返佣比例根据你的交易量和邀请码可能有所不同
+              </div>
             </div>
           </div>
         </div>

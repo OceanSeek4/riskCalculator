@@ -208,6 +208,14 @@ const defaultSettings: SettingsData = {
   defaultFeeCloseTaker: '0.0006',
   defaultSlippageOpen: '0.0005',
   defaultSlippageClose: '0.0005',
+  
+  // Rebate settings
+  defaultEnableRebate: true,
+  defaultRebateBinance: '30', // 30% rebate
+  defaultRebateBybit: '40',   // 40% rebate
+  defaultRebateBitget: '40',  // 40% rebate
+  defaultRebateOkx: '30',     // 30% rebate
+  
   // Backward compatibility
   defaultFeeOpen: '0.0006',
   defaultFeeClose: '0.0006',
@@ -305,6 +313,16 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
         feeCloseTaker: settings.defaultFeeCloseTaker,
         slippageOpen: settings.defaultSlippageOpen,
         slippageClose: settings.defaultSlippageClose,
+        
+        // Rebate settings - sync with current exchange (use form's exchange if available)
+        enableRebate: settings.defaultEnableRebate,
+        rebatePercent: settings.defaultEnableRebate ? (
+          (state.formData.exchange || settings.defaultExchange) === 'BINANCE' ? settings.defaultRebateBinance :
+          (state.formData.exchange || settings.defaultExchange) === 'BYBIT' ? settings.defaultRebateBybit :
+          (state.formData.exchange || settings.defaultExchange) === 'BITGET' ? settings.defaultRebateBitget :
+          settings.defaultRebateOkx
+        ) : '0',
+        
         // Backward compatibility
         feeOpen: settings.defaultFeeOpen,
         feeClose: settings.defaultFeeClose,

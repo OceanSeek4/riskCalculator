@@ -97,6 +97,12 @@ export function CalculatorForm() {
   const [lockedPipsStopPrice, setLockedPipsStopPrice] = useState<string | null>(null);
   const [lockedPipsTakeProfitPrice, setLockedPipsTakeProfitPrice] = useState<string | null>(null);
   const [lockedEntryPriceForPips, setLockedEntryPriceForPips] = useState<string | null>(null);
+
+  // Format percentage display by removing trailing zeros
+  const formatPercentageDisplay = (decimalValue: string) => {
+    const percentage = (parseFloat(decimalValue) * 100).toFixed(3);
+    return parseFloat(percentage).toString();
+  };
   
   // Reset price change indicator after 2 seconds
   useEffect(() => {
@@ -239,6 +245,23 @@ export function CalculatorForm() {
       fetchCurrentPrice();
     }
   }, [formData.exchange, formData.symbol, formData.contractMode, formData.orderType]);
+
+  // Auto-update rebate percent when exchange changes
+  useEffect(() => {
+    if (formData.enableRebate && formData.exchange) {
+      const exchangeRebateMap: Record<string, string> = {
+        'BINANCE': settings.defaultRebateBinance,
+        'BYBIT': settings.defaultRebateBybit,
+        'BITGET': settings.defaultRebateBitget,
+        'OKX': settings.defaultRebateOkx
+      };
+      
+      const newRebatePercent = exchangeRebateMap[formData.exchange];
+      if (newRebatePercent && newRebatePercent !== formData.rebatePercent) {
+        handleInputChange('rebatePercent', newRebatePercent);
+      }
+    }
+  }, [formData.exchange, formData.enableRebate, settings.defaultRebateBinance, settings.defaultRebateBybit, settings.defaultRebateBitget, settings.defaultRebateOkx]);
 
   // Real-time price updates for market orders
   useEffect(() => {
@@ -860,6 +883,9 @@ export function CalculatorForm() {
         feeCloseTaker: formData.feeCloseTaker || '0.0006',
         slippageOpen: formData.slippageOpen || '0.0005',
         slippageClose: formData.slippageClose || '0.0005',
+        // Rebate settings
+        enableRebate: formData.enableRebate || false,
+        rebatePercent: formData.rebatePercent || '0',
         // Backward compatibility
         feeOpen: formData.feeOpen || '0.0004',
         feeClose: formData.feeClose || '0.0004',
@@ -1148,8 +1174,8 @@ export function CalculatorForm() {
                   handleInputChange('feeType', e.target.value as 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY')
                 }
               >
-                <option value="MAKER">全部Maker (开平仓都挂单, {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点)</option>
-                <option value="TAKER">全部Taker (开平仓都吃单, {(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%, 有滑点)</option>
+                <option value="MAKER">全部Maker (开平仓都挂单, {formatPercentageDisplay(settings.defaultFeeOpenMaker)}%, 无滑点)</option>
+                <option value="TAKER">全部Taker (开平仓都吃单, {formatPercentageDisplay(settings.defaultFeeOpenTaker)}%, 有滑点)</option>
                 <option value="MAKER_OPEN_TAKER_CLOSE">开仓Maker + 止损Taker (开仓挂单, 止损吃单, 止盈无滑点)</option>
                 <option value="MAKER_OPEN_ONLY">仅开仓Maker (开仓挂单, 止盈止损吃单)</option>
               </Select>
@@ -1164,29 +1190,29 @@ export function CalculatorForm() {
                   <div className="text-xs opacity-75">
                     {formData.feeType === 'MAKER' && (
                       <>
-                        <strong>开仓:</strong> Maker {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点<br/>
-                        <strong>止损:</strong> Maker {(parseFloat(settings.defaultFeeCloseMaker) * 100).toFixed(3)}%, 无滑点
+                        <strong>开仓:</strong> Maker {formatPercentageDisplay(settings.defaultFeeOpenMaker)}%, 无滑点<br/>
+                        <strong>止损:</strong> Maker {formatPercentageDisplay(settings.defaultFeeCloseMaker)}%, 无滑点
                       </>
                     )}
                     {formData.feeType === 'TAKER' && (
                       <>
-                        <strong>开仓:</strong> Taker {(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%, 有滑点<br/>
-                        <strong>止损:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点
+                        <strong>开仓:</strong> Taker {formatPercentageDisplay(settings.defaultFeeOpenTaker)}%, 有滑点<br/>
+                        <strong>止损:</strong> Taker {formatPercentageDisplay(settings.defaultFeeCloseTaker)}%, 有滑点
                       </>
                     )}
                     {formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' && (
                       <>
-                        <strong>开仓:</strong> Maker {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点 (挂单入场)<br/>
-                        <strong>止损:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点 (市价出场)<br/>
+                        <strong>开仓:</strong> Maker {formatPercentageDisplay(settings.defaultFeeOpenMaker)}%, 无滑点 (挂单入场)<br/>
+                        <strong>止损:</strong> Taker {formatPercentageDisplay(settings.defaultFeeCloseTaker)}%, 有滑点 (市价出场)<br/>
                         <strong>止盈:</strong> 无滑点 (限价单出场)<br/>
                         <span className="text-green-600 dark:text-green-400">✓ 推荐：开仓成本低，止损速度快，止盈无滑点</span>
                       </>
                     )}
                     {formData.feeType === 'MAKER_OPEN_ONLY' && (
                       <>
-                        <strong>开仓:</strong> Maker {(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%, 无滑点 (挂单入场)<br/>
-                        <strong>止损:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点 (市价出场)<br/>
-                        <strong>止盈:</strong> Taker {(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%, 有滑点 (市价出场)<br/>
+                        <strong>开仓:</strong> Maker {formatPercentageDisplay(settings.defaultFeeOpenMaker)}%, 无滑点 (挂单入场)<br/>
+                        <strong>止损:</strong> Taker {formatPercentageDisplay(settings.defaultFeeCloseTaker)}%, 有滑点 (市价出场)<br/>
+                        <strong>止盈:</strong> Taker {formatPercentageDisplay(settings.defaultFeeCloseTaker)}%, 有滑点 (市价出场)<br/>
                         <span className="text-blue-600 dark:text-blue-400">ℹ️ 适合短线交易：开仓挂单等好价，出场市价保证成交</span>
                       </>
                     )}
@@ -1213,7 +1239,7 @@ export function CalculatorForm() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-yellow-600 dark:text-yellow-400">📊</span>
                 <span className="text-yellow-800 dark:text-yellow-200 font-medium">
-                  市价单自动使用 Taker 费率 ({(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%) 和滑点成本
+                  市价单自动使用 Taker 费率 ({formatPercentageDisplay(settings.defaultFeeOpenTaker)}%) 和滑点成本
                 </span>
               </div>
             </div>
@@ -1965,7 +1991,7 @@ export function CalculatorForm() {
                         step="0.001"
                         min="0"
                         max="1"
-                        value={(parseFloat(formData.feeOpenMaker || settings.defaultFeeOpenMaker) * 100).toFixed(3)}
+                        value={formatPercentageDisplay(formData.feeOpenMaker || settings.defaultFeeOpenMaker)}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const percentValue = parseFloat(e.target.value) || 0;
                           const decimalValue = (percentValue / 100).toFixed(5);
@@ -1981,7 +2007,7 @@ export function CalculatorForm() {
                         step="0.001"
                         min="0"
                         max="1"
-                        value={(parseFloat(formData.feeOpenTaker || settings.defaultFeeOpenTaker) * 100).toFixed(3)}
+                        value={formatPercentageDisplay(formData.feeOpenTaker || settings.defaultFeeOpenTaker)}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const percentValue = parseFloat(e.target.value) || 0;
                           const decimalValue = (percentValue / 100).toFixed(5);
@@ -1997,7 +2023,7 @@ export function CalculatorForm() {
                         step="0.001"
                         min="0"
                         max="1"
-                        value={(parseFloat(formData.slippageOpen || settings.defaultSlippageOpen) * 100).toFixed(3)}
+                        value={formatPercentageDisplay(formData.slippageOpen || settings.defaultSlippageOpen)}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const percentValue = parseFloat(e.target.value) || 0;
                           const decimalValue = (percentValue / 100).toFixed(5);
@@ -2022,7 +2048,7 @@ export function CalculatorForm() {
                         step="0.001"
                         min="0"
                         max="1"
-                        value={(parseFloat(formData.feeCloseMaker || settings.defaultFeeCloseMaker) * 100).toFixed(3)}
+                        value={formatPercentageDisplay(formData.feeCloseMaker || settings.defaultFeeCloseMaker)}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const percentValue = parseFloat(e.target.value) || 0;
                           const decimalValue = (percentValue / 100).toFixed(5);
@@ -2038,7 +2064,7 @@ export function CalculatorForm() {
                         step="0.001"
                         min="0"
                         max="1"
-                        value={(parseFloat(formData.feeCloseTaker || settings.defaultFeeCloseTaker) * 100).toFixed(3)}
+                        value={formatPercentageDisplay(formData.feeCloseTaker || settings.defaultFeeCloseTaker)}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const percentValue = parseFloat(e.target.value) || 0;
                           const decimalValue = (percentValue / 100).toFixed(5);
@@ -2054,7 +2080,7 @@ export function CalculatorForm() {
                         step="0.001"
                         min="0"
                         max="1"
-                        value={(parseFloat(formData.slippageClose || settings.defaultSlippageClose) * 100).toFixed(3)}
+                        value={formatPercentageDisplay(formData.slippageClose || settings.defaultSlippageClose)}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                           const percentValue = parseFloat(e.target.value) || 0;
                           const decimalValue = (percentValue / 100).toFixed(5);
@@ -2069,13 +2095,66 @@ export function CalculatorForm() {
                 {/* Quick Info */}
                 <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded">
                   💡 {formData.orderType === 'MARKET' 
-                    ? `Market订单自动使用Taker费率(${(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%)和滑点` 
+                    ? `Market订单自动使用Taker费率(${formatPercentageDisplay(settings.defaultFeeOpenTaker)}%)和滑点` 
                     : (formData.feeType === 'MAKER' 
-                       ? `Limit订单全部使用Maker费率(${(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%)（无滑点）`
+                       ? `Limit订单全部使用Maker费率(${formatPercentageDisplay(settings.defaultFeeOpenMaker)}%)（无滑点）`
                        : formData.feeType === 'TAKER'
-                       ? `Limit订单全部使用Taker费率(${(parseFloat(settings.defaultFeeOpenTaker) * 100).toFixed(3)}%)（有滑点）` 
-                       : `Limit订单混合费率：开仓Maker(${(parseFloat(settings.defaultFeeOpenMaker) * 100).toFixed(3)}%)，止损Taker(${(parseFloat(settings.defaultFeeCloseTaker) * 100).toFixed(3)}%)`)
+                       ? `Limit订单全部使用Taker费率(${formatPercentageDisplay(settings.defaultFeeOpenTaker)}%)（有滑点）` 
+                       : `Limit订单混合费率：开仓Maker(${formatPercentageDisplay(settings.defaultFeeOpenMaker)}%)，止损Taker(${formatPercentageDisplay(settings.defaultFeeCloseTaker)}%)`)
                   }
+                </div>
+                
+                {/* Rebate Settings */}
+                <div className="space-y-3 mt-4">
+                  <div className="text-xs font-medium text-muted-foreground mb-2 border-b pb-1">
+                    返佣设置 (Rebate Settings)
+                  </div>
+                  
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.enableRebate || false}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                        handleInputChange('enableRebate', e.target.checked)
+                      }
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-xs">启用返佣计算</span>
+                  </label>
+                  
+                  {formData.enableRebate && (
+                    <div className="space-y-2">
+                      <div>
+                        <Label className="text-xs">返佣比例 (%)</Label>
+                        <Input
+                          type="number"
+                          step="1"
+                          min="0"
+                          max="50"
+                          value={formData.rebatePercent || (
+                            formData.exchange === 'BINANCE' ? settings.defaultRebateBinance :
+                            formData.exchange === 'BYBIT' ? settings.defaultRebateBybit :
+                            formData.exchange === 'BITGET' ? settings.defaultRebateBitget :
+                            settings.defaultRebateOkx
+                          )}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                            handleInputChange('rebatePercent', e.target.value)
+                          }
+                          className="text-xs h-8"
+                          placeholder={`当前交易所默认: ${
+                            formData.exchange === 'BINANCE' ? settings.defaultRebateBinance :
+                            formData.exchange === 'BYBIT' ? settings.defaultRebateBybit :
+                            formData.exchange === 'BITGET' ? settings.defaultRebateBitget :
+                            settings.defaultRebateOkx
+                          }%`}
+                        />
+                      </div>
+                      
+                      <div className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950 p-2 rounded">
+                        💰 返佣后实际费率: 原费率 × (1 - {formData.rebatePercent || 30}%) = 实际使用费率
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

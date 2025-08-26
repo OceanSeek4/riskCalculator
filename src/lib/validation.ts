@@ -44,6 +44,11 @@ export const calculatorFormSchema = z.object({
   feeCloseTaker: z.string().default('0.0006'),
   slippageOpen: z.string().default('0.0005'),
   slippageClose: z.string().default('0.0005'),
+  
+  // Rebate settings
+  enableRebate: z.boolean().default(true),
+  rebatePercent: z.string().default('30'), // Default rebate percentage
+  
   // Backward compatibility fields
   feeOpen: z.string().default('0.0004'),
   feeClose: z.string().default('0.0004'),
@@ -94,6 +99,14 @@ export const settingsSchema = z.object({
   defaultSlippageOpen: z.string().default('0.0005'),
   defaultSlippageClose: z.string().default('0.0005'),
   defaultIncludeFees: z.boolean().default(false),
+  
+  // Rebate settings
+  defaultEnableRebate: z.boolean().default(true),
+  defaultRebateBinance: z.string().default('30'), // 30% rebate
+  defaultRebateBybit: z.string().default('40'), // 40% rebate
+  defaultRebateBitget: z.string().default('40'), // 40% rebate
+  defaultRebateOkx: z.string().default('30'), // 30% rebate
+  
   // Backward compatibility fields
   defaultFeeOpen: z.string().default('0.0004'),
   defaultFeeClose: z.string().default('0.0004'),

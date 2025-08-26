@@ -492,12 +492,18 @@ export function calculatePosition(input: CalcInput): CalcResult {
     // For calculations, we still need a single close fee for stop loss calculations
     const closeFeeType = stopLossFeeType;
     
-    const feeOpen = openFeeType === 'MAKER'
-      ? SafeDecimal.from(feeOpenMakerStr || '0.0002') 
-      : SafeDecimal.from(feeOpenTakerStr || '0.0006');
-    const feeClose = closeFeeType === 'MAKER'
-      ? SafeDecimal.from(feeCloseMakerStr || '0.0002') 
-      : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+    // Apply rebate if enabled
+    const rebateMultiplier = input.enableRebate 
+      ? SafeDecimal.one().safeSub(SafeDecimal.from(input.rebatePercent || '0').safeDiv(100))
+      : SafeDecimal.one();
+    
+    const baseFeeOpenMaker = SafeDecimal.from(feeOpenMakerStr || '0.0002').safeMul(rebateMultiplier);
+    const baseFeeOpenTaker = SafeDecimal.from(feeOpenTakerStr || '0.0006').safeMul(rebateMultiplier);
+    const baseFeeCloseMaker = SafeDecimal.from(feeCloseMakerStr || '0.0002').safeMul(rebateMultiplier);
+    const baseFeeCloseTaker = SafeDecimal.from(feeCloseTakerStr || '0.0006').safeMul(rebateMultiplier);
+    
+    const feeOpen = openFeeType === 'MAKER' ? baseFeeOpenMaker : baseFeeOpenTaker;
+    const feeClose = closeFeeType === 'MAKER' ? baseFeeCloseMaker : baseFeeCloseTaker;
     
     // Set slippage: Maker orders have no slippage, Taker orders have slippage
     const slippageOpen = openFeeType === 'MAKER' 
@@ -768,8 +774,8 @@ export function calculatePosition(input: CalcInput): CalcResult {
     // 用于验证的计算 - 显示实际计算出的风险
     const calculatedRisk = stopLossRisk;
     
-    // Create detailed risk breakdown
-    const riskBreakdown = {
+    // Calculate original fee amounts (without rebate) for breakdown
+    let riskBreakdown: any = {
       priceRisk: priceRiskTotal.toString(),
       priceRiskFormatted: priceRiskTotal.toLocaleString(),
       openFeeAmount: openFeeAmount.toString(),
@@ -781,6 +787,36 @@ export function calculatePosition(input: CalcInput): CalcResult {
         slippageAmountFormatted: openSlippageAmount.safeAdd(closeSlippageAmount).toLocaleString(),
       } : {})
     };
+
+    // Add rebate information to risk breakdown if enabled
+    if (input.enableRebate && input.rebatePercent && parseFloat(input.rebatePercent) > 0) {
+      // Calculate original fees (without rebate)
+      const originalFeeOpen = openFeeType === 'MAKER'
+        ? SafeDecimal.from(feeOpenMakerStr || '0.0002')
+        : SafeDecimal.from(feeOpenTakerStr || '0.0006');
+      const originalFeeClose = closeFeeType === 'MAKER'
+        ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
+        : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+      
+      const originalOpenFeeAmount = qtyRounded.safeMul(entryPrice).safeMul(originalFeeOpen);
+      const originalCloseFeeAmount = qtyRounded.safeMul(stopPrice).safeMul(originalFeeClose);
+      
+      // Calculate rebate savings
+      const openFeeSavings = originalOpenFeeAmount.safeSub(openFeeAmount);
+      const closeFeeSavings = originalCloseFeeAmount.safeSub(closeFeeAmount);
+      const totalRebateSavings = openFeeSavings.safeAdd(closeFeeSavings);
+      
+      riskBreakdown.rebateInfo = {
+        enabled: true,
+        rebatePercent: input.rebatePercent,
+        originalOpenFeeAmount: originalOpenFeeAmount.toString(),
+        originalOpenFeeAmountFormatted: originalOpenFeeAmount.toLocaleString(),
+        originalCloseFeeAmount: originalCloseFeeAmount.toString(),
+        originalCloseFeeAmountFormatted: originalCloseFeeAmount.toLocaleString(),
+        rebateSavings: totalRebateSavings.toString(),
+        rebateSavingsFormatted: totalRebateSavings.toLocaleString()
+      };
+    }
     
     // Calculate RR_RATIO take profit price now that we have stopLossRisk
     if (useTakeProfit && takeProfitMode === 'RR_RATIO' && !takeProfitPriceCalculated) {
@@ -788,8 +824,8 @@ export function calculatePosition(input: CalcInput): CalcResult {
         // For RR_RATIO take profit, use appropriate fee and slippage for take profit
         const takeProfitCloseSlippage = takeProfitFeeType === 'MAKER' ? SafeDecimal.from('0') : slippageClose;
         const takeProfitCloseFee = takeProfitFeeType === 'MAKER'
-          ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
-          : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+          ? baseFeeCloseMaker
+          : baseFeeCloseTaker;
           
         takeProfitPriceCalculated = calculateTakeProfitPrice(
           entryPrice,
@@ -841,8 +877,8 @@ export function calculatePosition(input: CalcInput): CalcResult {
       
       // 止盈平仓手续费 (成本，负数) - 使用止盈费率类型
       const takeProfitFee = takeProfitFeeType === 'MAKER'
-        ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
-        : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+        ? baseFeeCloseMaker
+        : baseFeeCloseTaker;
       const profitCloseFeeAmount = includeFees ? SafeDecimal.from('0').safeSub(qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(takeProfitFee)) : SafeDecimal.from('0');
       
       // 开仓滑点成本 (成本，负数)
@@ -868,12 +904,39 @@ export function calculatePosition(input: CalcInput): CalcResult {
           slippageAmountFormatted: profitOpenSlippageAmount.safeAdd(profitCloseSlippageAmount).toLocaleString(),
         } : {})
       };
+
+      // Add rebate information to profit breakdown if enabled
+      if (input.enableRebate && input.rebatePercent && parseFloat(input.rebatePercent) > 0) {
+        // Calculate original fees (without rebate) for take profit scenario
+        const originalFeeOpen = feeOpen.safeDiv(rebateMultiplier);
+        const originalTakeProfitFee = takeProfitFee.safeDiv(rebateMultiplier);
+        
+        // Calculate original fee amounts
+        const originalOpenFeeAmount = qtyRounded.safeMul(entryPrice).safeMul(originalFeeOpen);
+        const originalCloseFeeAmount = qtyRounded.safeMul(takeProfitPriceCalculated).safeMul(originalTakeProfitFee);
+        
+        // Calculate rebate savings (positive values)
+        const openFeeSavings = originalOpenFeeAmount.safeAdd(profitOpenFeeAmount); // profitOpenFeeAmount is negative
+        const closeFeeSavings = originalCloseFeeAmount.safeAdd(profitCloseFeeAmount); // profitCloseFeeAmount is negative
+        const totalRebateSavings = openFeeSavings.safeAdd(closeFeeSavings);
+        
+        profitBreakdown.rebateInfo = {
+          enabled: true,
+          rebatePercent: input.rebatePercent,
+          originalOpenFeeAmount: SafeDecimal.from('0').safeSub(originalOpenFeeAmount).toString(), // Negative for cost display
+          originalOpenFeeAmountFormatted: SafeDecimal.from('0').safeSub(originalOpenFeeAmount).toLocaleString(),
+          originalCloseFeeAmount: SafeDecimal.from('0').safeSub(originalCloseFeeAmount).toString(), // Negative for cost display
+          originalCloseFeeAmountFormatted: SafeDecimal.from('0').safeSub(originalCloseFeeAmount).toLocaleString(),
+          rebateSavings: totalRebateSavings.toString(),
+          rebateSavingsFormatted: totalRebateSavings.toLocaleString()
+        };
+      }
     }
 
     // Calculate take profit fees for targets (R:R ratios)
     const takeProfitTargetFee = takeProfitFeeType === 'MAKER'
-      ? SafeDecimal.from(feeCloseMakerStr || '0.0002')
-      : SafeDecimal.from(feeCloseTakerStr || '0.0006');
+      ? baseFeeCloseMaker
+      : baseFeeCloseTaker;
     const takeProfitTargetSlippage = takeProfitFeeType === 'MAKER' ? SafeDecimal.from('0') : slippageClose;
 
     // Calculate targets using the calculated stop loss risk
@@ -918,13 +981,23 @@ export function calculatePosition(input: CalcInput): CalcResult {
       orderType: useOrderType,
       feeType: useFeeType,
       feeRates: {
-        openMaker: feeOpenMakerStr,
-        openTaker: feeOpenTakerStr,
-        closeMaker: feeCloseMakerStr,
-        closeTaker: feeCloseTakerStr,
+        openMaker: baseFeeOpenMaker.toString(),
+        openTaker: baseFeeOpenTaker.toString(),
+        closeMaker: baseFeeCloseMaker.toString(),
+        closeTaker: baseFeeCloseTaker.toString(),
         slippageOpen: slippageOpenStr,
         slippageClose: slippageCloseStr
-      }
+      },
+      rebateInfo: input.enableRebate ? {
+        enabled: true,
+        rebatePercent: input.rebatePercent || '0',
+        originalRates: {
+          openMaker: feeOpenMakerStr,
+          openTaker: feeOpenTakerStr,
+          closeMaker: feeCloseMakerStr,
+          closeTaker: feeCloseTakerStr
+        }
+      } : undefined
     });
     
     return {
@@ -997,6 +1070,16 @@ function generateOrderSummary(params: {
     slippageOpen: string;
     slippageClose: string;
   };
+  rebateInfo?: {
+    enabled: boolean;
+    rebatePercent: string;
+    originalRates: {
+      openMaker: string;
+      openTaker: string;
+      closeMaker: string;
+      closeTaker: string;
+    };
+  };
 }): string {
   const {
     side,
@@ -1017,7 +1100,8 @@ function generateOrderSummary(params: {
     includeFees,
     orderType,
     feeType,
-    feeRates
+    feeRates,
+    rebateInfo
   } = params;
   
   let summary = `${side} ${marketMeta.symbol}\n`;
@@ -1042,7 +1126,10 @@ function generateOrderSummary(params: {
     
     // Add detailed fee rate information for limit orders
     if (orderType === 'LIMIT' && feeType && feeRates) {
-      const formatFeeRate = (rate: string) => (parseFloat(rate) * 100).toFixed(3) + '%';
+      const formatFeeRate = (rate: string) => {
+        const percentage = (parseFloat(rate) * 100).toFixed(3);
+        return parseFloat(percentage).toString() + '%';
+      };
       
       summary += `Fee Rates:\n`;
       
@@ -1067,12 +1154,41 @@ function generateOrderSummary(params: {
         summary += `  Take Profit: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
         summary += `  Slippage: 0% + ${formatFeeRate(feeRates.slippageClose)}\n`;
       }
-    } else if (orderType === 'MARKET' && feeRates) {
-      const formatFeeRate = (rate: string) => (parseFloat(rate) * 100).toFixed(3) + '%';
+    }
+    
+    // Add detailed rebate information if enabled
+    if (rebateInfo && rebateInfo.enabled) {
+      const formatOriginalRate = (rate: string) => {
+        const percentage = (parseFloat(rate) * 100).toFixed(3);
+        return parseFloat(percentage).toString() + '%';
+      };
+      summary += `\nRebate Applied: ${rebateInfo.rebatePercent}%\n`;
+      summary += `Original Rates (before rebate):\n`;
+      summary += `  Open Maker: ${formatOriginalRate(rebateInfo.originalRates.openMaker)}\n`;
+      summary += `  Open Taker: ${formatOriginalRate(rebateInfo.originalRates.openTaker)}\n`;
+      summary += `  Close Maker: ${formatOriginalRate(rebateInfo.originalRates.closeMaker)}\n`;
+      summary += `  Close Taker: ${formatOriginalRate(rebateInfo.originalRates.closeTaker)}\n`;
+    }
+    
+    if (orderType === 'MARKET' && feeRates) {
+      const formatFeeRate = (rate: string) => {
+        const percentage = (parseFloat(rate) * 100).toFixed(3);
+        return parseFloat(percentage).toString() + '%';
+      };
       summary += `Fee Rates:\n`;
       summary += `  Opening: ${formatFeeRate(feeRates.openTaker)} (Market Taker)\n`;
       summary += `  Stop Loss: ${formatFeeRate(feeRates.closeTaker)} (Taker)\n`;
       summary += `  Slippage: ${formatFeeRate(feeRates.slippageOpen)} + ${formatFeeRate(feeRates.slippageClose)}\n`;
+      
+      // Add rebate information for market orders too
+      if (rebateInfo && rebateInfo.enabled) {
+        const formatOriginalRate = (rate: string) => {
+          const percentage = (parseFloat(rate) * 100).toFixed(3);
+          return parseFloat(percentage).toString() + '%';
+        };
+        summary += `\nRebate Applied: ${rebateInfo.rebatePercent}%\n`;
+        summary += `Original Taker Rate: ${formatOriginalRate(rebateInfo.originalRates.openTaker)}\n`;
+      }
     }
   }
   

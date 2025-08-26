@@ -60,6 +60,9 @@ export interface CalcInput {
   feeCloseTaker: string;
   slippageOpen: string;
   slippageClose: string;
+  // Rebate settings
+  enableRebate?: boolean;
+  rebatePercent?: string;
   // Backward compatibility
   feeOpen: string;
   feeClose: string;
@@ -96,6 +99,17 @@ export interface CalcResult {
     closeFeeAmountFormatted: string;
     slippageAmount?: string; // 数量 × 开仓价格 × 滑点率 (负数，成本)
     slippageAmountFormatted?: string;
+    // Rebate information
+    rebateInfo?: {
+      enabled: boolean;
+      rebatePercent: string;
+      originalOpenFeeAmount: string; // 原始开仓手续费（负数，成本）
+      originalOpenFeeAmountFormatted: string;
+      originalCloseFeeAmount: string; // 原始平仓手续费（负数，成本）
+      originalCloseFeeAmountFormatted: string;
+      rebateSavings: string; // 返佣节省金额（正数，节省的成本）
+      rebateSavingsFormatted: string;
+    };
   };
   // Stop loss risk
   stopLossRisk?: string; // Total risk including fees and price difference
@@ -112,6 +126,17 @@ export interface CalcResult {
     closeFeeAmountFormatted: string;
     slippageAmount?: string; // 数量 × 开仓价格 × 滑点率
     slippageAmountFormatted?: string;
+    // Rebate information
+    rebateInfo?: {
+      enabled: boolean;
+      rebatePercent: string;
+      originalOpenFeeAmount: string; // 原始开仓手续费
+      originalOpenFeeAmountFormatted: string;
+      originalCloseFeeAmount: string; // 原始平仓手续费
+      originalCloseFeeAmountFormatted: string;
+      rebateSavings: string; // 返佣节省金额
+      rebateSavingsFormatted: string;
+    };
   };
   targets: Array<{ rr: number; price: string; priceFormatted: string; isBreakeven?: boolean }>;
   warnings: string[];
