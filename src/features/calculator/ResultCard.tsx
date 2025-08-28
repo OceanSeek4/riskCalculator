@@ -8,6 +8,7 @@ import { calculateExpectedPnL, calculatePosition } from '@/lib/core';
 import { getCurrentPrice, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 
+
 export function ResultCard() {
   const { 
     result, 
@@ -464,20 +465,9 @@ export function ResultCard() {
     }
   };
 
+  // 如果没有结果，直接返回null，不显示任何内容
   if (!result) {
-    return (
-      <Card className="w-full max-w-md sm:max-w-lg lg:max-w-xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="w-5 h-5" />
-            {t('results')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-32 text-muted-foreground">
-          {t('enterAndCalculate')}
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (

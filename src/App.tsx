@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-import { CalculatorForm } from '@/features/calculator/CalculatorForm';
-import { ResultCard } from '@/features/calculator/ResultCard';
+import { CalculatorPageManager } from '@/features/calculator/CalculatorPageManager';
 import { SettingsForm } from '@/features/settings/SettingsForm';
 import { PresetManager } from '@/features/presets/PresetManager';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -108,16 +107,9 @@ function App() {
               </div>
             </div>
 
-            <TabsContent value="calculator" className="space-y-6">
-              <div className="flex flex-col xl:flex-row xl:gap-8 items-start justify-center max-w-6xl mx-auto px-4">
-                <div className="w-full flex justify-center mb-6 xl:mb-0">
-                  <CalculatorForm />
-                </div>
-                <div className="w-full flex justify-center">
-                  <ResultCard />
-                </div>
-              </div>
-            </TabsContent>
+                         <TabsContent value="calculator" className="space-y-6">
+               <CalculatorPageManager />
+             </TabsContent>
 
             <TabsContent value="presets" className="flex justify-center">
               <PresetManager />
