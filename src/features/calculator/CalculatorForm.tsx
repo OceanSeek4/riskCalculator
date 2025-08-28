@@ -101,6 +101,13 @@ export function CalculatorForm() {
   const [isQuickUpdateClicked, setIsQuickUpdateClicked] = useState(false);
   const [quickUpdateSuccess, setQuickUpdateSuccess] = useState(false);
   
+  // 实时价格显示的独立状态（不受锁定影响）
+  const [displayPrice, setDisplayPrice] = useState<string>('');
+  const [displayPriceChange, setDisplayPriceChange] = useState<'up' | 'down' | 'same' | null>(null);
+  const [displayLastUpdate, setDisplayLastUpdate] = useState<Date | null>(null);
+  const [displayPriceDiff, setDisplayPriceDiff] = useState<number>(0);
+  const [displayPreviousPrice, setDisplayPreviousPrice] = useState<number>(0);
+  
   // Candle management for trailing exits
   const [candleManager, setCandleManager] = useState<CandleManager | null>(null);
   const [isInitializingCandles, setIsInitializingCandles] = useState(false);
@@ -302,33 +309,13 @@ export function CalculatorForm() {
     }
   }, [formData.exchange, formData.enableRebate, settings.defaultRebateBinance, settings.defaultRebateBybit, settings.defaultRebateBitget, settings.defaultRebateOkx]);
 
-  // Real-time price updates for market orders
-  // Note: This only updates the display price. Automatic result recalculation is handled in ResultCard.tsx
+  // 市价单实时价格更新已移除
+  // 市价单现在使用锁定价格进行计算，不再进行自动更新
   useEffect(() => {
-    // Clear existing timer
+    // Clear existing timer if any
     if (priceTimer) {
       clearInterval(priceTimer);
       setPriceTimer(null);
-    }
-
-    if (formData.orderType === 'MARKET' && 
-        formData.exchange && 
-        formData.symbol && 
-        formData.contractMode) {
-      // Initial fetch
-      fetchRealTimePrice();
-      
-      // Set up interval for real-time price updates (every 2 seconds to match auto-recalculation)
-      const timer = setInterval(() => {
-        fetchRealTimePrice();
-      }, 2000);
-      
-      setPriceTimer(timer);
-      
-      return () => {
-        clearInterval(timer);
-        setPriceTimer(null);
-      };
     }
 
     return () => {
@@ -338,6 +325,57 @@ export function CalculatorForm() {
       }
     };
   }, [formData.orderType, formData.exchange, formData.symbol, formData.contractMode]);
+
+  // 独立的价格显示更新逻辑（不受订单类型和锁定状态影响）
+  useEffect(() => {
+    let displayPriceInterval: NodeJS.Timeout | null = null;
+
+    if (formData.exchange && formData.symbol && formData.contractMode) {
+      const updateDisplayPrice = async () => {
+        try {
+          const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const price = await getCurrentPrice(formData.exchange as Exchange, formData.symbol!, instType);
+          
+          const oldPrice = parseFloat(displayPrice || '0');
+          setDisplayPrice(price.toString());
+          setDisplayLastUpdate(new Date());
+          
+          // 计算价格差值和设置变化指示
+          if (oldPrice > 0) {
+            const diff = price - oldPrice;
+            setDisplayPriceDiff(diff);
+            setDisplayPreviousPrice(oldPrice);
+            
+            if (diff > 0) {
+              setDisplayPriceChange('up');
+            } else if (diff < 0) {
+              setDisplayPriceChange('down');
+            } else {
+              setDisplayPriceChange('same');
+            }
+            setTimeout(() => setDisplayPriceChange(null), 2500);
+          } else {
+            setDisplayPriceDiff(0);
+            setDisplayPreviousPrice(price);
+          }
+        } catch (error) {
+          console.warn('Failed to update display price:', error);
+        }
+      };
+
+      // 立即更新一次
+      updateDisplayPrice();
+      
+      // 设置定时更新（每3秒）
+      displayPriceInterval = setInterval(updateDisplayPrice, 3000);
+    }
+
+    return () => {
+      if (displayPriceInterval) {
+        clearInterval(displayPriceInterval);
+      }
+    };
+  }, [formData.exchange, formData.symbol, formData.contractMode, displayPrice]);
 
   // Initialize CandleManager for trailing exits when enabled
   useEffect(() => {
@@ -605,6 +643,76 @@ export function CalculatorForm() {
     const presetData = loadPreset(presetId);
     if (presetData) {
       setFormData(presetData);
+    }
+  };
+
+  // 根据tickSize格式化价格显示
+  const formatPriceWithTickSize = (price: number, tickSize?: string): string => {
+    if (!tickSize) {
+      // 如果没有tickSize，默认保留8位小数
+      return price.toFixed(8);
+    }
+
+    try {
+      const tick = parseFloat(tickSize);
+      if (tick <= 0) {
+        return price.toFixed(8);
+      }
+
+      // 计算tickSize对应的小数位数
+      const tickStr = tick.toString();
+      let decimalPlaces = 0;
+      
+      if (tickStr.includes('.')) {
+        decimalPlaces = tickStr.split('.')[1].length;
+      } else if (tickStr.includes('e-')) {
+        // 处理科学计数法，如 1e-8
+        const exponent = parseInt(tickStr.split('e-')[1]);
+        decimalPlaces = exponent;
+      }
+
+      // 根据tickSize舍入价格
+      const roundedPrice = Math.round(price / tick) * tick;
+      
+      // 格式化显示，移除尾随零
+      return parseFloat(roundedPrice.toFixed(decimalPlaces)).toString();
+    } catch (error) {
+      console.error('Price formatting error:', error);
+      return price.toFixed(8);
+    }
+  };
+
+  // 根据指定百分比设置快速止损
+  const handleQuickStopWithPercentage = async (percentage: number) => {
+    if (!formData.entryPrice || !formData.side) {
+      // 使用通知系统
+      setNotification?.('请先设置入场价格和方向', 'error');
+      return;
+    }
+
+    const entryPrice = parseFloat(formData.entryPrice);
+    if (isNaN(entryPrice)) {
+      setNotification?.('请输入有效的入场价格', 'error');
+      return;
+    }
+
+    try {
+      // 计算指定百分比的止损距离
+      const stopDistance = entryPrice * (percentage / 100);
+      const rawStopPrice = formData.side === 'LONG'
+        ? entryPrice - stopDistance
+        : entryPrice + stopDistance;
+      
+      // 根据tickSize格式化
+      const stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
+      
+      // 更新止损价格
+      setFormData({ ...formData, stopPrice: stopPrice.toString() });
+      setNotification?.(`已设置${percentage}%止损距离`, 'success');
+      
+    } catch (error) {
+      console.error('百分比止损计算错误:', error);
+      setNotification?.('止损计算失败，请检查参数', 'error');
     }
   };
 
@@ -1193,6 +1301,69 @@ export function CalculatorForm() {
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{t('entrySettings')}</h3>
           
+          {/* 实时价格显示栏 - 独立显示，不受订单类型限制 */}
+          {formData.exchange && formData.symbol && (
+            <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="space-y-2">
+                {/* 第一行：交易对信息和更新时间 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      {formData.exchange} {formData.symbol}
+                    </span>
+                    <span className="text-xs text-blue-600/70 dark:text-blue-300/70 font-normal">
+                      {formData.orderType === 'MARKET' ? '实时价格' : '市场参考价'}
+                    </span>
+                  </div>
+                  {displayLastUpdate && (
+                    <span className="text-xs text-blue-600/70 dark:text-blue-300/70">
+                      {displayLastUpdate.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
+                
+                {/* 第二行：价格显示区域 */}
+                {displayPrice && (
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-center gap-3">
+                      {/* 主要价格 */}
+                      <span className={`text-2xl font-bold font-mono ${
+                        displayPriceChange === 'up' ? 'text-green-600 dark:text-green-400' :
+                        displayPriceChange === 'down' ? 'text-red-600 dark:text-red-400' :
+                        'text-blue-700 dark:text-blue-300'
+                      }`}>
+                        ${parseFloat(displayPrice).toLocaleString('en-US', { 
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 8
+                        })}
+                      </span>
+                      
+                      {/* 涨跌标识和差值 */}
+                      {displayPriceChange && displayPriceChange !== 'same' && displayPriceDiff !== 0 && (
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ${
+                          displayPriceChange === 'up' 
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                        }`}>
+                          <span>
+                            {displayPriceChange === 'up' ? '↗' : '↘'}
+                          </span>
+                          <span className="text-xs">
+                            {displayPriceChange === 'up' ? '+' : ''}
+                            {Math.abs(displayPriceDiff).toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 8
+                            })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
           <div>
             <Label>{t('orderType')}</Label>
             <Select
@@ -1552,7 +1723,7 @@ export function CalculatorForm() {
           </div>
 
           {formData.stopMode === 'PRICE' && (
-            <div>
+            <div className="space-y-2">
               <Label>{t('stopPrice')}</Label>
               <Input
                 type="number"
@@ -1562,6 +1733,51 @@ export function CalculatorForm() {
                 placeholder={t('enterStopPrice')}
                 className={formErrors.stopPrice ? 'border-red-500' : ''}
               />
+              
+              {/* 价格止损模式的快速设置按钮组 */}
+              <div className="flex gap-1 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickStopWithPercentage(0.5)}
+                  className="text-xs px-2 py-1 h-7"
+                  title="设置0.5%止损距离"
+                >
+                  0.5%
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickStopWithPercentage(1)}
+                  className="text-xs px-2 py-1 h-7"
+                  title="设置1%止损距离"
+                >
+                  1%
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickStopWithPercentage(2)}
+                  className="text-xs px-2 py-1 h-7"
+                  title="设置2%止损距离"
+                >
+                  2%
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickStopWithPercentage(3)}
+                  className="text-xs px-2 py-1 h-7"
+                  title="设置3%止损距离"
+                >
+                  3%
+                </Button>
+              </div>
+              
               {formErrors.stopPrice && (
                 <p className="text-sm text-red-500 mt-1">{formErrors.stopPrice}</p>
               )}

@@ -135,20 +135,8 @@ export function ResultCard() {
       }
     };
     
-    // Set up auto recalculation only for market orders that are not locked
-    if (formData.orderType === 'MARKET' && 
-        !isPriceLocked && 
-        result &&
-        marketMeta &&
-        formData.exchange && 
-        formData.symbol) {
-      
-      // Initial recalculation
-      performRecalculation();
-      
-      // Set up interval for every 2 seconds
-      recalcTimer = setInterval(performRecalculation, 2000);
-    }
+    // Removed auto recalculation for market orders
+    // Market orders now use locked price for calculation instead of continuous updates
     
     // Cleanup
     return () => {
@@ -495,8 +483,8 @@ export function ResultCard() {
                   </>
                 ) : (
                   <>
-                    <span>🔄</span>
-                    <span>每2秒更新</span>
+                    <span>📈</span>
+                    <span>市价计算</span>
                   </>
                 )}
               </div>
@@ -536,8 +524,8 @@ export function ResultCard() {
                       </>
                     ) : (
                       <>
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-green-600 dark:text-green-400">实时价格</span>
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-green-600 dark:text-green-400">市场价格</span>
                       </>
                     )}
                   </div>
@@ -574,9 +562,9 @@ export function ResultCard() {
                     </>
                   ) : (
                     <>
-                      <strong>实时动态计算</strong> - 结果根据当前市场价格自动更新
+                      <strong>市价单计算</strong> - 基于锁定的市场价格计算
                       <div className="text-xs mt-1 opacity-80">
-                        计算结果会随价格变动实时刷新，点击左侧"锁定"按钮可固定结果
+                        每次计算时获取最新价格并锁定，确保结果准确稳定
                       </div>
                     </>
                   )}

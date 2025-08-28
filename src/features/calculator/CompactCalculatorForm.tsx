@@ -57,9 +57,15 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [priceError, setPriceError] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [marketMeta, setMarketMeta] = useState<any>(null);
-  const [autoUpdatePrice, setAutoUpdatePrice] = useState(false);
   const [showSavedParams, setShowSavedParams] = useState(true);
   const [showTrailingPanel, setShowTrailingPanel] = useState(false);
+  
+  // 实时价格显示的独立状态（不受锁定影响）
+  const [displayPrice, setDisplayPrice] = useState<string>('');
+  const [displayPriceChange, setDisplayPriceChange] = useState<'up' | 'down' | 'same' | null>(null);
+  const [displayLastUpdate, setDisplayLastUpdate] = useState<Date | null>(null);
+  const [displayPriceDiff, setDisplayPriceDiff] = useState<number>(0);
+  const [displayPreviousPrice, setDisplayPreviousPrice] = useState<number>(0);
 
   // 保存当前计算时使用的所有参数（除了价格和订单类型）
   const [savedCalculationParams] = useState(() => ({
@@ -119,11 +125,11 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     fetchMarketMeta();
   }, [savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode]);
 
-  // 实时价格更新（市价单模式）
+  // 实时价格更新（市价单模式，未锁定时）
   useEffect(() => {
     let priceUpdateInterval: NodeJS.Timeout | null = null;
 
-    if (formData.orderType === 'MARKET' && autoUpdatePrice && 
+    if (formData.orderType === 'MARKET' && !isPriceLocked && 
         savedCalculationParams.exchange && savedCalculationParams.symbol && 
         savedCalculationParams.contractMode) {
       
@@ -165,11 +171,62 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         clearInterval(priceUpdateInterval);
       }
     };
-  }, [formData.orderType, autoUpdatePrice, savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, realTimePrice, formData.entryPrice, setFormData, setRealTimePrice, setLastPriceUpdate, setPriceChange]);
+  }, [formData.orderType, isPriceLocked, savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, realTimePrice, formData.entryPrice, setFormData, setRealTimePrice, setLastPriceUpdate, setPriceChange]);
+
+  // 独立的价格显示更新逻辑（不受订单类型和锁定状态影响）
+  useEffect(() => {
+    let displayPriceInterval: NodeJS.Timeout | null = null;
+
+    if (savedCalculationParams.exchange && savedCalculationParams.symbol && savedCalculationParams.contractMode) {
+      const updateDisplayPrice = async () => {
+        try {
+          const instType: InstType = savedCalculationParams.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const price = await getCurrentPrice(savedCalculationParams.exchange as Exchange, savedCalculationParams.symbol!, instType);
+          
+          const oldPrice = parseFloat(displayPrice || '0');
+          setDisplayPrice(price.toString());
+          setDisplayLastUpdate(new Date());
+          
+          // 计算价格差值和设置变化指示
+          if (oldPrice > 0) {
+            const diff = price - oldPrice;
+            setDisplayPriceDiff(diff);
+            setDisplayPreviousPrice(oldPrice);
+            
+            if (diff > 0) {
+              setDisplayPriceChange('up');
+            } else if (diff < 0) {
+              setDisplayPriceChange('down');
+            } else {
+              setDisplayPriceChange('same');
+            }
+            setTimeout(() => setDisplayPriceChange(null), 2500);
+          } else {
+            setDisplayPriceDiff(0);
+            setDisplayPreviousPrice(price);
+          }
+        } catch (error) {
+          console.warn('Failed to update display price:', error);
+        }
+      };
+
+      // 立即更新一次
+      updateDisplayPrice();
+      
+      // 设置定时更新（每3秒）
+      displayPriceInterval = setInterval(updateDisplayPrice, 3000);
+    }
+
+    return () => {
+      if (displayPriceInterval) {
+        clearInterval(displayPriceInterval);
+      }
+    };
+  }, [savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, displayPrice]);
 
   // 表单输入处理
-  const handleInputChange = (field: 'entryPrice' | 'orderType', value: string) => {
-    if (field === 'entryPrice') {
+  const handleInputChange = (field: 'entryPrice' | 'orderType' | 'stopPrice', value: string) => {
+    if (field === 'entryPrice' || field === 'stopPrice') {
       const validationResult = validateNumberString(value, field);
       if (validationResult) {
         setFormErrors(prev => ({ ...prev, [field]: validationResult }));
@@ -223,16 +280,198 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     }
   };
 
-  // 价格锁定切换
-  const togglePriceLock = () => {
-    if (!isPriceLocked && formData.entryPrice) {
-      setLockedPrice(formData.entryPrice);
+  // 价格锁定处理函数（沿用完整版逻辑）
+  const handleLockPrice = () => {
+    if (realTimePrice) {
+      setLockedPrice(realTimePrice);
       setIsPriceLocked(true);
-      setNotification(t('priceLocked'), 'info');
-    } else {
-      setLockedPrice(null);
-      setIsPriceLocked(false);
-      setNotification(t('priceUnlocked'), 'info');
+      setNotification('价格已锁定', 'info');
+    }
+  };
+
+  const handleUnlockPrice = () => {
+    setIsPriceLocked(false);
+    setLockedPrice(null);
+    setNotification('价格已解锁', 'info');
+  };
+
+  // 快速止损设置 - 基于保存的计算参数中的止损模式设置止损
+  const handleQuickStopSet = async () => {
+    if (!formData.entryPrice || !savedCalculationParams.side) {
+      setNotification('请先设置入场价格和方向', 'error');
+      return;
+    }
+
+    const entryPrice = parseFloat(formData.entryPrice);
+    if (isNaN(entryPrice)) {
+      setNotification('请输入有效的入场价格', 'error');
+      return;
+    }
+
+    let stopPrice: number;
+    let notificationMessage = '';
+
+    try {
+      switch (savedCalculationParams.stopMode) {
+        case 'PRICE':
+          // 如果有保存的止损价格，使用它
+          if (savedCalculationParams.stopPrice) {
+            stopPrice = parseFloat(savedCalculationParams.stopPrice);
+            notificationMessage = '已应用保存的止损价格';
+          } else {
+            // 价格止损模式使用0.5%的止损距离
+            const stopDistance = entryPrice * 0.005;
+            const rawStopPrice = savedCalculationParams.side === 'LONG' 
+              ? entryPrice - stopDistance 
+              : entryPrice + stopDistance;
+            // 根据tickSize格式化
+            stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
+            notificationMessage = '已设置0.5%止损距离';
+          }
+          break;
+
+        case 'ATR':
+          // 基于ATR计算止损
+          if (currentATR && savedCalculationParams.atrMultiplier) {
+            const atrValue = currentATR;
+            const multiplier = parseFloat(savedCalculationParams.atrMultiplier);
+            const atrDistance = atrValue * multiplier;
+            
+            const rawStopPrice = savedCalculationParams.side === 'LONG'
+              ? entryPrice - atrDistance
+              : entryPrice + atrDistance;
+            // 根据tickSize格式化
+            stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
+            notificationMessage = `已设置ATR止损 (${multiplier}x ATR)`;
+          } else {
+            setNotification('ATR数据不可用，请先获取ATR数据', 'error');
+            return;
+          }
+          break;
+
+        case 'PIPS':
+          // 基于PIPS计算止损
+          if (savedCalculationParams.stopPips && marketMeta) {
+            const pips = parseFloat(savedCalculationParams.stopPips);
+            const tickSize = parseFloat(marketMeta.tickSize);
+            const pipsDistance = pips * tickSize;
+            
+            const rawStopPrice = savedCalculationParams.side === 'LONG'
+              ? entryPrice - pipsDistance
+              : entryPrice + pipsDistance;
+            // 根据tickSize格式化
+            stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta.tickSize));
+            notificationMessage = `已设置${pips}点止损`;
+          } else {
+            setNotification('PIPS止损参数不完整或市场数据不可用', 'error');
+            return;
+          }
+          break;
+
+        default:
+          // 默认情况：使用2%止损
+          const stopDistance = entryPrice * 0.02;
+          const rawStopPrice = savedCalculationParams.side === 'LONG'
+            ? entryPrice - stopDistance
+            : entryPrice + stopDistance;
+          // 根据tickSize格式化
+          stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
+          notificationMessage = '已设置2%默认止损距离';
+          break;
+      }
+
+      // 更新止损价格
+      setFormData({ stopPrice: stopPrice.toString() });
+      setNotification(notificationMessage, 'success');
+      
+    } catch (error) {
+      console.error('快速止损计算错误:', error);
+      setNotification('止损计算失败，请检查参数', 'error');
+    }
+  };
+
+  // 根据指定百分比设置快速止损
+  const handleQuickStopWithPercentage = async (percentage: number) => {
+    if (!formData.entryPrice || !savedCalculationParams.side) {
+      setNotification('请先设置入场价格和方向', 'error');
+      return;
+    }
+
+    const entryPrice = parseFloat(formData.entryPrice);
+    if (isNaN(entryPrice)) {
+      setNotification('请输入有效的入场价格', 'error');
+      return;
+    }
+
+    try {
+      // 计算指定百分比的止损距离
+      const stopDistance = entryPrice * (percentage / 100);
+      const rawStopPrice = savedCalculationParams.side === 'LONG'
+        ? entryPrice - stopDistance
+        : entryPrice + stopDistance;
+      
+      // 根据tickSize格式化
+      const stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
+      
+      // 更新止损价格
+      setFormData({ stopPrice: stopPrice.toString() });
+      setNotification(`已设置${percentage}%止损距离`, 'success');
+      
+    } catch (error) {
+      console.error('百分比止损计算错误:', error);
+      setNotification('止损计算失败，请检查参数', 'error');
+    }
+  };
+
+  // 根据tickSize格式化价格显示
+  const formatPriceWithTickSize = (price: number, tickSize?: string): string => {
+    if (!tickSize) {
+      // 如果没有tickSize，默认保留8位小数
+      return price.toFixed(8);
+    }
+
+    try {
+      const tick = parseFloat(tickSize);
+      if (tick <= 0) {
+        return price.toFixed(8);
+      }
+
+      // 计算tickSize对应的小数位数
+      const tickStr = tick.toString();
+      let decimalPlaces = 0;
+      
+      if (tickStr.includes('.')) {
+        decimalPlaces = tickStr.split('.')[1].length;
+      } else if (tickStr.includes('e-')) {
+        // 处理科学计数法，如 1e-8
+        const exponent = parseInt(tickStr.split('e-')[1]);
+        decimalPlaces = exponent;
+      }
+
+      // 根据tickSize舍入价格
+      const roundedPrice = Math.round(price / tick) * tick;
+      
+      // 格式化显示，移除尾随零
+      return parseFloat(roundedPrice.toFixed(decimalPlaces)).toString();
+    } catch (error) {
+      console.error('Price formatting error:', error);
+      return price.toFixed(8);
+    }
+  };
+
+  // 获取止损模式描述
+  const getStopModeDescription = () => {
+    switch (savedCalculationParams.stopMode) {
+      case 'PRICE':
+        return savedCalculationParams.stopPrice ? '保存止损' : '0.5%止损';
+      case 'ATR':
+        const multiplier = savedCalculationParams.atrMultiplier || '2';
+        return `${multiplier}x ATR`;
+      case 'PIPS':
+        const pips = savedCalculationParams.stopPips || '50';
+        return `${pips}点止损`;
+      default:
+        return '快速止损';
     }
   };
 
@@ -327,6 +566,69 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
             {/* 左侧：简易计算器 */}
             <Card className="w-full">
       <CardHeader className="pb-4">
+        {/* 实时价格显示栏 - 独立显示，不受订单类型限制 */}
+        {savedCalculationParams.exchange && savedCalculationParams.symbol && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="space-y-2">
+              {/* 第一行：交易对信息和更新时间 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    {savedCalculationParams.exchange} {savedCalculationParams.symbol}
+                  </span>
+                  <span className="text-xs text-blue-600/70 dark:text-blue-300/70 font-normal">
+                    {formData.orderType === 'MARKET' ? '实时价格' : '市场参考价'}
+                  </span>
+                </div>
+                {displayLastUpdate && (
+                  <span className="text-xs text-blue-600/70 dark:text-blue-300/70">
+                    {displayLastUpdate.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              
+              {/* 第二行：价格显示区域 */}
+              {displayPrice && (
+                <div className="flex items-center justify-center">
+                  <div className="flex items-center gap-3">
+                    {/* 主要价格 */}
+                    <span className={`text-3xl font-bold font-mono ${
+                      displayPriceChange === 'up' ? 'text-green-600 dark:text-green-400' :
+                      displayPriceChange === 'down' ? 'text-red-600 dark:text-red-400' :
+                      'text-blue-700 dark:text-blue-300'
+                    }`}>
+                      ${parseFloat(displayPrice).toLocaleString('en-US', { 
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 8
+                      })}
+                    </span>
+                    
+                    {/* 涨跌标识和差值 */}
+                    {displayPriceChange && displayPriceChange !== 'same' && displayPriceDiff !== 0 && (
+                      <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full font-medium ${
+                        displayPriceChange === 'up' 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                      }`}>
+                        <span className="text-lg">
+                          {displayPriceChange === 'up' ? '↗' : '↘'}
+                        </span>
+                        <span className="text-sm">
+                          {displayPriceChange === 'up' ? '+' : ''}
+                          {Math.abs(displayPriceDiff).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 8
+                          })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
         <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="flex items-center gap-2 whitespace-nowrap">
             <Calculator className="w-5 h-5 text-blue-600" />
@@ -390,7 +692,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         {/* 入场价格 */}
         <div className="space-y-2">
           <Label htmlFor="entryPrice">
-            {formData.orderType === 'MARKET' ? t('currentPrice') : t('entryPrice')}
+            入场价格
           </Label>
           <div className="flex gap-2">
             <Input
@@ -399,8 +701,14 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
               value={formData.entryPrice || ''}
               onChange={(e) => handleInputChange('entryPrice', e.target.value)}
               placeholder={formData.orderType === 'MARKET' ? t('getCurrentPrice') : t('enterPrice')}
-              className={priceChange === 'up' ? 'border-green-400 bg-green-50' : 
-                        priceChange === 'down' ? 'border-red-400 bg-red-50' : ''}
+              className={
+                priceChange === 'up' ? 'border-green-400 bg-green-50' : 
+                priceChange === 'down' ? 'border-red-400 bg-red-50' :
+                formData.orderType === 'MARKET' && !isPriceLocked ? 'border-blue-300 bg-blue-50' :
+                isPriceLocked ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800' : ''
+              }
+              disabled={formData.orderType === 'MARKET' && !isPriceLocked}
+              readOnly={formData.orderType === 'MARKET' && !isPriceLocked}
             />
             
             {/* 获取价格按钮 */}
@@ -424,29 +732,25 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
               )}
             </Button>
 
-            {/* 实时更新切换按钮（仅市价单） */}
-            {formData.orderType === 'MARKET' && (
-              <Button
-                type="button"
-                variant={autoUpdatePrice ? "default" : "outline"}
-                onClick={() => setAutoUpdatePrice(!autoUpdatePrice)}
-                className="flex items-center gap-2 px-4 whitespace-nowrap"
-                title={autoUpdatePrice ? '停止实时更新' : '开始实时更新'}
-              >
-                <div className={`w-2 h-2 rounded-full ${autoUpdatePrice ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
-                <span className="text-xs whitespace-nowrap">{autoUpdatePrice ? '实时' : '手动'}</span>
-              </Button>
-            )}
             
-            {/* 价格锁定按钮 */}
-            {formData.orderType === 'MARKET' && formData.entryPrice && (
+            {/* Price Lock Button for Market Orders */}
+            {formData.orderType === 'MARKET' && realTimePrice && (
               <Button
                 type="button"
                 variant={isPriceLocked ? "default" : "outline"}
-                onClick={togglePriceLock}
-                className="px-3"
+                onClick={isPriceLocked ? handleUnlockPrice : handleLockPrice}
+                className={`px-3 ${
+                  isPriceLocked 
+                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500' 
+                    : 'border-gray-300 hover:bg-gray-50'
+                }`}
+                title={isPriceLocked ? '解锁价格' : '锁定价格'}
               >
-                {isPriceLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                {isPriceLocked ? (
+                  <Lock className="w-4 h-4" />
+                ) : (
+                  <Unlock className="w-4 h-4" />
+                )}
               </Button>
             )}
           </div>
@@ -456,22 +760,100 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           {priceError && (
             <p className="text-sm text-red-600">{priceError}</p>
           )}
+          
+          {/* 市价单锁定状态显示 */}
+          {formData.orderType === 'MARKET' && (
+            <>
+              {isPriceLocked ? (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-center gap-1">
+                  🔒 价格已锁定在 ${lockedPrice} - 点击"解锁"按钮恢复实时价格更新
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  📈 市价单使用锁定价格计算 - 点击"锁定"按钮固定当前价格
+                </p>
+              )}
+            </>
+          )}
         </div>
 
-        {/* 实时价格状态显示 */}
-        {formData.orderType === 'MARKET' && autoUpdatePrice && (
-          <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm text-green-700 dark:text-green-300">实时价格更新中</span>
-            </div>
-            {lastPriceUpdate && (
-              <span className="text-xs text-green-600 dark:text-green-400">
-                最后更新: {lastPriceUpdate.toLocaleTimeString()}
+        {/* 止损设置 */}
+        <div className="space-y-2">
+          <Label htmlFor="stopPrice">止损价格</Label>
+          <div className="flex gap-2">
+            <Input
+              id="stopPrice"
+              type="text"
+              value={formData.stopPrice || ''}
+              onChange={(e) => handleInputChange('stopPrice', e.target.value)}
+              placeholder="输入止损价格"
+              className="flex-1"
+            />
+            {/* 快速设置按钮 */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleQuickStopSet}
+              className="flex items-center gap-2 px-4 whitespace-nowrap"
+              title={`快速设置止损 (${getStopModeDescription()})`}
+            >
+              <Calculator className="w-4 h-4" />
+              <span className="text-xs whitespace-nowrap">
+                {getStopModeDescription()}
               </span>
-            )}
+            </Button>
           </div>
-        )}
+          
+          {/* 价格止损模式的快速设置按钮组 */}
+          {savedCalculationParams.stopMode === 'PRICE' && (
+            <div className="flex gap-1 flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickStopWithPercentage(0.5)}
+                className="text-xs px-2 py-1 h-7"
+                title="设置0.5%止损距离"
+              >
+                0.5%
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickStopWithPercentage(1)}
+                className="text-xs px-2 py-1 h-7"
+                title="设置1%止损距离"
+              >
+                1%
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickStopWithPercentage(2)}
+                className="text-xs px-2 py-1 h-7"
+                title="设置2%止损距离"
+              >
+                2%
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickStopWithPercentage(3)}
+                className="text-xs px-2 py-1 h-7"
+                title="设置3%止损距离"
+              >
+                3%
+              </Button>
+            </div>
+          )}
+          
+          {formErrors.stopPrice && (
+            <p className="text-sm text-red-600">{formErrors.stopPrice}</p>
+          )}
+        </div>
 
         {/* 重新计算按钮 */}
         <Button

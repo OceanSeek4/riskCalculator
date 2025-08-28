@@ -208,10 +208,10 @@ export function SavedParametersCard({ savedParams }: SavedParametersCardProps) {
             <div className="flex justify-between items-center min-h-[20px]">
               <span className="text-muted-foreground whitespace-nowrap">{t('feeType')}:</span>
               <span className="font-mono text-xs">
-                {savedParams.feeType === 'MAKER' ? '全部Maker' :
-                 savedParams.feeType === 'TAKER' ? '全部Taker' :
-                 savedParams.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? '开仓Maker' :
-                 '仅开仓Maker'}
+                {savedParams.feeType === 'MAKER' ? t('feeTypeAllMaker') :
+                 savedParams.feeType === 'TAKER' ? t('feeTypeAllTaker') :
+                 savedParams.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? t('feeTypeMakerOpenTakerClose') :
+                 t('feeTypeMakerOpenOnly')}
               </span>
             </div>
             {savedParams.enableRebate && savedParams.rebatePercent && parseFloat(savedParams.rebatePercent) > 0 && (

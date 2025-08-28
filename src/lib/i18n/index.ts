@@ -46,8 +46,8 @@ const resources = {
       entryPriceLimit: 'Entry Price (Limit)',
       limitPrice: 'Limit Price',
       marketOrderNote: 'For market orders, enter the expected execution price',
-      realTimePriceUpdated: 'Price updates automatically from market',
-      realTimePrice: 'Live Price',
+      realTimePriceUpdated: 'Market price locked for calculation',
+      realTimePrice: 'Market Price',
       
       // Stop Loss
       stopMode: 'Stop Mode',
@@ -91,6 +91,7 @@ const resources = {
       basedOnRealTimePrice: 'Based on real-time price',
       lockedAtCalculation: 'Locked at calculation',
       priceLocked: 'Price locked for calculation',
+      priceUnlocked: 'Price unlocked - real-time updates resumed',
       takeProfitMAPeriod: 'MA Period',
       takeProfitMATimeframe: 'MA Timeframe',
       expectedTakeProfit: 'Expected Take Profit',
@@ -365,7 +366,7 @@ const resources = {
       // Header Features
       riskManagement: 'Risk Management',
       exchanges: 'Exchanges',
-      realTimeCalc: 'Real-time Calculation',
+      realTimeCalc: 'Professional Calculation',
       
       // Warning Messages
       warningExchangeRule: 'EXCHANGE RULE',
@@ -424,6 +425,28 @@ const resources = {
       takeProfitDistance: 'Take Profit Distance',
       priceProfit: 'Price Profit',
       netProfit: 'Net Profit',
+      
+      // Fee Types
+      feeTypeAllMaker: 'All Maker',
+      feeTypeAllTaker: 'All Taker',
+      feeTypeMakerOpenTakerClose: 'Maker Open/Taker Close',
+      feeTypeMakerOpenOnly: 'Maker Open Only',
+      
+      // Risk Mode
+      accountPercent: 'Account Percent',
+      fixedAmount: 'Fixed Amount',
+      
+      // Stop/Profit Mode
+      priceMode: 'Price',
+      
+      // General
+      rrRatio: 'R:R Ratio',
+      rebate: 'Rebate',
+      advanced: 'Advanced',
+      enabled: 'Enabled',
+      riskPercent: 'Risk Percent',
+      feeType: 'Fee Type',
+      multiplier: 'Multiplier',
       
       // Trailing Exits
       trailingExits: {
@@ -525,8 +548,8 @@ const resources = {
       entryPriceLimit: '入场价格（限价）',
       limitPrice: '限价',
       marketOrderNote: '市价单请输入预期成交价格',
-      realTimePriceUpdated: '价格自动从市场更新',
-      realTimePrice: '实时价格',
+      realTimePriceUpdated: '市场价格已锁定计算',
+      realTimePrice: '市场价格',
       
       // Stop Loss
       stopMode: '止损模式',
@@ -570,6 +593,7 @@ const resources = {
       basedOnRealTimePrice: '基于实时价格',
       lockedAtCalculation: '计算时锁定',
       priceLocked: '计算价格已锁定',
+      priceUnlocked: '价格已解锁 - 恢复实时更新',
       takeProfitMAPeriod: '均线周期',
       takeProfitMATimeframe: '均线时间框架',
       expectedTakeProfit: '预期止盈',
@@ -845,7 +869,7 @@ const resources = {
       // Header Features
       riskManagement: '风险管理',
       exchanges: '交易所',
-      realTimeCalc: '实时计算',
+      realTimeCalc: '专业计算',
       
       // Warning Messages
       warningExchangeRule: '交易所规则',
@@ -904,6 +928,28 @@ const resources = {
       takeProfitDistance: '止盈距离',
       priceProfit: '价格盈利',
       netProfit: '净盈利',
+      
+      // Fee Types
+      feeTypeAllMaker: '全部Maker',
+      feeTypeAllTaker: '全部Taker',
+      feeTypeMakerOpenTakerClose: '开仓Maker',
+      feeTypeMakerOpenOnly: '仅开仓Maker',
+      
+      // Risk Mode
+      accountPercent: '账户百分比',
+      fixedAmount: '固定金额',
+      
+      // Stop/Profit Mode
+      priceMode: '价格模式',
+      
+      // General
+      rrRatio: '风险收益比',
+      rebate: '返佣',
+      advanced: '高级设置',
+      enabled: '已启用',
+      riskPercent: '风险百分比',
+      feeType: '费率类型',
+      multiplier: '倍数',
       
       // Trailing Exits
       trailingExits: {

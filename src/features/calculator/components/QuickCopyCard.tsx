@@ -104,26 +104,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
     return formatted.replace(/\.?0+$/, '');
   };
 
-  // 复制按钮组件
-  const CopyButton = ({ text, itemKey, label }: { text: string; itemKey: string; label: string }) => {
-    const isCopied = copiedItems.has(itemKey);
-    
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => copyToClipboard(text, itemKey)}
-        className="h-8 px-2 text-xs"
-        title={`复制${label}`}
-      >
-        {isCopied ? (
-          <Check className="w-3 h-3 text-green-600" />
-        ) : (
-          <Copy className="w-3 h-3" />
-        )}
-      </Button>
-    );
-  };
+  // 不再需要单独的复制按钮组件，已改为整行点击复制
 
   if (!result) {
     return (
@@ -151,76 +132,86 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
           快速复制
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
-          点击复制按钮快速复制交易信息
+          点击任意行快速复制对应的交易信息
         </p>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-1">
         {/* 入场价格 */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">入场价格:</span>
+        <div 
+          className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all duration-200 hover:shadow-sm group"
+          onClick={() => copyToClipboard(formatPrice(entryPrice), 'entryPrice-row')}
+          title="点击复制入场价格"
+        >
+          <span className="text-sm text-muted-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">入场价格:</span>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-medium">
+            <span className="font-mono text-sm font-medium group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
               ${formatPrice(entryPrice)}
             </span>
-            <CopyButton 
-              text={formatPrice(entryPrice)} 
-              itemKey="entryPrice" 
-              label="入场价格"
-            />
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <Copy className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+            </div>
           </div>
         </div>
 
         {/* 开仓数量 */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">开仓数量:</span>
+        <div 
+          className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-green-50 dark:hover:bg-green-950/50 transition-all duration-200 hover:shadow-sm group"
+          onClick={() => copyToClipboard(formatQuantity(result.qtyRounded), 'quantity-row')}
+          title="点击复制开仓数量"
+        >
+          <span className="text-sm text-muted-foreground group-hover:text-green-700 dark:group-hover:text-green-300 transition-colors">开仓数量:</span>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-medium">
+            <span className="font-mono text-sm font-medium group-hover:text-green-700 dark:group-hover:text-green-300 transition-colors">
               {formatQuantity(result.qtyRounded)}
             </span>
-            <CopyButton 
-              text={formatQuantity(result.qtyRounded)} 
-              itemKey="quantity" 
-              label="开仓数量"
-            />
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <Copy className="w-3 h-3 text-green-600 dark:text-green-400" />
+            </div>
           </div>
         </div>
 
         {/* 止损价格 */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">止损价格:</span>
+        <div 
+          className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/50 transition-all duration-200 hover:shadow-sm group"
+          onClick={() => copyToClipboard(formatPrice(result.stopPrice), 'stopPrice-row')}
+          title="点击复制止损价格"
+        >
+          <span className="text-sm text-muted-foreground group-hover:text-red-700 dark:group-hover:text-red-300 transition-colors">止损价格:</span>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-medium text-red-600">
+            <span className="font-mono text-sm font-medium text-red-600 group-hover:text-red-700 dark:group-hover:text-red-400 transition-colors">
               ${formatPrice(result.stopPrice)}
             </span>
-            <CopyButton 
-              text={formatPrice(result.stopPrice)} 
-              itemKey="stopPrice" 
-              label="止损价格"
-            />
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <Copy className="w-3 h-3 text-red-600 dark:text-red-400" />
+            </div>
           </div>
         </div>
 
         {/* 预期止盈价格 */}
         {result.takeProfitPrice && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">止盈价格:</span>
+          <div 
+            className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-all duration-200 hover:shadow-sm group"
+            onClick={() => copyToClipboard(formatPrice(result.takeProfitPrice), 'takeProfitPrice-row')}
+            title="点击复制止盈价格"
+          >
+            <span className="text-sm text-muted-foreground group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">止盈价格:</span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-sm font-medium text-green-600">
+              <span className="font-mono text-sm font-medium text-green-600 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
                 ${formatPrice(result.takeProfitPrice)}
               </span>
-              <CopyButton 
-                text={formatPrice(result.takeProfitPrice)} 
-                itemKey="takeProfitPrice" 
-                label="止盈价格"
-              />
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <Copy className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              </div>
             </div>
           </div>
         )}
 
         {/* 目标位 */}
         {result.targets && result.targets.length > 0 && (
-          <div className="space-y-2">
-            <span className="text-sm text-muted-foreground">目标位:</span>
+          <div className="space-y-1">
+            <div className="px-2 py-1">
+              <span className="text-sm text-muted-foreground">目标位:</span>
+            </div>
             {result.targets.map((target, index) => {
               // 目标1显示为保本，其他显示正常的风险回报比
               const isBreakeven = index === 0 || target.isBreakeven;
@@ -228,21 +219,38 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
               const displayText = isBreakeven ? '保本' : `目标${index + 1}`;
               
               return (
-                <div key={index} className="flex items-center justify-between pl-4">
-                  <span className="text-xs text-muted-foreground">
+                <div 
+                  key={index} 
+                  className={`flex items-center justify-between pl-4 pr-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm group ${
+                    isBreakeven 
+                      ? 'hover:bg-blue-50 dark:hover:bg-blue-950/50' 
+                      : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+                  }`}
+                  onClick={() => copyToClipboard(formatPrice(target.price), `target-${index}-row`)}
+                  title={`点击复制${displayText}价格`}
+                >
+                  <span className={`text-xs text-muted-foreground transition-colors ${
+                    isBreakeven 
+                      ? 'group-hover:text-blue-700 dark:group-hover:text-blue-300' 
+                      : 'group-hover:text-emerald-700 dark:group-hover:text-emerald-300'
+                  }`}>
                     {label}:
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className={`font-mono text-xs font-medium ${
-                      isBreakeven ? 'text-blue-600' : 'text-emerald-600'
+                    <span className={`font-mono text-xs font-medium transition-colors ${
+                      isBreakeven 
+                        ? 'text-blue-600 group-hover:text-blue-700 dark:group-hover:text-blue-400' 
+                        : 'text-emerald-600 group-hover:text-emerald-700 dark:group-hover:text-emerald-400'
                     }`}>
                       ${formatPrice(target.price)}
                     </span>
-                    <CopyButton 
-                      text={formatPrice(target.price)} 
-                      itemKey={`target-${index}`} 
-                      label={displayText}
-                    />
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Copy className={`w-3 h-3 ${
+                        isBreakeven 
+                          ? 'text-blue-600 dark:text-blue-400' 
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`} />
+                    </div>
                   </div>
                 </div>
               );
