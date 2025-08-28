@@ -77,12 +77,15 @@ export interface CalcInput {
 
 export interface CalcResult {
   qtyRaw: string;
-  qtyRounded: string;
-  notional: string;
+  qty?: number; // Original quantity as number for calculations
+  qtyRounded: string | number;
+  notional: string | number;
   initialMargin?: string;
+  margin?: string | number; // Alias for initialMargin
   entryPrice: string; // Store the entry price used in calculation
   stopPrice: string;
   liquidationPrice?: string;
+  leverage?: string | number;
   // Take profit result
   takeProfitPrice?: string;
   takeProfitPriceFormatted?: string;
@@ -150,6 +153,7 @@ export interface CalcResult {
   qtyRoundedFormatted: string;
   stopPriceFormatted: string;
   liquidationPriceFormatted?: string;
+  leverageUsed?: number; // Actual leverage being used
 }
 
 export interface KlineData {

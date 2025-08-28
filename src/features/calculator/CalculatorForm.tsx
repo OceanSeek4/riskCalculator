@@ -1079,7 +1079,27 @@ export function CalculatorForm() {
         rrRatios: settings.rrRatios,
       };
       
+      console.log('📊 Calculation Input:', input);
+      
+      // Validate critical fields before calculation
+      if (!input.entryPrice) {
+        throw new Error('Entry price is required');
+      }
+      if (input.stopMode === 'PRICE' && !input.stopPrice) {
+        throw new Error('Stop price is required for PRICE stop mode');
+      }
+      if (input.stopMode === 'ATR' && (!input.atr || !input.atrMultiplier)) {
+        throw new Error('ATR value and multiplier are required for ATR stop mode');
+      }
+      if (input.riskMode === 'FIXED_USDT' && !input.riskUSDT) {
+        throw new Error('Risk amount in USDT is required for fixed USDT mode');
+      }
+      if (input.riskMode === 'ACCOUNT_PERCENT' && (!input.accountEquity || !input.riskPercent)) {
+        throw new Error('Account equity and risk percentage are required for percentage mode');
+      }
+      
       const result = calculatePosition(input);
+      console.log('✅ Calculation Result:', result);
       setResult(result);
       
       // Scroll to top to show calculation results
@@ -1090,13 +1110,24 @@ export function CalculatorForm() {
         });
       }, 100);
     } catch (error) {
-      setCalculationError(error instanceof Error ? error.message : t('calculationFailed'));
+      console.error('❌ Calculation Error:', error);
+      const errorMessage = error instanceof Error ? error.message : t('calculationFailed');
+      console.error('Error details:', errorMessage);
+      setCalculationError(errorMessage);
       throw error; // Re-throw so caller can handle it
     }
   };
 
   const handleCalculate = async () => {
-    if (!validateForm() || !marketMeta) return;
+    if (!validateForm()) {
+      setCalculationError(t('pleaseFixValidationErrors'));
+      return;
+    }
+    
+    if (!marketMeta) {
+      setCalculationError(t('marketMetadataRequired'));
+      return;
+    }
     
     setIsCalculating(true);
     setCalculationError(null);

@@ -325,6 +325,8 @@ const resources = {
       failedToFetchATR: 'Failed to fetch ATR data',
       copiedToClipboard: 'Copied to clipboard',
       clickToCopy: 'Click to copy value',
+      pleaseFixValidationErrors: 'Please fix form validation errors before calculating',
+      marketMetadataRequired: 'Market metadata is required. Please wait for automatic loading or refresh the form.',
       
       // Market Data
       fetchingPrice: 'Fetching current price...',
@@ -427,6 +429,8 @@ const resources = {
       netProfit: 'Net Profit',
       
       // Fee Types
+      fees: 'Fees',
+      takeProfit: 'Take Profit',
       feeTypeAllMaker: 'All Maker',
       feeTypeAllTaker: 'All Taker',
       feeTypeMakerOpenTakerClose: 'Maker Open/Taker Close',
@@ -447,6 +451,31 @@ const resources = {
       riskPercent: 'Risk Percent',
       feeType: 'Fee Type',
       multiplier: 'Multiplier',
+      
+      // Risk Warning Card
+      riskWarnings: 'Risk Warnings',
+      riskRatio: 'Risk Ratio',
+      leverageMultiple: 'Leverage Multiple',
+      detectedRiskWarnings: 'Detected {count} risk warnings:',
+      moreWarnings: '+{count} more warnings...',
+      noMajorRisks: '✅ No major risks detected',
+      positionRelativelySafe: 'Current position settings are relatively safe',
+      estimatedPnL: 'Estimated P&L',
+      maximumLoss: 'Maximum Loss',
+      targetProfit: 'Target Profit',
+      
+      // Calculation Breakdown Cards
+      stopLossBreakdown: 'Stop Loss Calculation Breakdown',
+      takeProfitBreakdown: 'Take Profit Calculation Breakdown',
+      openingFee: 'Opening Fee',
+      stopLossFee: 'Stop Loss Fee',
+      takeProfitFee: 'Take Profit Fee',
+      slippageCost: 'Slippage Cost',
+      rebateSavings: 'Rebate Savings',
+      totalRiskAmount: 'Total Risk Amount',
+      netProfitAmount: 'Net Profit Amount',
+      rebatePercentage: 'Rebate Percentage',
+      savingsAmount: 'Savings Amount',
       
       // Trailing Exits
       trailingExits: {
@@ -828,6 +857,8 @@ const resources = {
       failedToFetchATR: '获取ATR数据失败',
       copiedToClipboard: '已复制到剪贴板',
       clickToCopy: '点击复制数值',
+      pleaseFixValidationErrors: '请在计算前修复表单验证错误',
+      marketMetadataRequired: '需要市场元数据。请等待自动加载或刷新表单。',
       
       // Market Data
       fetchingPrice: '正在获取当前价格...',
@@ -930,6 +961,8 @@ const resources = {
       netProfit: '净盈利',
       
       // Fee Types
+      fees: '费率设置',
+      takeProfit: '止盈设置',
       feeTypeAllMaker: '全部Maker',
       feeTypeAllTaker: '全部Taker',
       feeTypeMakerOpenTakerClose: '开仓Maker',
@@ -950,6 +983,31 @@ const resources = {
       riskPercent: '风险百分比',
       feeType: '费率类型',
       multiplier: '倍数',
+      
+      // Risk Warning Card
+      riskWarnings: '风险提醒',
+      riskRatio: '风险比例',
+      leverageMultiple: '杠杆倍数',
+      detectedRiskWarnings: '检测到 {count} 个风险提醒:',
+      moreWarnings: '+{count} 条更多警告...',
+      noMajorRisks: '✅ 未发现重大风险',
+      positionRelativelySafe: '当前仓位设置相对安全',
+      estimatedPnL: '预估盈亏',
+      maximumLoss: '最大损失',
+      targetProfit: '目标盈利',
+      
+      // Calculation Breakdown Cards
+      stopLossBreakdown: '止损计算分解',
+      takeProfitBreakdown: '止盈计算分解',
+      openingFee: '开仓手续费',
+      stopLossFee: '止损手续费',
+      takeProfitFee: '止盈手续费',
+      slippageCost: '滑点成本',
+      rebateSavings: '返佣节省',
+      totalRiskAmount: '总风险金额',
+      netProfitAmount: '净盈利金额',
+      rebatePercentage: '返佣比例',
+      savingsAmount: '节省金额',
       
       // Trailing Exits
       trailingExits: {

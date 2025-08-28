@@ -191,7 +191,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
         {result.takeProfitPrice && (
           <div 
             className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-all duration-200 hover:shadow-sm group"
-            onClick={() => copyToClipboard(formatPrice(result.takeProfitPrice), 'takeProfitPrice-row')}
+            onClick={() => copyToClipboard(formatPrice(result.takeProfitPrice || '0'), 'takeProfitPrice-row')}
             title="点击复制止盈价格"
           >
             <span className="text-sm text-muted-foreground group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">止盈价格:</span>

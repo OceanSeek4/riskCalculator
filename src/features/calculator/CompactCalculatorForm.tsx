@@ -59,6 +59,8 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [marketMeta, setMarketMeta] = useState<any>(null);
   const [showSavedParams, setShowSavedParams] = useState(true);
   const [showTrailingPanel, setShowTrailingPanel] = useState(false);
+  const [keepOriginalStopPrice, setKeepOriginalStopPrice] = useState(false);
+  const [lockedStopPrice, setLockedStopPrice] = useState<string | null>(null);
   
   // 实时价格显示的独立状态（不受锁定影响）
   const [displayPrice, setDisplayPrice] = useState<string>('');
@@ -333,7 +335,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         case 'ATR':
           // 基于ATR计算止损
           if (currentATR && savedCalculationParams.atrMultiplier) {
-            const atrValue = currentATR;
+            const atrValue = parseFloat(currentATR);
             const multiplier = parseFloat(savedCalculationParams.atrMultiplier);
             const atrDistance = atrValue * multiplier;
             
@@ -507,14 +509,32 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
       }
 
       // 使用保存的参数和当前的价格、订单类型进行计算
+      // 止损价格处理逻辑：
+      // 1. 如果锁定原止损价格选项开启，直接使用保存的止损设置
+      // 2. 如果用户手动输入了止损价格，则强制使用PRICE模式
+      // 3. 如果止损价格为空，则沿用原本的止损价格不做更改
+      let effectiveStopMode: 'PRICE' | 'ATR' | 'PIPS';
+      let effectiveStopPrice: string | undefined;
+      
+      if (keepOriginalStopPrice && lockedStopPrice) {
+        // 锁定当前结果中的止损价格数值，强制使用PRICE模式
+        effectiveStopMode = 'PRICE';
+        effectiveStopPrice = lockedStopPrice;
+      } else {
+        // 正常逻辑：支持手动输入覆盖
+        const userInputStopPrice = formData.stopPrice;
+        effectiveStopMode = userInputStopPrice ? 'PRICE' : ((savedCalculationParams.stopMode || 'ATR') as 'PRICE' | 'ATR' | 'PIPS');
+        effectiveStopPrice = userInputStopPrice || savedCalculationParams.stopPrice;
+      }
+      
       const input = {
         side: savedCalculationParams.side!,
         entryPrice: formData.entryPrice!,
-        stopPrice: savedCalculationParams.stopPrice,
+        stopPrice: effectiveStopPrice,
         atr: atrValue || undefined,
         atrMultiplier: savedCalculationParams.atrMultiplier,
         stopPips: savedCalculationParams.stopPips,
-        stopMode: savedCalculationParams.stopMode || 'ATR',
+        stopMode: effectiveStopMode,
         useTakeProfit: savedCalculationParams.useTakeProfit || false,
         takeProfitMode: savedCalculationParams.takeProfitMode,
         takeProfitPrice: savedCalculationParams.takeProfitPrice,
@@ -779,23 +799,64 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
 
         {/* 止损设置 */}
         <div className="space-y-2">
-          <Label htmlFor="stopPrice">止损价格</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="stopPrice">止损价格</Label>
+            <Button
+              type="button"
+              variant={keepOriginalStopPrice ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                if (!keepOriginalStopPrice) {
+                  // 锁定时：使用当前结果中的止损价格
+                  const currentStopPrice = result?.stopPrice || savedCalculationParams.stopPrice || null;
+                  setLockedStopPrice(currentStopPrice);
+                  setKeepOriginalStopPrice(true);
+                } else {
+                  // 解锁时：清除锁定的止损价格
+                  setLockedStopPrice(null);
+                  setKeepOriginalStopPrice(false);
+                }
+              }}
+              className={`flex items-center gap-2 text-xs px-3 ${
+                keepOriginalStopPrice 
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                  : 'border-gray-300'
+              }`}
+              title={keepOriginalStopPrice ? '解锁止损价格修改' : '锁定当前结果中的止损价格'}
+              disabled={!result && !savedCalculationParams.stopPrice}
+            >
+              {keepOriginalStopPrice ? (
+                <>
+                  <Lock className="w-3 h-3" />
+                  锁定止损
+                </>
+              ) : (
+                <>
+                  <Unlock className="w-3 h-3" />
+                  可修改止损
+                </>
+              )}
+            </Button>
+          </div>
           <div className="flex gap-2">
             <Input
               id="stopPrice"
               type="text"
               value={formData.stopPrice || ''}
               onChange={(e) => handleInputChange('stopPrice', e.target.value)}
-              placeholder="输入止损价格"
-              className="flex-1"
+              placeholder={keepOriginalStopPrice ? "已锁定原止损设置" : "输入止损价格"}
+              className={`flex-1 ${keepOriginalStopPrice ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' : ''}`}
+              disabled={keepOriginalStopPrice}
+              readOnly={keepOriginalStopPrice}
             />
             {/* 快速设置按钮 */}
             <Button
               type="button"
               variant="outline"
               onClick={handleQuickStopSet}
+              disabled={keepOriginalStopPrice}
               className="flex items-center gap-2 px-4 whitespace-nowrap"
-              title={`快速设置止损 (${getStopModeDescription()})`}
+              title={keepOriginalStopPrice ? "已锁定原止损设置" : `快速设置止损 (${getStopModeDescription()})`}
             >
               <Calculator className="w-4 h-4" />
               <span className="text-xs whitespace-nowrap">
@@ -805,7 +866,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           </div>
           
           {/* 价格止损模式的快速设置按钮组 */}
-          {savedCalculationParams.stopMode === 'PRICE' && (
+          {savedCalculationParams.stopMode === 'PRICE' && !keepOriginalStopPrice && (
             <div className="flex gap-1 flex-wrap">
               <Button
                 type="button"
@@ -848,6 +909,13 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
                 3%
               </Button>
             </div>
+          )}
+          
+          {/* 锁定状态提示 */}
+          {keepOriginalStopPrice && lockedStopPrice && (
+            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-1">
+              🔒 已锁定结果中的止损价格 ({lockedStopPrice}) - 重新计算时将使用此固定价格
+            </p>
           )}
           
           {formErrors.stopPrice && (
