@@ -17,6 +17,7 @@ import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/c
 import { CandleManager, timeframeToMs } from '@/lib/candles';
 import { EntrySection } from './sections/EntrySection';
 import { TakeProfitSection } from './components/form/TakeProfitSection';
+import { LeverageSection } from './components/form/LeverageSection';
 export function CalculatorForm() {
   const {
     formData,
@@ -1860,19 +1861,10 @@ export function CalculatorForm() {
         </div>
 
         {/* Leverage (for contracts) */}
-        {formData.contractMode !== 'SPOT' && (
-          <div>
-            <Label>{t('leverage')}</Label>
-            <Input
-              type="number"
-              min="1"
-              max="200"
-              value={formData.leverage || ''}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('leverage', parseInt(e.target.value))}
-              placeholder={t('autoSuggestLeverage')}
-            />
-          </div>
-        )}
+        <LeverageSection
+          formData={formData}
+          onInputChange={handleInputChange}
+        />
 
         {/* Advanced Options */}
         {settings.showAdvancedOptions && (
