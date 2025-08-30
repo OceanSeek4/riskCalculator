@@ -130,7 +130,7 @@ export function CalculatorForm() {
     if (formData.orderType === 'MARKET' && realTimePrice) {
       setLockedPrice(realTimePrice);
       setIsPriceLocked(true);
-      setFormData(currentFormData => ({ ...currentFormData, entryPrice: realTimePrice }));
+      setFormData({ entryPrice: realTimePrice });
     }
   };
 
@@ -139,7 +139,7 @@ export function CalculatorForm() {
     setLockedPrice(null);
     // Resume real-time price updates
     if (formData.orderType === 'MARKET' && realTimePrice) {
-      setFormData(currentFormData => ({ ...currentFormData, entryPrice: realTimePrice }));
+      setFormData({ entryPrice: realTimePrice });
     }
   };
 
@@ -147,7 +147,7 @@ export function CalculatorForm() {
     if (isPriceLocked) {
       setLockedPrice(newPrice);
     }
-    setFormData(currentFormData => ({ ...currentFormData, entryPrice: newPrice }));
+    setFormData({ entryPrice: newPrice });
   };
   
   // Reset price change indicator after 2 seconds
@@ -921,13 +921,9 @@ export function CalculatorForm() {
       setRealTimePrice(newPrice);
       setLastPriceUpdate(new Date());
       // Only update form data if it's a market order and price is not locked
-      // Use a callback to ensure we get the latest state
-      setFormData(currentFormData => {
-        if (currentFormData.orderType === 'MARKET' && !isPriceLocked) {
-          return { ...currentFormData, entryPrice: newPrice };
-        }
-        return currentFormData;
-      });
+      if (formData.orderType === 'MARKET' && !isPriceLocked) {
+        setFormData({ entryPrice: newPrice });
+      }
       setPriceError('');
     } catch (error) {
       if (!String(error).includes('invoke')) {
