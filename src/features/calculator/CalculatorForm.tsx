@@ -15,13 +15,15 @@ import { useTranslation } from 'react-i18next';
 import { TrailingPanel } from './TrailingPanelWrapper';
 import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/core/trailing';
 import { CandleManager, timeframeToMs } from '@/lib/candles';
-import { EntrySection } from './sections/EntrySection';
-import { TakeProfitSection } from './components/form/TakeProfitSection';
-import { LeverageSection } from './components/form/LeverageSection';
-import { ActionButtonsSection } from './components/form/ActionButtonsSection';
-import { MarketSection } from './sections/MarketSection';
-import { RiskSection } from './sections/RiskSection';
-import { StopSection } from './sections/StopSection';
+import { 
+  EntrySection, 
+  TakeProfitSection, 
+  LeverageSection, 
+  ActionButtonsSection,
+  MarketSection,
+  RiskSection,
+  StopSection
+} from './components/form';
 export function CalculatorForm() {
   const {
     formData,
