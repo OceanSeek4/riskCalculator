@@ -18,6 +18,10 @@ import { CandleManager, timeframeToMs } from '@/lib/candles';
 import { EntrySection } from './sections/EntrySection';
 import { TakeProfitSection } from './components/form/TakeProfitSection';
 import { LeverageSection } from './components/form/LeverageSection';
+import { ActionButtonsSection } from './components/form/ActionButtonsSection';
+import { MarketSection } from './sections/MarketSection';
+import { RiskSection } from './sections/RiskSection';
+import { StopSection } from './sections/StopSection';
 export function CalculatorForm() {
   const {
     formData,
@@ -2069,27 +2073,12 @@ export function CalculatorForm() {
         )}
 
         {/* Calculate Button */}
-        <Button
-          onClick={handleCalculate}
-          disabled={isCalculating || !marketMeta}
-          className="w-full"
-        >
-          {isCalculating ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              {t('calculating')}
-            </>
-          ) : (
-            t('calculatePosition')
-          )}
-        </Button>
-
-        {calculationError && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-            <AlertCircle className="w-4 h-4" />
-            {calculationError}
-          </div>
-        )}
+        <ActionButtonsSection
+          onCalculate={handleCalculate}
+          isCalculating={isCalculating}
+          marketMeta={marketMeta}
+          calculationError={calculationError}
+        />
       </CardContent>
     </Card>
   );
