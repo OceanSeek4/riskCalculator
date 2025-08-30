@@ -92,6 +92,12 @@ const resources = {
       lockedAtCalculation: 'Locked at calculation',
       priceLocked: 'Price locked for calculation',
       priceUnlocked: 'Price unlocked - real-time updates resumed',
+      lockPrice: 'Lock price',
+      unlockPrice: 'Unlock price',
+      realTimePriceUpdating: 'Real-time price updating',
+      clickUnlockToResumeUpdates: 'Click unlock button to resume real-time updates',
+      clickLockToFixPrice: 'Click lock button to fix price',
+      marketOrderAutoUsesTaker: 'Market orders automatically use Taker rates and slippage costs',
       takeProfitMAPeriod: 'MA Period',
       takeProfitMATimeframe: 'MA Timeframe',
       expectedTakeProfit: 'Expected Take Profit',
@@ -152,6 +158,7 @@ const resources = {
       calculatePosition: 'Calculate Position',
       calculating: 'Calculating...',
       copyOrderSummary: 'Copy Order Summary',
+      quickCopy: 'Quick Copy',
       
       // Results
       results: 'Results',
@@ -436,6 +443,12 @@ const resources = {
       feeTypeMakerOpenTakerClose: 'Maker Open/Taker Close',
       feeTypeMakerOpenOnly: 'Maker Open Only',
       
+      // Fee type descriptions
+      feeTypeAllMakerDesc: 'All use Maker rates, low cost and no slippage',
+      feeTypeAllTakerDesc: 'All use Taker rates, fast execution but higher cost',
+      feeTypeMakerOpenTakerCloseDesc: 'Opening Maker + Take Profit Maker + Stop Loss Taker, balanced cost and execution',
+      feeTypeMakerOpenOnlyDesc: 'Only opening uses Maker rate, closing uses Taker rate',
+      
       // Risk Mode
       accountPercent: 'Account Percent',
       fixedAmount: 'Fixed Amount',
@@ -450,6 +463,10 @@ const resources = {
       enabled: 'Enabled',
       riskPercent: 'Risk Percent',
       feeType: 'Fee Type',
+      allMaker: 'All Maker',
+      allTaker: 'All Taker', 
+      makerOpenTakerClose: 'Maker Open/Taker Close',
+      makerOpenOnly: 'Maker Open Only',
       multiplier: 'Multiplier',
       
       // Risk Warning Card
@@ -623,6 +640,12 @@ const resources = {
       lockedAtCalculation: '计算时锁定',
       priceLocked: '计算价格已锁定',
       priceUnlocked: '价格已解锁 - 恢复实时更新',
+      lockPrice: '锁定价格',
+      unlockPrice: '解锁价格',
+      realTimePriceUpdating: '实时价格自动更新中',
+      clickUnlockToResumeUpdates: '点击解锁按钮恢复实时更新',
+      clickLockToFixPrice: '点击锁定按钮固定价格',
+      marketOrderAutoUsesTaker: '市价单自动使用 Taker 费率和滑点成本',
       takeProfitMAPeriod: '均线周期',
       takeProfitMATimeframe: '均线时间框架',
       expectedTakeProfit: '预期止盈',
@@ -683,6 +706,7 @@ const resources = {
       calculatePosition: '计算仓位',
       calculating: '计算中...',
       copyOrderSummary: '复制订单摘要',
+      quickCopy: '快速复制',
       
       // Results
       results: '结果',
@@ -968,6 +992,12 @@ const resources = {
       feeTypeMakerOpenTakerClose: '开仓Maker',
       feeTypeMakerOpenOnly: '仅开仓Maker',
       
+      // Fee type descriptions
+      feeTypeAllMakerDesc: '全部使用Maker费率，低成本且无滑点',
+      feeTypeAllTakerDesc: '全部使用Taker费率，快速成交但成本较高',
+      feeTypeMakerOpenTakerCloseDesc: '开仓Maker + 止盈Maker + 止损Taker，平衡成本与执行',
+      feeTypeMakerOpenOnlyDesc: '仅开仓Maker，平仓使用Taker费率',
+      
       // Risk Mode
       accountPercent: '账户百分比',
       fixedAmount: '固定金额',
@@ -982,6 +1012,10 @@ const resources = {
       enabled: '已启用',
       riskPercent: '风险百分比',
       feeType: '费率类型',
+      allMaker: '全部Maker',
+      allTaker: '全部Taker',
+      makerOpenTakerClose: '开仓Maker止损Taker', 
+      makerOpenOnly: '仅开仓Maker',
       multiplier: '倍数',
       
       // Risk Warning Card

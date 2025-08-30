@@ -254,13 +254,13 @@ export function ResultCard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
               <DollarSign className="w-5 h-5" />
-              入场信息
+              {t('entrySettings')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 入场价格 */}
             <div className="text-center">
-              <p className="text-xs text-muted-foreground mb-1">入场价格</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('entryPrice')}</p>
               <p className="text-2xl font-bold font-mono text-blue-900 dark:text-blue-100">
                 ${formatPrice(result.entryPrice || formData.entryPrice)}
               </p>
@@ -272,7 +272,7 @@ export function ResultCard() {
                       ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
                       : 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
                   }`}>
-                    {isPriceLocked ? '🔒 已锁定' : '📈 实时价格'}
+                    {isPriceLocked ? '🔒 Locked' : '📈 Real-time'}
                   </span>
                 )}
                 {formData.orderType === 'LIMIT' && (
@@ -286,21 +286,21 @@ export function ResultCard() {
             {/* 基本信息 */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">交易所:</span>
+                <span className="text-muted-foreground">{t('exchange')}:</span>
                 <span className="font-medium">{formData.exchange}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">交易对:</span>
+                <span className="text-muted-foreground">{t('symbol')}:</span>
                 <span className="font-medium">{formData.symbol}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">方向:</span>
+                <span className="text-muted-foreground">{t('side')}:</span>
                 <span className={`font-medium ${formData.side === 'LONG' ? 'text-green-600' : 'text-red-600'}`}>
-                  {formData.side === 'LONG' ? '📈 做多' : '📉 做空'}
+                  {formData.side === 'LONG' ? `📈 ${t('long')}` : `📉 ${t('short')}`}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">杠杆:</span>
+                <span className="text-muted-foreground">{t('leverage')}:</span>
                 <span className="font-medium">{result.leverage ? (typeof result.leverage === 'string' ? parseFloat(result.leverage) : result.leverage) : formData.leverage || '1'}x</span>
               </div>
             </div>
@@ -312,34 +312,34 @@ export function ResultCard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-300">
               <Calculator className="w-5 h-5" />
-              仓位规模
+              {t('positionSize')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 开仓数量 */}
             <div className="text-center">
-              <p className="text-xs text-muted-foreground mb-1">开仓数量</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('roundedQuantity')}</p>
               <p className="text-2xl font-bold font-mono text-green-900 dark:text-green-100">
                 {formatQuantity(result.qtyRounded)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                (原始: {formatQuantity(result.qty)})
+                (Raw: {formatQuantity(result.qty)})
               </p>
             </div>
             
             {/* 仓位信息 */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">名义价值:</span>
+                <span className="text-muted-foreground">{t('notionalValue')}:</span>
                 <span className="font-medium">${formatUSDT(result.notional)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">初始保证金:</span>
+                <span className="text-muted-foreground">{t('initialMargin')}:</span>
                 <span className="font-medium">${formatUSDT(result.margin || result.initialMargin)}</span>
               </div>
               {result.leverageUsed && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">实际杠杆:</span>
+                  <span className="text-muted-foreground">{t('leverage')} Used:</span>
                   <span className="font-medium">{result.leverageUsed.toFixed(2)}x</span>
                 </div>
               )}
@@ -347,33 +347,33 @@ export function ResultCard() {
           </CardContent>
         </Card>
 
-        {/* 3. 风险管理卡片 */}
+        {/* 3. Risk Management Card */}
         <Card className="col-span-1 bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-950 dark:to-rose-950 border-red-200 dark:border-red-800 hover:shadow-lg transition-all duration-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300">
               <AlertTriangle className="w-5 h-5" />
-              风险管理
+              {t('riskManagement')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 止损价格 */}
             <div className="text-center">
-              <p className="text-xs text-muted-foreground mb-1">止损价格</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('stopLoss')}</p>
               <p className="text-2xl font-bold font-mono text-red-900 dark:text-red-100">
                 ${formatPrice(result.stopPrice)}
               </p>
             </div>
             
-            {/* 风险信息 */}
+            {/* Risk Information */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">最大损失:</span>
+                <span className="text-muted-foreground">{t('maximumLoss')}:</span>
                 <span className="font-medium text-red-600">
                   ${formatUSDT(result.stopLossRisk)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">止损距离:</span>
+                <span className="text-muted-foreground">{t('stopDistance')}:</span>
                 <span className="font-medium">
                   {result.stopPrice && result.entryPrice ? (Math.abs((parseFloat(result.stopPrice.toString()) - parseFloat(result.entryPrice || formData.entryPrice || '0')) / parseFloat(result.entryPrice || formData.entryPrice || '0')) * 100).toFixed(2) : '0.00'}%
                 </span>
@@ -381,7 +381,7 @@ export function ResultCard() {
               {result.liquidationPrice && (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">预估强平价:</span>
+                    <span className="text-muted-foreground">{t('estLiquidation')}:</span>
                     <span className="font-medium text-orange-600">
                       ${formatPrice(result.liquidationPrice)}
                     </span>
@@ -397,14 +397,14 @@ export function ResultCard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
               <Target className="w-5 h-5" />
-              盈利目标
+              {t('riskReward')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* 止盈价格 */}
             {result.takeProfitPrice ? (
               <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">主要止盈价格</p>
+                <p className="text-xs text-muted-foreground mb-1">Take Profit Price</p>
                 <p className="text-xl font-bold font-mono text-purple-900 dark:text-purple-100">
                   ${formatPrice(result.takeProfitPrice)}
                 </p>
@@ -413,32 +413,32 @@ export function ResultCard() {
               <div className="text-center">
                 <p className="text-xs text-muted-foreground mb-1">止盈设置</p>
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  已启用但未计算
+                  {t('enabled')} but not calculated
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  模式: {formData.takeProfitMode === 'PRICE' ? '价格' : 
+                  {t('takeProfitMode')}: {formData.takeProfitMode === 'PRICE' ? t('priceMode') : 
                          formData.takeProfitMode === 'ATR' ? 'ATR' :
-                         formData.takeProfitMode === 'RR_RATIO' ? '风险收益比' : '未设置'}
+                         formData.takeProfitMode === 'RR_RATIO' ? t('rrRatio') : 'Not set'}
                 </p>
               </div>
             ) : (
               <div className="text-center">
-                <p className="text-xs text-muted-foreground mb-1">止盈设置</p>
-                <p className="text-sm text-gray-500">未启用</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('takeProfit')}</p>
+                <p className="text-sm text-gray-500">Not enabled</p>
               </div>
             )}
             
-            {/* 目标位列表 */}
+            {/* Target List */}
             {result.targets && result.targets.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">风险收益比目标</p>
+                <p className="text-xs text-muted-foreground font-medium">{t('riskReward')}</p>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {result.targets.slice(0, 4).map((target, index) => {
                     const isBreakeven = index === 0 || target.isBreakeven;
                     return (
                       <div key={index} className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground">
-                          {isBreakeven ? '保本' : `目标${index + 1} (1:${target.rr})`}:
+                          {isBreakeven ? t('breakeven') : `Target ${index + 1} (1:${target.rr})`}:
                         </span>
                         <span className={`font-mono font-medium ${
                           isBreakeven ? 'text-blue-600' : 'text-emerald-600'
@@ -463,33 +463,33 @@ export function ResultCard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
               <DollarSign className="w-5 h-5" />
-              费率分析
+              {t('tradingFees')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">订单类型:</span>
+                <span className="text-muted-foreground">{t('orderType')}:</span>
                 <span className="font-medium">
-                  {formData.orderType === 'MARKET' ? '市价单' : '限价单'}
+                  {formData.orderType === 'MARKET' ? t('marketOrder') : t('limitOrder')}
                 </span>
               </div>
               {formData.orderType === 'LIMIT' && formData.feeType && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">费率策略:</span>
+                  <span className="text-muted-foreground">{t('feeType')}:</span>
                   <span className="font-medium text-xs">
-                    {formData.feeType === 'MAKER' ? '全部Maker' :
-                     formData.feeType === 'TAKER' ? '全部Taker' :
-                     formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? '开仓Maker' :
-                     '仅开仓Maker'}
+                    {formData.feeType === 'MAKER' ? t('feeTypeAllMaker') :
+                     formData.feeType === 'TAKER' ? t('feeTypeAllTaker') :
+                     formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? t('feeTypeMakerOpenTakerClose') :
+                     t('feeTypeMakerOpenOnly')}
                   </span>
                 </div>
               )}
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">费用计算:</span>
+                  <span className="text-muted-foreground">{t('fees')} Calc:</span>
                   <span className="font-medium">
-                    {formData.includeFees ? '已启用' : '未启用'}
+                    {formData.includeFees ? t('enabled') : 'Disabled'}
                   </span>
                 </div>
                 
@@ -549,7 +549,7 @@ export function ResultCard() {
                   </>
                 ) : (
                   <div className="text-xs text-muted-foreground text-center">
-                    未计算手续费成本
+                    No fee calculations included
                   </div>
                 )}
               </div>
@@ -585,7 +585,7 @@ export function ResultCard() {
               </div>
             </div>
             
-            {/* 风险警告 */}
+            {/* Risk Warnings */}
             {result.warnings && result.warnings.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
@@ -610,7 +610,7 @@ export function ResultCard() {
               </div>
             )}
             
-            {/* 预估盈亏简要信息 */}
+            {/* Estimated P&L Summary */}
             {result.takeProfitProfit && (
               <div className="pt-2 border-t space-y-1">
                 <div className="text-xs font-medium text-center">{t('estimatedPnL')}</div>
@@ -636,7 +636,7 @@ export function ResultCard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
               <Copy className="w-5 h-5" />
-              快速操作
+              Quick Actions
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -646,7 +646,7 @@ export function ResultCard() {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Copy className="w-4 h-4 mr-2" />
-              复制完整摘要
+              {t('copyOrderSummary')}
             </Button>
             
             {/* 快速复制主要信息 */}
@@ -654,42 +654,42 @@ export function ResultCard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleCopyValue(result.entryPrice || formData.entryPrice || '0', '入场价格')}
+                onClick={() => handleCopyValue(result.entryPrice || formData.entryPrice || '0', 'Entry Price')}
                 className="text-xs"
               >
-                复制入场价
+                Copy Entry
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleCopyValue(result.qtyRounded ? result.qtyRounded.toString() : '0', '开仓数量')}
+                onClick={() => handleCopyValue(result.qtyRounded ? result.qtyRounded.toString() : '0', 'Quantity')}
                 className="text-xs"
               >
-                复制数量
+                Copy Qty
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleCopyValue(result.stopPrice ? String(result.stopPrice) : '0', '止损价格')}
+                onClick={() => handleCopyValue(result.stopPrice ? String(result.stopPrice) : '0', 'Stop Price')}
                 className="text-xs"
               >
-                复制止损价
+                Copy Stop
               </Button>
               {result.takeProfitPrice && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleCopyValue(result.takeProfitPrice ? result.takeProfitPrice.toString() : '0', '止盈价格')}
+                  onClick={() => handleCopyValue(result.takeProfitPrice ? result.takeProfitPrice.toString() : '0', 'Take Profit Price')}
                   className="text-xs"
                 >
-                  复制止盈价
+                  Copy TP
                 </Button>
               )}
             </div>
             
             {/* 时间戳 */}
             <div className="text-xs text-muted-foreground text-center pt-2 border-t">
-              计算时间: {new Date().toLocaleString('zh-CN')}
+              Calculated: {new Date().toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -698,13 +698,13 @@ export function ResultCard() {
       {/* 第三行 - 详细计算分解 */}
       <div className="mt-6 grid grid-cols-1 xl:grid-cols-2 lg:grid-cols-1 gap-6">
         
-        {/* 止损详细分解卡片 */}
+        {/* Stop Loss Breakdown Card */}
         {result.riskBreakdown && (
           <Card className="bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-950 dark:to-rose-950 border-red-200 dark:border-red-800 hover:shadow-lg transition-all duration-200">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300">
                 <AlertTriangle className="w-5 h-5" />
-                止损计算分解
+                {t('stopLossBreakdown')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -732,7 +732,7 @@ export function ResultCard() {
                 
                 {result.riskBreakdown.slippageAmount && (
                   <div className="flex justify-between items-center p-2 bg-white/50 dark:bg-black/20 rounded">
-                    <span className="text-muted-foreground">滑点成本:</span>
+                    <span className="text-muted-foreground">{t('slippageCost')}:</span>
                     <span className="font-medium text-yellow-600">
                       ${formatUSDT(result.riskBreakdown.slippageAmount)}
                     </span>
@@ -772,7 +772,7 @@ export function ResultCard() {
           </Card>
         )}
         
-        {/* 止盈详细分解卡片 */}
+        {/* Take Profit Breakdown Card */}
         {result.profitBreakdown && result.takeProfitPrice && (
           <Card className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-950 dark:to-emerald-950 border-green-200 dark:border-green-800 hover:shadow-lg transition-all duration-200">
             <CardHeader className="pb-3">
@@ -842,7 +842,7 @@ export function ResultCard() {
                   </div>
                   {result.takeProfitRR && (
                     <div className="flex justify-between items-center text-sm mt-1">
-                      <span className="text-muted-foreground">风险收益比:</span>
+                      <span className="text-muted-foreground">{t('riskRewardRatio')}:</span>
                       <span className="font-medium">1:{result.takeProfitRR.toFixed(2)}</span>
                     </div>
                   )}

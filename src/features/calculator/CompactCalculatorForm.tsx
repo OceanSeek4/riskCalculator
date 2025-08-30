@@ -70,7 +70,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [displayPreviousPrice, setDisplayPreviousPrice] = useState<number>(0);
 
   // 保存当前计算时使用的所有参数（除了价格和订单类型）
-  const [savedCalculationParams] = useState(() => ({
+  const [baseSavedCalculationParams] = useState(() => ({
     exchange: formData.exchange,
     symbol: formData.symbol,
     contractMode: formData.contractMode,
@@ -108,6 +108,13 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     autoLeverage: formData.autoLeverage,
     maxEquityUsage: formData.maxEquityUsage,
   }));
+
+  // 动态合并当前表单数据与保存参数，用于显示和计算
+  const savedCalculationParams = React.useMemo(() => ({
+    ...baseSavedCalculationParams,
+    // 如果用户选择了新的费率类型，使用新的，否则使用保存的
+    feeType: formData.feeType || baseSavedCalculationParams.feeType,
+  }), [baseSavedCalculationParams, formData.feeType]);
 
   // 获取市场元数据
   React.useEffect(() => {
@@ -227,7 +234,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   }, [savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, displayPrice]);
 
   // 表单输入处理
-  const handleInputChange = (field: 'entryPrice' | 'orderType' | 'stopPrice', value: string) => {
+  const handleInputChange = (field: 'entryPrice' | 'orderType' | 'stopPrice' | 'feeType', value: string) => {
     if (field === 'entryPrice' || field === 'stopPrice') {
       const validationResult = validateNumberString(value, field);
       if (validationResult) {
@@ -561,7 +568,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         contractMode: savedCalculationParams.contractMode || 'USDT_PERP',
         marketMeta: marketMeta,
         orderType: formData.orderType || 'MARKET',
-        feeType: savedCalculationParams.feeType || 'MAKER_OPEN_TAKER_CLOSE',
+        feeType: formData.feeType || savedCalculationParams.feeType || 'MAKER_OPEN_TAKER_CLOSE',
         rrRatios: settings.rrRatios || [1, 1.5, 2],
       };
 
@@ -652,7 +659,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="flex items-center gap-2 whitespace-nowrap">
             <Calculator className="w-5 h-5 text-blue-600" />
-            快速重新计算
+            快速计算
           </CardTitle>
           <div className="flex gap-2 flex-wrap">
             {/* 显示/隐藏保存参数切换 */}
@@ -709,10 +716,49 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           </select>
         </div>
 
+        {/* 费率类型选择 - 限价单专用 */}
+        {formData.orderType === 'LIMIT' && (
+          <div className="space-y-2">
+            <Label htmlFor="feeType">{t('feeType')}</Label>
+            <select
+              value={formData.feeType || 'MAKER_OPEN_TAKER_CLOSE'}
+              onChange={(e) => handleInputChange('feeType', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="MAKER">{t('allMaker')}</option>
+              <option value="TAKER">{t('allTaker')}</option>
+              <option value="MAKER_OPEN_TAKER_CLOSE">{t('makerOpenTakerClose')}</option>
+              <option value="MAKER_OPEN_ONLY">{t('makerOpenOnly')}</option>
+            </select>
+            <div className="text-xs text-muted-foreground p-2 bg-gray-50 dark:bg-gray-800 rounded">
+              <div className="space-y-1">
+                <div>
+                  💡 {formData.feeType === 'MAKER' ? t('feeTypeAllMakerDesc') : 
+                      formData.feeType === 'TAKER' ? t('feeTypeAllTakerDesc') :
+                      formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? t('feeTypeMakerOpenTakerCloseDesc') :
+                      formData.feeType === 'MAKER_OPEN_ONLY' ? t('feeTypeMakerOpenOnlyDesc') : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Market Order Fee Info */}
+        {formData.orderType === 'MARKET' && (
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-yellow-600 dark:text-yellow-400">📊</span>
+              <span className="text-yellow-800 dark:text-yellow-200 font-medium">
+                {t('marketOrderAutoUsesTaker')}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 入场价格 */}
         <div className="space-y-2">
           <Label htmlFor="entryPrice">
-            入场价格
+            {t('entryPrice')}
           </Label>
           <div className="flex gap-2">
             <Input
@@ -800,7 +846,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         {/* 止损设置 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="stopPrice">止损价格</Label>
+            <Label htmlFor="stopPrice">{t('stopPrice')}</Label>
             <Button
               type="button"
               variant={keepOriginalStopPrice ? "default" : "outline"}
@@ -938,7 +984,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           ) : (
             <>
               <RotateCcw className="w-5 h-5 mr-2" />
-重新计算
+              {t('calculate')}
             </>
           )}
         </Button>

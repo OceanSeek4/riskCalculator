@@ -112,7 +112,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Copy className="w-4 h-4 text-purple-600" />
-            快速复制
+            {t('quickCopy')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -129,16 +129,16 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Copy className="w-4 h-4 text-purple-600" />
-          快速复制
+          {t('quickCopy')}
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
           点击任意行快速复制对应的交易信息
         </p>
       </CardHeader>
-      <CardContent className="space-y-1">
+      <CardContent className="space-y-3">
         {/* 入场价格 */}
         <div 
-          className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all duration-200 hover:shadow-sm group"
+          className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all duration-200 hover:shadow-sm group border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
           onClick={() => copyToClipboard(formatPrice(entryPrice), 'entryPrice-row')}
           title="点击复制入场价格"
         >
@@ -155,7 +155,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
 
         {/* 开仓数量 */}
         <div 
-          className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-green-50 dark:hover:bg-green-950/50 transition-all duration-200 hover:shadow-sm group"
+          className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-green-50 dark:hover:bg-green-950/50 transition-all duration-200 hover:shadow-sm group border border-transparent hover:border-green-200 dark:hover:border-green-800"
           onClick={() => copyToClipboard(formatQuantity(result.qtyRounded), 'quantity-row')}
           title="点击复制开仓数量"
         >
@@ -172,7 +172,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
 
         {/* 止损价格 */}
         <div 
-          className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/50 transition-all duration-200 hover:shadow-sm group"
+          className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/50 transition-all duration-200 hover:shadow-sm group border border-transparent hover:border-red-200 dark:hover:border-red-800"
           onClick={() => copyToClipboard(formatPrice(result.stopPrice), 'stopPrice-row')}
           title="点击复制止损价格"
         >
@@ -190,7 +190,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
         {/* 预期止盈价格 */}
         {result.takeProfitPrice && (
           <div 
-            className="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-all duration-200 hover:shadow-sm group"
+            className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-all duration-200 hover:shadow-sm group border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800"
             onClick={() => copyToClipboard(formatPrice(result.takeProfitPrice || '0'), 'takeProfitPrice-row')}
             title="点击复制止盈价格"
           >
@@ -208,9 +208,9 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
 
         {/* 目标位 */}
         {result.targets && result.targets.length > 0 && (
-          <div className="space-y-1">
-            <div className="px-2 py-1">
-              <span className="text-sm text-muted-foreground">目标位:</span>
+          <div className="space-y-2">
+            <div className="px-3 py-2">
+              <span className="text-sm text-muted-foreground font-medium">目标位:</span>
             </div>
             {result.targets.map((target, index) => {
               // 目标1显示为保本，其他显示正常的风险回报比
@@ -221,10 +221,10 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
               return (
                 <div 
                   key={index} 
-                  className={`flex items-center justify-between pl-4 pr-2 py-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm group ${
+                  className={`flex items-center justify-between px-4 py-3 ml-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-sm group border border-transparent ${
                     isBreakeven 
-                      ? 'hover:bg-blue-50 dark:hover:bg-blue-950/50' 
-                      : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+                      ? 'hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:border-blue-200 dark:hover:border-blue-800' 
+                      : 'hover:bg-emerald-50 dark:hover:bg-emerald-950/50 hover:border-emerald-200 dark:hover:border-emerald-800'
                   }`}
                   onClick={() => copyToClipboard(formatPrice(target.price), `target-${index}-row`)}
                   title={`点击复制${displayText}价格`}
@@ -259,7 +259,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
         )}
 
         {/* 全部复制按钮 */}
-        <div className="pt-3 border-t">
+        <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
           <Button
             variant="default"
             size="sm"
@@ -279,7 +279,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
               
               copyToClipboard(allInfo, 'all');
             }}
-            className="w-full text-xs"
+            className="w-full text-xs h-10 font-medium"
           >
             {copiedItems.has('all') ? (
               <>

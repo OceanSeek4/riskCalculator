@@ -309,13 +309,31 @@ export function CalculatorForm() {
     }
   }, [formData.exchange, formData.enableRebate, settings.defaultRebateBinance, settings.defaultRebateBybit, settings.defaultRebateBitget, settings.defaultRebateOkx]);
 
-  // 市价单实时价格更新已移除
-  // 市价单现在使用锁定价格进行计算，不再进行自动更新
+  // 市价单实时价格更新逻辑
   useEffect(() => {
     // Clear existing timer if any
     if (priceTimer) {
       clearInterval(priceTimer);
       setPriceTimer(null);
+    }
+
+    // Only start price updates for market orders in online mode with valid data
+    if (formData.orderType === 'MARKET' && 
+        !isOfflineMode && 
+        formData.exchange && 
+        formData.symbol && 
+        formData.contractMode &&
+        !isPriceLocked) {
+      
+      // Start immediate price fetch
+      fetchRealTimePrice();
+      
+      // Set up regular price updates every 3 seconds
+      const interval = setInterval(() => {
+        fetchRealTimePrice();
+      }, 3000);
+      
+      setPriceTimer(interval);
     }
 
     return () => {
@@ -324,7 +342,7 @@ export function CalculatorForm() {
         setPriceTimer(null);
       }
     };
-  }, [formData.orderType, formData.exchange, formData.symbol, formData.contractMode]);
+  }, [formData.orderType, formData.exchange, formData.symbol, formData.contractMode, isOfflineMode, isPriceLocked]);
 
   // 独立的价格显示更新逻辑（不受订单类型和锁定状态影响）
   useEffect(() => {
