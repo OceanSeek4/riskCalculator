@@ -88,9 +88,10 @@ export function SimplifiedCalculatorForm() {
       if (validationResult) {
         setFormErrors(prev => ({ ...prev, [field]: validationResult }));
         return;
-      } else {
+      } else {zge
         setFormErrors(prev => ({ ...prev, [field]: '' }));
       }
+
     }
 
     // Handle order type switching with price field synchronization

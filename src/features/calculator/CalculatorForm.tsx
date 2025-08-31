@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { ComboInput } from '@/components/ui/combo-input';
-import { RefreshCw, AlertCircle, Bookmark, Calculator, WifiOff, Check, X } from 'lucide-react';
+import { RefreshCw, AlertCircle, Bookmark, Calculator, WifiOff, Check, X, Zap } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore, usePresetStore } from '@/lib/store';
 import { calculatePosition } from '@/lib/core';
 import { validateNumberString, validateStopPrice, type CalculatorFormData } from '@/lib/validation';
@@ -1217,6 +1217,21 @@ export function CalculatorForm() {
               <Calculator className="w-5 h-5" />
             </div>
             <CardTitle className="text-xl">{t('calculator')}</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                // Switch to quick calculator tab
+                const quickTab = document.querySelector('[value="quick"]') as HTMLElement;
+                if (quickTab) {
+                  quickTab.click();
+                }
+              }}
+              className="flex items-center gap-1 text-xs"
+            >
+              <Zap className="w-3 h-3" />
+              {t('quickMode')}
+            </Button>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1 border rounded-full text-xs ${
             isOfflineMode 

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { CalculatorPageManager } from '@/features/calculator/CalculatorPageManager';
+import { QuickCalculatorPage } from '@/features/calculator/QuickCalculatorPage';
 import { SettingsForm } from '@/features/settings/SettingsForm';
 import { PresetManager } from '@/features/presets/PresetManager';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Calculator, Bookmark, Settings, TrendingUp, Shield, Globe2 } from 'lucide-react';
+import { Calculator, Bookmark, Settings, TrendingUp, Shield, Globe2, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { LanguageToggle } from '@/components/ui/language-toggle';
@@ -90,6 +91,13 @@ function App() {
                     {t('calculator')}
                   </TabsTrigger>
                   <TabsTrigger 
+                    value="quick" 
+                    className="flex items-center gap-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  >
+                    <Zap className="w-4 h-4" />
+                    {t('quickCalculator')}
+                  </TabsTrigger>
+                  <TabsTrigger 
                     value="presets" 
                     className="flex items-center gap-2 px-6 py-3 data-[state=active]:bg-background data-[state=active]:shadow-sm"
                   >
@@ -110,6 +118,10 @@ function App() {
                          <TabsContent value="calculator" className="space-y-6">
                <CalculatorPageManager />
              </TabsContent>
+
+            <TabsContent value="quick" className="space-y-6">
+              <QuickCalculatorPage />
+            </TabsContent>
 
             <TabsContent value="presets" className="flex justify-center">
               <PresetManager />
