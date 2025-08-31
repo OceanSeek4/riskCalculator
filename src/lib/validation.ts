@@ -12,6 +12,9 @@ export const calculatorFormSchema = z.object({
     .min(1, 'Entry price is required')
     .refine(val => !isNaN(Number(val)) && Number(val) > 0, 'Entry price must be a positive number'),
   
+  // Limit order specific price (separate from entryPrice to prevent auto-overwrite)
+  limitPrice: z.string().optional(),
+  
   // Stop loss settings
   stopMode: z.enum(['PRICE', 'ATR', 'PIPS']),
   stopPrice: z.string().optional(),

@@ -9,11 +9,10 @@ import { useState } from 'react';
 
 interface QuickCopyCardProps {
   result: CalcResult | null;
-  entryPrice: string;
   marketMeta?: MarketMeta | null;
 }
 
-export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardProps) {
+export function QuickCopyCard({ result, marketMeta }: QuickCopyCardProps) {
   const { t } = useTranslation();
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
 
@@ -139,13 +138,13 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
         {/* 入场价格 */}
         <div 
           className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all duration-200 hover:shadow-sm group border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
-          onClick={() => copyToClipboard(formatPrice(entryPrice), 'entryPrice-row')}
+          onClick={() => copyToClipboard(formatPrice(result.entryPrice), 'entryPrice-row')}
           title="点击复制入场价格"
         >
           <span className="text-sm text-muted-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">入场价格:</span>
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-medium group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-              ${formatPrice(entryPrice)}
+              ${formatPrice(result.entryPrice)}
             </span>
             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <Copy className="w-3 h-3 text-blue-600 dark:text-blue-400" />
@@ -265,7 +264,7 @@ export function QuickCopyCard({ result, entryPrice, marketMeta }: QuickCopyCardP
             size="sm"
             onClick={() => {
               const allInfo = [
-                `入场价格: $${formatPrice(entryPrice)}`,
+                `入场价格: $${formatPrice(result.entryPrice)}`,
                 `开仓数量: ${formatQuantity(result.qtyRounded)}`,
                 `止损价格: $${formatPrice(result.stopPrice)}`,
                 result.takeProfitPrice ? `止盈价格: $${formatPrice(result.takeProfitPrice)}` : '',

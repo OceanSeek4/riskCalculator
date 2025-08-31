@@ -1,3 +1,24 @@
+/**
+ * CalculatorForm - Main position size calculator component
+ * 
+ * Architecture: Modularized form with extracted sections for maintainability
+ * - MarketSection: Exchange/symbol selection
+ * - EntrySection: Price input and order configuration
+ * - StopSection: Stop loss settings (price/ATR)
+ * - RiskSection: Risk management inputs
+ * - TakeProfitSection: Profit target configuration  
+ * - LeverageSection: Contract leverage for perpetuals
+ * - ActionButtonsSection: Calculate button and error display
+ * 
+ * State: Uses Zustand store for form data and calculation results
+ * Validation: Real-time validation with user-friendly error messages
+ * 
+ * Key Features:
+ * - Professional fee control with 4 granular strategies
+ * - ATR-based stop loss calculation
+ * - Real-time price fetching with offline fallback
+ * - Comprehensive risk warnings and analysis
+ */
 import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,8 +36,10 @@ import { useTranslation } from 'react-i18next';
 import { TrailingPanel } from './TrailingPanelWrapper';
 import { calculateExpectedPnL, updateOnClose, type TrailingState } from '@/lib/core/trailing';
 import { CandleManager, timeframeToMs } from '@/lib/candles';
+import { getEffectiveEntryPrice as getUnifiedEffectiveEntryPrice } from './utils/effectivePrice';
+import { getEffectiveEntryPrice as getNewEffectiveEntryPrice } from './lib/price';
+import { usePriceLock } from './hooks/usePriceLock';
 import { 
-  EntrySection, 
   TakeProfitSection, 
   LeverageSection, 
   ActionButtonsSection,
@@ -24,6 +47,7 @@ import {
   RiskSection,
   StopSection
 } from './components/form';
+import { EntrySection } from './sections/EntrySection';
 export function CalculatorForm() {
   const {
     formData,
@@ -47,11 +71,6 @@ export function CalculatorForm() {
     setATRError,
     maError,
     setMAError,
-    // Price locking
-    isPriceLocked,
-    setIsPriceLocked,
-    lockedPrice,
-    setLockedPrice,
     // Real-time price state
     realTimePrice,
     setRealTimePrice,
@@ -59,6 +78,11 @@ export function CalculatorForm() {
     setLastPriceUpdate,
     priceChange,
     setPriceChange,
+    // Price binding mode
+    bindModeForEntry,
+    setBindModeForEntry,
+    lastManualAt,
+    setLastManualAt,
     // Trailing exits
     trailingEnabled,
     setTrailingEnabled,
@@ -72,6 +96,9 @@ export function CalculatorForm() {
     saveTrailingState,
     loadTrailingState,
   } = useCalculatorStore();
+
+  // NEW: Market price locking for MARKET orders
+  const priceLock = usePriceLock();
 
   const { 
     settings, 
@@ -134,30 +161,10 @@ export function CalculatorForm() {
     return parseFloat(percentage).toString();
   };
 
-  // Price locking handlers
-  const handleLockPrice = () => {
-    if (formData.orderType === 'MARKET' && realTimePrice) {
-      setLockedPrice(realTimePrice);
-      setIsPriceLocked(true);
-      setFormData({ entryPrice: realTimePrice });
-    }
-  };
-
-  const handleUnlockPrice = () => {
-    setIsPriceLocked(false);
-    setLockedPrice(null);
-    // Resume real-time price updates
-    if (formData.orderType === 'MARKET' && realTimePrice) {
-      setFormData({ entryPrice: realTimePrice });
-    }
-  };
-
-  const handleManualPriceChange = (newPrice: string) => {
-    if (isPriceLocked) {
-      setLockedPrice(newPrice);
-    }
-    setFormData({ entryPrice: newPrice });
-  };
+  // Clear price lock when switching exchanges/symbols/order types
+  useEffect(() => {
+    priceLock.unlock();
+  }, [formData.exchange, formData.symbol, formData.contractMode, formData.orderType]);
   
   // Reset price change indicator after 2 seconds
   useEffect(() => {
@@ -247,7 +254,7 @@ export function CalculatorForm() {
         handleInputChange('entryPrice', defaultPrice);
       }
     }
-  }, [isOfflineMode, formData.orderType, formData.entryPrice, settings.offlineDefaultEntryPrice]);
+  }, [isOfflineMode, formData.orderType, formData.entryPrice, formData.limitPrice, settings.offlineDefaultEntryPrice]);
 
   // 步骤4.3：初始化时水合持久化数据（追加）
   useEffect(() => {
@@ -318,7 +325,7 @@ export function CalculatorForm() {
     }
   }, [formData.exchange, formData.enableRebate, settings.defaultRebateBinance, settings.defaultRebateBybit, settings.defaultRebateBitget, settings.defaultRebateOkx]);
 
-  // 市价单实时价格更新逻辑
+  // 市价单实时价格更新逻辑 - 显示用，不影响计算锁定
   useEffect(() => {
     // Clear existing timer if any
     if (priceTimer) {
@@ -326,13 +333,13 @@ export function CalculatorForm() {
       setPriceTimer(null);
     }
 
-    // Only start price updates for market orders in online mode with valid data
+    // Start price updates for market orders in online mode with valid data
+    // Continue updating even when locked (for display purposes)
     if (formData.orderType === 'MARKET' && 
         !isOfflineMode && 
         formData.exchange && 
         formData.symbol && 
-        formData.contractMode &&
-        !isPriceLocked) {
+        formData.contractMode) {
       
       // Start immediate price fetch
       fetchRealTimePrice();
@@ -351,7 +358,7 @@ export function CalculatorForm() {
         setPriceTimer(null);
       }
     };
-  }, [formData.orderType, formData.exchange, formData.symbol, formData.contractMode, isOfflineMode, isPriceLocked]);
+  }, [formData.orderType, formData.exchange, formData.symbol, formData.contractMode, isOfflineMode]);
 
   // 独立的价格显示更新逻辑（不受订单类型和锁定状态影响）
   useEffect(() => {
@@ -873,7 +880,14 @@ export function CalculatorForm() {
         instType
       );
 
-      handleInputChange('entryPrice', price.toString());
+      // For limit orders, write to limitPrice; for market orders, write to entryPrice
+      if (formData.orderType === 'LIMIT') {
+        handleInputChange('limitPrice', price.toString());
+        setBindModeForEntry('manual');
+        setLastManualAt(Date.now());
+      } else {
+        handleInputChange('entryPrice', price.toString());
+      }
       setPriceError('');
     } catch (error) {
       if (!String(error).includes('invoke')) {
@@ -885,18 +899,14 @@ export function CalculatorForm() {
     }
   };
 
-  // Helper function to get the effective entry price for calculations
-  const getEffectiveEntryPrice = (): string => {
-    if (formData.orderType === 'MARKET') {
-      // If price is locked, use locked price; otherwise use real-time price
-      if (isPriceLocked && lockedPrice) {
-        return lockedPrice;
-      }
-      if (realTimePrice) {
-        return realTimePrice;
-      }
-    }
-    return formData.entryPrice || '';
+  // Helper function to get the effective entry price for display
+  const getEffectiveEntryPriceForDisplay = (): string => {
+    return getNewEffectiveEntryPrice({
+      orderType: formData.orderType as 'MARKET' | 'LIMIT',
+      limitPrice: formData.limitPrice,
+      marketRefPrice: realTimePrice,
+      lockedEntryPrice: priceLock.lockedEntryPrice
+    }).toString();
   };
 
   const fetchRealTimePrice = async () => {
@@ -929,8 +939,12 @@ export function CalculatorForm() {
 
       setRealTimePrice(newPrice);
       setLastPriceUpdate(new Date());
+      
+      // Check if user manually set limit price recently (15-second protection)
+      const isManualProtected = lastManualAt && (Date.now() - lastManualAt < 15000);
+      
       // Only update form data if it's a market order and price is not locked
-      if (formData.orderType === 'MARKET' && !isPriceLocked) {
+      if (formData.orderType === 'MARKET' && !priceLock.isLocked && bindModeForEntry === 'market' && !isManualProtected) {
         setFormData({ entryPrice: newPrice });
       }
       setPriceError('');
@@ -999,23 +1013,41 @@ export function CalculatorForm() {
   // Core calculation logic that can be shared between handleCalculate and handleQuickUpdate
   const performCalculation = async () => {
     
-    // For market orders, fetch the latest price and lock it for calculation
-    let lockedEntryPrice = formData.entryPrice!;
+    // Get effective entry price - lock market price if MARKET order
+    let calculationEntryPrice: number;
+    
     if (formData.orderType === 'MARKET') {
       try {
-        // Fetch the latest real-time price for calculation
+        // Lock current market price for MARKET orders
         const instType: any = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
         const latestPrice = await getCurrentPrice(
           formData.exchange as any,
           formData.symbol!,
           instType
         );
-        lockedEntryPrice = latestPrice.toString();
+        priceLock.lock(latestPrice);
+        calculationEntryPrice = latestPrice;
       } catch (error) {
-        // Silently fall back to current displayed price
-        lockedEntryPrice = formData.entryPrice!;
+        // Fall back to current real-time price
+        if (realTimePrice) {
+          const price = parseFloat(realTimePrice);
+          priceLock.lock(price);
+          calculationEntryPrice = price;
+        } else {
+          throw new Error('No market price available for MARKET order');
+        }
       }
+    } else {
+      // For limit orders, use input box value
+      calculationEntryPrice = getNewEffectiveEntryPrice({
+        orderType: formData.orderType as 'MARKET' | 'LIMIT',
+        limitPrice: formData.limitPrice,
+        marketRefPrice: realTimePrice,
+        lockedEntryPrice: null // No locking for LIMIT orders
+      });
     }
+    
+    const lockedEntryPrice = calculationEntryPrice.toString();
     
     // Calculate and store locked PIPS prices if in PIPS modes
     if (formData.stopMode === 'PIPS' || (formData.useTakeProfit && formData.takeProfitMode === 'PIPS')) {
@@ -1367,8 +1399,8 @@ export function CalculatorForm() {
           realTimePrice={realTimePrice}
           priceChange={priceChange}
           lastPriceUpdate={lastPriceUpdate ? new Date(lastPriceUpdate) : null}
-          isPriceLocked={isPriceLocked}
-          lockedPrice={lockedPrice}
+          isPriceLocked={priceLock.isLocked}
+          lockedPrice={priceLock.lockedEntryPrice?.toString() || null}
           isOfflineMode={isOfflineMode}
           isFetchingPrice={isFetchingPrice}
           priceError={priceError}
@@ -1378,12 +1410,14 @@ export function CalculatorForm() {
           isQuickUpdateClicked={isQuickUpdateClicked}
           quickUpdateSuccess={quickUpdateSuccess}
           settings={settings}
-          onLockPrice={handleLockPrice}
-          onUnlockPrice={handleUnlockPrice}
-          onManualPriceChange={handleManualPriceChange}
+          priceLock={priceLock}
           onQuickUpdate={handleQuickUpdate}
           onFetchCurrentPrice={fetchCurrentPrice}
           onSetNotification={setNotification}
+          bindModeForEntry={bindModeForEntry}
+          lastManualAt={lastManualAt}
+          onSetBindMode={setBindModeForEntry}
+          onSetLastManualAt={setLastManualAt}
         />
 
         {/* Stop Loss Settings */}
@@ -1579,14 +1613,14 @@ export function CalculatorForm() {
               <p className="text-xs text-muted-foreground mt-1">
                 {t('stopPipsHelp')}
               </p>
-              {formData.stopPips && getEffectiveEntryPrice() && marketMeta && (
+              {formData.stopPips && getEffectiveEntryPriceForDisplay() && marketMeta && (
                 <div className="mt-2 p-2 bg-muted rounded text-sm">
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">{t('calculatedStopPrice')}:</span>
                     <span className="font-mono font-medium text-red-600">
                       {(() => {
                         try {
-                          const effectiveEntryPrice = getEffectiveEntryPrice();
+                          const effectiveEntryPrice = getEffectiveEntryPriceForDisplay();
                           const entryPrice = parseFloat(effectiveEntryPrice);
                           const stopPips = parseFloat(formData.stopPips);
                           const tickSize = parseFloat(marketMeta.tickSize);
@@ -1605,15 +1639,23 @@ export function CalculatorForm() {
                       })()}
                     </span>
                   </div>
-                  {formData.orderType === 'MARKET' && realTimePrice && (
+                  {formData.orderType === 'MARKET' && (
                     <div className="text-xs text-muted-foreground mt-1">
-                      📈 {t('basedOnRealTimePrice')}: {realTimePrice}
-                      {priceChange && (
-                        <span className={`ml-1 ${
-                          priceChange === 'up' ? 'text-green-600' : 
-                          priceChange === 'down' ? 'text-red-600' : ''
-                        }`}>
-                          {priceChange === 'up' ? '↑' : priceChange === 'down' ? '↓' : ''}
+                      {priceLock.isLocked ? (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          🔒 计算锁定价格: {priceLock.lockedEntryPrice}
+                        </span>
+                      ) : realTimePrice && (
+                        <span>
+                          📈 {t('basedOnRealTimePrice')}: {realTimePrice}
+                          {priceChange && (
+                            <span className={`ml-1 ${
+                              priceChange === 'up' ? 'text-green-600' : 
+                              priceChange === 'down' ? 'text-red-600' : ''
+                            }`}>
+                              {priceChange === 'up' ? '↑' : priceChange === 'down' ? '↓' : ''}
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -1647,7 +1689,7 @@ export function CalculatorForm() {
           marketMeta={marketMeta}
           lockedPipsTakeProfitPrice={lockedPipsTakeProfitPrice}
           lockedEntryPriceForPips={lockedEntryPriceForPips}
-          getEffectiveEntryPrice={getEffectiveEntryPrice}
+          getEffectiveEntryPrice={getEffectiveEntryPriceForDisplay}
         />
 
         {/* Trailing Stop Settings */}

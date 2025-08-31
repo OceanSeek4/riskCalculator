@@ -586,20 +586,20 @@ export function ResultCard() {
             </div>
             
             {/* Risk Warnings */}
-            {result.warnings && result.warnings.length > 0 ? (
+            {result.warningKeys && result.warningKeys.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                  {t('detectedRiskWarnings', { count: result.warnings.length })}
+                  {t('detectedRiskWarnings', { count: result.warningKeys.length })}
                 </div>
-                {result.warnings.slice(0, 4).map((warning, index) => (
+                {result.warningKeys.slice(0, 4).map((warningKey, index) => (
                   <div key={index} className="flex items-start gap-2 p-2 bg-white/50 dark:bg-black/20 rounded text-xs">
                     <span className="text-yellow-600 mt-0.5">⚠️</span>
-                    <span className="text-yellow-800 dark:text-yellow-200">{warning}</span>
+                    <span className="text-yellow-800 dark:text-yellow-200">{t(warningKey)}</span>
                   </div>
                 ))}
-                {result.warnings.length > 4 && (
+                {result.warningKeys.length > 4 && (
                   <p className="text-xs text-muted-foreground text-center">
-                    {t('moreWarnings', { count: result.warnings.length - 4 })}
+                    {t('moreWarnings', { count: result.warningKeys.length - 4 })}
                   </p>
                 )}
               </div>

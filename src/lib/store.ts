@@ -68,6 +68,12 @@ interface CalculatorState {
   priceChange: 'up' | 'down' | 'same' | null;
   setPriceChange: (change: 'up' | 'down' | 'same' | null) => void;
   
+  // Price binding mode for limit order protection
+  bindModeForEntry: 'market' | 'manual';
+  setBindModeForEntry: (mode: 'market' | 'manual') => void;
+  lastManualAt: number | null;
+  setLastManualAt: (timestamp: number | null) => void;
+  
   // Trailing exits state
   trailingEnabled: boolean;
   setTrailingEnabled: (enabled: boolean) => void;
@@ -403,6 +409,12 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   setLastPriceUpdate: (date) => set({ lastPriceUpdate: date }),
   priceChange: null,
   setPriceChange: (change) => set({ priceChange: change }),
+  
+  // Price binding mode state
+  bindModeForEntry: 'market',
+  setBindModeForEntry: (mode) => set({ bindModeForEntry: mode }),
+  lastManualAt: null,
+  setLastManualAt: (timestamp) => set({ lastManualAt: timestamp }),
   
   // Trailing exits state
   trailingEnabled: false,

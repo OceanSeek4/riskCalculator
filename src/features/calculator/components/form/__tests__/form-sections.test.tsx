@@ -15,9 +15,9 @@ vi.mock('react-i18next', () => ({
 describe('Form Sections', () => {
   const mockProps = {
     formData: {
-      orderType: 'MARKET',
+      orderType: 'MARKET' as const,
       entryPrice: '50000',
-      contractMode: 'USDT_PERP'
+      contractMode: 'USDT_PERP' as const
     },
     onInputChange: vi.fn(),
     formErrors: {}
@@ -41,7 +41,7 @@ describe('Form Sections', () => {
   it('LeverageSection does not render for SPOT', () => {
     const spotProps = {
       ...mockProps,
-      formData: { ...mockProps.formData, contractMode: 'SPOT' }
+      formData: { ...mockProps.formData, contractMode: 'SPOT' as const }
     };
     const { container } = render(<LeverageSection {...spotProps} />);
     expect(container.firstChild).toBeNull();

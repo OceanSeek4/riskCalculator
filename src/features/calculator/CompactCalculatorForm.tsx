@@ -8,11 +8,15 @@ import { SavedParametersCard } from './components/SavedParametersCard';
 import { QuickCopyCard } from './components/QuickCopyCard';
 import { TrailingPanel } from './TrailingPanelWrapper';
 import { useCalculatorStore, useSettingsStore } from '@/lib/store';
+import { useEntryPriceBinding } from './hooks/useEntryPriceBinding';
 import { calculatePosition } from '@/lib/core';
 import { validateNumberString } from '@/lib/validation';
 import { getCurrentPrice, getATRValue, getMarketMeta } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
 import { useTranslation } from 'react-i18next';
+import { getEffectiveEntryPrice } from './utils/effectivePrice';
+import { getEffectiveEntryPrice as getNewEffectiveEntryPrice } from './lib/price';
+import { usePriceLock } from './hooks/usePriceLock';
 
 interface CompactCalculatorFormProps {
   onBackToFull: () => void;
@@ -30,11 +34,6 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     setIsCalculating,
     calculationError,
     setCalculationError,
-    // Price locking
-    isPriceLocked,
-    setIsPriceLocked,
-    lockedPrice,
-    setLockedPrice,
     // Real-time price state
     realTimePrice,
     setRealTimePrice,
@@ -50,8 +49,19 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     trailingState,
   } = useCalculatorStore();
 
+  // NEW: Market price locking
+  const priceLock = usePriceLock();
+
   const { settings, isOfflineMode, setNotification } = useSettingsStore();
   const { t } = useTranslation();
+  
+  // Price binding protection
+  const priceBinding = useEntryPriceBinding();
+
+  // Clear price lock when switching context
+  useEffect(() => {
+    priceLock.unlock();
+  }, [formData.exchange, formData.symbol, formData.contractMode, formData.orderType]);
   
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
   const [priceError, setPriceError] = useState<string>('');
@@ -138,7 +148,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   useEffect(() => {
     let priceUpdateInterval: NodeJS.Timeout | null = null;
 
-    if (formData.orderType === 'MARKET' && !isPriceLocked && 
+    if (formData.orderType === 'MARKET' && !priceLock.isLocked && 
         savedCalculationParams.exchange && savedCalculationParams.symbol && 
         savedCalculationParams.contractMode) {
       
@@ -148,7 +158,12 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           const price = await getCurrentPrice(savedCalculationParams.exchange as Exchange, savedCalculationParams.symbol!, instType);
           
           const oldPrice = parseFloat(realTimePrice || formData.entryPrice || '0');
-          setFormData({ entryPrice: price.toString() });
+          
+          // Only update form data if allowed by binding protection
+          if (priceBinding.shouldAllowAutoWrite(formData.orderType as 'MARKET' | 'LIMIT')) {
+            setFormData({ entryPrice: price.toString() });
+          }
+          
           setRealTimePrice(price.toString());
           setLastPriceUpdate(new Date());
           
@@ -180,7 +195,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         clearInterval(priceUpdateInterval);
       }
     };
-  }, [formData.orderType, isPriceLocked, savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, realTimePrice, formData.entryPrice, setFormData, setRealTimePrice, setLastPriceUpdate, setPriceChange]);
+  }, [formData.orderType, priceLock.isLocked, savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, realTimePrice, formData.entryPrice, formData.limitPrice, setFormData, setRealTimePrice, setLastPriceUpdate, setPriceChange]);
 
   // 独立的价格显示更新逻辑（不受订单类型和锁定状态影响）
   useEffect(() => {
@@ -234,14 +249,24 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   }, [savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode, displayPrice]);
 
   // 表单输入处理
-  const handleInputChange = (field: 'entryPrice' | 'orderType' | 'stopPrice' | 'feeType', value: string) => {
-    if (field === 'entryPrice' || field === 'stopPrice') {
+  const handleInputChange = (field: 'entryPrice' | 'limitPrice' | 'orderType' | 'stopPrice' | 'feeType', value: string) => {
+    if (field === 'entryPrice' || field === 'limitPrice' || field === 'stopPrice') {
       const validationResult = validateNumberString(value, field);
       if (validationResult) {
         setFormErrors(prev => ({ ...prev, [field]: validationResult }));
         return;
       } else {
         setFormErrors(prev => ({ ...prev, [field]: '' }));
+      }
+    }
+
+    // Handle order type switching with price field synchronization
+    if (field === 'orderType') {
+      const oldOrderType = formData.orderType as 'MARKET' | 'LIMIT';
+      const newOrderType = value as 'MARKET' | 'LIMIT';
+      
+      if (oldOrderType !== newOrderType) {
+        priceBinding.handleOrderTypeSwitch(newOrderType, oldOrderType);
       }
     }
 
@@ -262,7 +287,12 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
       const instType: InstType = savedCalculationParams.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
       const price = await getCurrentPrice(savedCalculationParams.exchange as Exchange, savedCalculationParams.symbol, instType);
       
-      handleInputChange('entryPrice', price.toString());
+      // Use price binding hook for proper field targeting
+      await priceBinding.handleFetchCurrentPrice(
+        async () => price.toString(),
+        formData.orderType as 'MARKET' | 'LIMIT'
+      );
+      
       setRealTimePrice(price.toString());
       setLastPriceUpdate(new Date());
       
@@ -289,19 +319,12 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     }
   };
 
-  // 价格锁定处理函数（沿用完整版逻辑）
-  const handleLockPrice = () => {
-    if (realTimePrice) {
-      setLockedPrice(realTimePrice);
-      setIsPriceLocked(true);
-      setNotification('价格已锁定', 'info');
+  // Market order status display helpers
+  const getMarketOrderStatusText = () => {
+    if (priceLock.isLocked) {
+      return `🔒 计算锁定: ${priceLock.lockedEntryPrice}`;
     }
-  };
-
-  const handleUnlockPrice = () => {
-    setIsPriceLocked(false);
-    setLockedPrice(null);
-    setNotification('价格已解锁', 'info');
+    return '📈 实时跟随';
   };
 
   // 快速止损设置 - 基于保存的计算参数中的止损模式设置止损
@@ -534,9 +557,45 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         effectiveStopPrice = userInputStopPrice || savedCalculationParams.stopPrice;
       }
       
+      // Get effective price - lock market price if MARKET order
+      let calculationEntryPrice: number;
+      
+      if (formData.orderType === 'MARKET') {
+        try {
+          // Lock current market price for MARKET orders
+          const instType: InstType = savedCalculationParams.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const latestPrice = await getCurrentPrice(
+            savedCalculationParams.exchange as Exchange,
+            savedCalculationParams.symbol!,
+            instType
+          );
+          priceLock.lock(latestPrice);
+          calculationEntryPrice = latestPrice;
+        } catch (error) {
+          // Fall back to current real-time price
+          if (realTimePrice) {
+            const price = parseFloat(realTimePrice);
+            priceLock.lock(price);
+            calculationEntryPrice = price;
+          } else {
+            throw new Error('No market price available for MARKET order');
+          }
+        }
+      } else {
+        // For limit orders, use input box value
+        calculationEntryPrice = getNewEffectiveEntryPrice({
+          orderType: formData.orderType as 'MARKET' | 'LIMIT',
+          limitPrice: formData.limitPrice,
+          marketRefPrice: realTimePrice,
+          lockedEntryPrice: null
+        });
+      }
+      
+      const effectivePrice = calculationEntryPrice.toString();
+
       const input = {
         side: savedCalculationParams.side!,
-        entryPrice: formData.entryPrice!,
+        entryPrice: effectivePrice,
         stopPrice: effectiveStopPrice,
         atr: atrValue || undefined,
         atrMultiplier: savedCalculationParams.atrMultiplier,
@@ -755,92 +814,150 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           </div>
         )}
 
-        {/* 入场价格 */}
+        {/* 入场价格设置 */}
         <div className="space-y-2">
-          <Label htmlFor="entryPrice">
-            {t('entryPrice')}
+          <Label>
+            {formData.orderType === 'MARKET' ? '市场价格' : t('entryPrice')}
           </Label>
-          <div className="flex gap-2">
-            <Input
-              id="entryPrice"
-              type="text"
-              value={formData.entryPrice || ''}
-              onChange={(e) => handleInputChange('entryPrice', e.target.value)}
-              placeholder={formData.orderType === 'MARKET' ? t('getCurrentPrice') : t('enterPrice')}
-              className={
-                priceChange === 'up' ? 'border-green-400 bg-green-50' : 
-                priceChange === 'down' ? 'border-red-400 bg-red-50' :
-                formData.orderType === 'MARKET' && !isPriceLocked ? 'border-blue-300 bg-blue-50' :
-                isPriceLocked ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800' : ''
-              }
-              disabled={formData.orderType === 'MARKET' && !isPriceLocked}
-              readOnly={formData.orderType === 'MARKET' && !isPriceLocked}
-            />
-            
-            {/* 获取价格按钮 */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleFetchCurrentPrice}
-              disabled={isFetchingPrice}
-              className="flex items-center gap-2 px-4 whitespace-nowrap"
-            >
-              {isFetchingPrice ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span className="text-xs whitespace-nowrap">获取中</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  <span className="text-xs whitespace-nowrap">获取价格</span>
-                </>
-              )}
-            </Button>
-
-            
-            {/* Price Lock Button for Market Orders */}
-            {formData.orderType === 'MARKET' && realTimePrice && (
+          
+          {/* LIMIT Order: Input field with fetch button */}
+          {formData.orderType === 'LIMIT' && (
+            <div className="flex gap-2">
+              <Input
+                id="limitPrice"
+                type="text"
+                value={formData.limitPrice || ''}
+                onChange={(e) => priceBinding.handlePriceInputChange(e.target.value, formData.orderType as 'MARKET' | 'LIMIT')}
+                placeholder={t('enterPrice')}
+                className="flex-1"
+              />
+              
+              {/* 获取价格按钮 */}
               <Button
                 type="button"
-                variant={isPriceLocked ? "default" : "outline"}
-                onClick={isPriceLocked ? handleUnlockPrice : handleLockPrice}
-                className={`px-3 ${
-                  isPriceLocked 
-                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500' 
-                    : 'border-gray-300 hover:bg-gray-50'
-                }`}
-                title={isPriceLocked ? '解锁价格' : '锁定价格'}
+                variant="outline"
+                onClick={handleFetchCurrentPrice}
+                disabled={isFetchingPrice}
+                className="flex items-center gap-2 px-4 whitespace-nowrap"
               >
-                {isPriceLocked ? (
-                  <Lock className="w-4 h-4" />
+                {isFetchingPrice ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span className="text-xs whitespace-nowrap">获取中</span>
+                  </>
                 ) : (
-                  <Unlock className="w-4 h-4" />
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span className="text-xs whitespace-nowrap">获取价格</span>
+                  </>
                 )}
               </Button>
-            )}
-          </div>
-          {formErrors.entryPrice && (
-            <p className="text-sm text-red-600">{formErrors.entryPrice}</p>
+            </div>
           )}
-          {priceError && (
-            <p className="text-sm text-red-600">{priceError}</p>
-          )}
-          
-          {/* 市价单锁定状态显示 */}
+
+          {/* MARKET Order: Price display with manual lock button */}
           {formData.orderType === 'MARKET' && (
-            <>
-              {isPriceLocked ? (
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-center gap-1">
-                  🔒 价格已锁定在 ${lockedPrice} - 点击"解锁"按钮恢复实时价格更新
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1">
-                  📈 市价单使用锁定价格计算 - 点击"锁定"按钮固定当前价格
-                </p>
-              )}
-            </>
+            <div className="space-y-3">
+              {/* Current price display and manual lock button */}
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">当前市场价格:</span>
+                  {realTimePrice && !isOfflineMode && (
+                    <Button
+                      type="button"
+                      variant={priceLock.isLocked ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        if (priceLock.isLocked) {
+                          priceLock.unlock();
+                          setNotification('价格已解锁', 'info');
+                        } else {
+                          const price = parseFloat(realTimePrice);
+                          priceLock.lock(price);
+                          setNotification('价格已手动锁定', 'info');
+                        }
+                      }}
+                      className={`px-3 text-xs ${
+                        priceLock.isLocked 
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' 
+                          : 'border-gray-300 hover:bg-gray-50'
+                      }`}
+                      title={priceLock.isLocked ? '解锁价格' : '手动锁定当前价格'}
+                    >
+                      {priceLock.isLocked ? (
+                        <>
+                          <Lock className="w-3 h-3 mr-1" />
+                          解锁
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="w-3 h-3 mr-1" />
+                          锁定
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    {realTimePrice && (
+                      <span className={`font-mono text-xl font-bold ${
+                        priceChange === 'up' ? 'text-green-600 dark:text-green-400' :
+                        priceChange === 'down' ? 'text-red-600 dark:text-red-400' :
+                        'text-foreground'
+                      }`}>
+                        ${parseFloat(realTimePrice).toLocaleString('en-US', { 
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 8
+                        })}
+                        {priceChange && (
+                          <span className={`ml-2 text-sm ${
+                            priceChange === 'up' ? 'text-green-500' : 
+                            priceChange === 'down' ? 'text-red-500' : ''
+                          }`}>
+                            {priceChange === 'up' ? '↗' : priceChange === 'down' ? '↘' : ''}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Lock status */}
+                {priceLock.isLocked && priceLock.lockedEntryPrice && (
+                  <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-blue-700 dark:text-blue-300">🔒 入场价格锁定值:</span>
+                      <span className="font-mono text-sm font-bold text-blue-800 dark:text-blue-200">
+                        ${parseFloat(priceLock.lockedEntryPrice.toString()).toLocaleString('en-US', { 
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 8
+                        })}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                      计算将使用此锁定价格，不受后续价格变动影响
+                    </div>
+                  </div>
+                )}
+                
+                {/* Behavior explanation */}
+                {!priceLock.isLocked && (
+                  <div className="mt-2 text-xs text-muted-foreground text-center">
+                    💡 可手动锁定当前价格，或在点击"计算"时自动锁定
+                  </div>
+                )}
+              </div>
+            </div>
           )}
+        
+        {formErrors.entryPrice && (
+          <p className="text-sm text-red-600">{formErrors.entryPrice}</p>
+        )}
+        {priceError && (
+          <p className="text-sm text-red-600">{priceError}</p>
+        )}
         </div>
 
         {/* 止损设置 */}
@@ -1023,7 +1140,6 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
             {/* 右侧：快速复制 */}
             <QuickCopyCard 
               result={result} 
-              entryPrice={formData.entryPrice || ''} 
               marketMeta={marketMeta}
             />
           </div>
