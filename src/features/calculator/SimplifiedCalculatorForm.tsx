@@ -88,7 +88,7 @@ export function SimplifiedCalculatorForm() {
       if (validationResult) {
         setFormErrors(prev => ({ ...prev, [field]: validationResult }));
         return;
-      } else {zge
+      } else {
         setFormErrors(prev => ({ ...prev, [field]: '' }));
       }
 

@@ -48,7 +48,11 @@ import {
   StopSection
 } from './components/form';
 import { EntrySection } from './sections/EntrySection';
-export function CalculatorForm() {
+interface CalculatorFormProps {
+  onSwitchToQuick?: () => void;
+}
+
+export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
   const {
     formData,
     setFormData,
@@ -1220,13 +1224,7 @@ export function CalculatorForm() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                // Switch to quick calculator tab
-                const quickTab = document.querySelector('[value="quick"]') as HTMLElement;
-                if (quickTab) {
-                  quickTab.click();
-                }
-              }}
+              onClick={onSwitchToQuick}
               className="flex items-center gap-1 text-xs"
             >
               <Zap className="w-3 h-3" />

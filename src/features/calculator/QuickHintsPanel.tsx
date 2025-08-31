@@ -6,14 +6,18 @@ import { useSettingsStore } from '@/lib/store';
 
 interface QuickHintsPanelProps {
   currentFeeType?: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY';
+  hasStopPriceInput?: boolean;
 }
 
-export function QuickHintsPanel({ currentFeeType }: QuickHintsPanelProps) {
+export function QuickHintsPanel({ currentFeeType, hasStopPriceInput }: QuickHintsPanelProps) {
   const { t } = useTranslation();
   const { settings } = useSettingsStore();
   
   // Use current fee type from form, fallback to settings
   const effectiveFeeType = currentFeeType || settings.defaultFeeType || 'MAKER_OPEN_TAKER_CLOSE';
+  
+  // Determine effective stop mode
+  const effectiveStopMode = hasStopPriceInput ? 'PRICE' : (settings.defaultStopMode || 'PRICE');
   
   // Collapse state for different sections
   const [showRebateSettings, setShowRebateSettings] = useState(false);
@@ -93,6 +97,20 @@ export function QuickHintsPanel({ currentFeeType }: QuickHintsPanelProps) {
               {effectiveFeeType === 'TAKER' && t('feeTypeAllTaker')}
               {effectiveFeeType === 'MAKER_OPEN_TAKER_CLOSE' && t('feeTypeMakerOpenTakerClose')}
               {effectiveFeeType === 'MAKER_OPEN_ONLY' && t('feeTypeMakerOpenOnly')}
+            </div>
+          </div>
+          
+          {/* Current Stop Mode Display */}
+          <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md">
+            <div className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">
+              {t('currentStopMode')}
+            </div>
+            <div className="text-sm font-medium text-amber-900 dark:text-amber-200">
+              {hasStopPriceInput ? (
+                <span>{t('priceStop')} - {t('usingManualPrice')}</span>
+              ) : (
+                <span>{t(`${effectiveStopMode.toLowerCase()}Stop`)} - {t('usingSettingsDefault')}</span>
+              )}
             </div>
           </div>
           

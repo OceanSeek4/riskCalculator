@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calculator, RefreshCw, Lock, Unlock } from 'lucide-react';
+import { Calculator, RefreshCw, Lock, Unlock, ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCalculatorStore, useSettingsStore } from '@/lib/store';
 import { usePriceLock } from './hooks/usePriceLock';
@@ -13,12 +13,15 @@ import { getCurrentPrice, getMarketMeta, getATRValue } from '@/lib/market-servic
 import { calculateATRStopPrice, calculatePipsStopPrice } from '@/lib/core';
 import { SafeDecimal } from '@/lib/core';
 import type { Exchange, InstType } from '@/lib/adapters';
+import type { StopMode } from '@/lib/core/types';
 
 interface QuickCalculatorFormProps {
   onFeeTypeChange?: (feeType: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY') => void;
+  onBackToFull?: () => void;
+  onStopPriceChange?: (hasInput: boolean) => void;
 }
 
-export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProps) {
+export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPriceChange }: QuickCalculatorFormProps) {
   const { t } = useTranslation();
   const { settings, setNotification } = useSettingsStore();
   const { setResult, setIsCalculating } = useCalculatorStore();
@@ -36,12 +39,29 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
     onFeeTypeChange?.(newFeeType);
   };
 
-  // Initialize parent with current fee type
-  useEffect(() => {
-    onFeeTypeChange?.(feeType);
-  }, []);
+  // Get effective fee type (TAKER for MARKET orders, user selection for LIMIT)
+  const getEffectiveFeeType = () => {
+    return orderType === 'MARKET' ? 'TAKER' : feeType;
+  };
+
   const [entryPrice, setEntryPrice] = useState<string>(''); // For LIMIT orders only
   const [stopPrice, setStopPrice] = useState<string>('');
+
+  // Initialize parent with current fee type
+  useEffect(() => {
+    onFeeTypeChange?.(getEffectiveFeeType());
+  }, []);
+
+  // Notify parent about stop price input status
+  useEffect(() => {
+    const hasInput = !!(stopPrice && stopPrice.trim() !== '');
+    onStopPriceChange?.(hasInput);
+  }, [stopPrice, onStopPriceChange]);
+
+  // Update effective fee type when order type changes
+  useEffect(() => {
+    onFeeTypeChange?.(getEffectiveFeeType());
+  }, [orderType, feeType]);
 
   // Market reference price state
   const [marketPrice, setMarketPrice] = useState<string>('');
@@ -222,8 +242,9 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!stopPrice || isNaN(Number(stopPrice)) || Number(stopPrice) <= 0) {
-      errors.stopPrice = t('stopPriceRequired');
+    // Stop price is now optional - only validate if provided
+    if (stopPrice && (isNaN(Number(stopPrice)) || Number(stopPrice) <= 0)) {
+      errors.stopPrice = t('stopPriceInvalid');
     }
 
     if (orderType === 'LIMIT') {
@@ -258,15 +279,38 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
         lockedEntryPrice: priceLock.lockedEntryPrice,
       });
 
+      // Determine stop mode based on input
+      let stopMode: StopMode;
+      let stopPriceValue: string;
+      let atrValue: string = '';
+      let stopPipsValue: string = '';
+      
+      if (stopPrice && stopPrice.trim() !== '') {
+        // If stop price is provided, use PRICE mode
+        stopMode = 'PRICE';
+        stopPriceValue = stopPrice;
+      } else {
+        // If no stop price, use settings default mode
+        stopMode = (settings.defaultStopMode as StopMode) || 'PRICE';
+        stopPriceValue = '';
+        
+        // For ATR mode, we need to set default values
+        if (stopMode === 'ATR') {
+          stopPipsValue = '';
+        } else if (stopMode === 'PIPS') {
+          stopPipsValue = settings.defaultStopPips || '50';
+        }
+      }
+
       // Build calculation parameters from settings + form data
       const calcParams = {
         side: 'LONG' as const, // Default to LONG since settings doesn't have defaultSide
         entryPrice: String(effectiveEntryPrice),
-        stopPrice: stopPrice,
-        stopMode: settings.defaultStopMode || 'PRICE',
-        atr: '',
+        stopPrice: stopPriceValue,
+        stopMode: stopMode,
+        atr: atrValue,
         atrMultiplier: String(settings.defaultAtrMultiplier || 2),
-        stopPips: '',
+        stopPips: stopPipsValue,
         
         // Take profit from settings
         useTakeProfit: settings.defaultUseTakeProfit || false,
@@ -309,7 +353,7 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
         contractMode: settings.defaultContractMode || 'USDT_PERP',
         marketMeta: marketMeta,
         orderType: orderType,
-        feeType: feeType,
+        feeType: getEffectiveFeeType(),
         rrRatios: settings.rrRatios || [1, 1.5, 2],
       };
 
@@ -327,9 +371,22 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calculator className="w-5 h-5" />
-          {t('quickCalculator')}
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calculator className="w-5 h-5" />
+            {t('quickCalculator')}
+          </div>
+          {onBackToFull && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={onBackToFull}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t('backToFullCalculator')}
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -345,22 +402,33 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
               <option value="LIMIT">{t('limitOrder')}</option>
               <option value="MARKET">{t('marketOrder')}</option>
             </select>
+            
+            {/* Market Order Fee Notice */}
+            {orderType === 'MARKET' && (
+              <div className="p-2 bg-orange-50 dark:bg-orange-950/30 rounded-md">
+                <p className="text-xs font-medium text-orange-800 dark:text-orange-300">
+                  {t('marketOrderAutoTaker')}
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Fee Type */}
-          <div className="space-y-2">
-            <Label>{t('feeType')}</Label>
-            <select 
-              value={feeType} 
-              onChange={(e) => handleFeeTypeChange(e.target.value as any)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <option value="MAKER">{t('feeTypeAllMaker')}</option>
-              <option value="TAKER">{t('feeTypeAllTaker')}</option>
-              <option value="MAKER_OPEN_TAKER_CLOSE">{t('feeTypeMakerOpenTakerClose')}</option>
-              <option value="MAKER_OPEN_ONLY">{t('feeTypeMakerOpenOnly')}</option>
-            </select>
-          </div>
+          {/* Fee Type - Only show for LIMIT orders */}
+          {orderType === 'LIMIT' && (
+            <div className="space-y-2">
+              <Label>{t('feeType')}</Label>
+              <select 
+                value={feeType} 
+                onChange={(e) => handleFeeTypeChange(e.target.value as any)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="MAKER">{t('feeTypeAllMaker')}</option>
+                <option value="TAKER">{t('feeTypeAllTaker')}</option>
+                <option value="MAKER_OPEN_TAKER_CLOSE">{t('feeTypeMakerOpenTakerClose')}</option>
+                <option value="MAKER_OPEN_ONLY">{t('feeTypeMakerOpenOnly')}</option>
+              </select>
+            </div>
+          )}
 
           {/* Entry Price */}
           <div className="space-y-2">
@@ -418,7 +486,7 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
 
           {/* Stop Price */}
           <div className="space-y-2">
-            <Label>{t('stopPrice')}</Label>
+            <Label>{t('stopPriceOptional')}</Label>
             <Input
               value={stopPrice}
               onChange={(e) => setStopPrice(e.target.value)}
@@ -426,6 +494,7 @@ export function QuickCalculatorForm({ onFeeTypeChange }: QuickCalculatorFormProp
               type="number"
               step="any"
             />
+            <p className="text-xs text-muted-foreground">{t('stopPriceOptionalHelp')}</p>
             
             {/* Quick Stop Distance Buttons */}
             <div className="space-y-2">

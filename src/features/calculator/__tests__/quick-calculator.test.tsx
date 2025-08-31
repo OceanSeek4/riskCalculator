@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuickCalculatorForm } from '../QuickCalculatorForm';
 import { QuickHintsPanel } from '../QuickHintsPanel';
-import { QuickCalculatorPage } from '../QuickCalculatorPage';
+// QuickCalculatorPage is now integrated into CalculatorPageManager
 import { useSettingsStore, useCalculatorStore } from '@/lib/store';
 import { usePriceLock } from '../hooks/usePriceLock';
 import { getEffectiveEntryPrice } from '../lib/price';
@@ -284,28 +284,5 @@ describe('Quick Calculator', () => {
     });
   });
 
-  describe('QuickCalculatorPage', () => {
-    it('renders all components correctly', () => {
-      render(<QuickCalculatorPage />);
-      
-      expect(screen.getByText('quickCalculator')).toBeInTheDocument();
-      expect(screen.getByText('quickCalculatorDescription')).toBeInTheDocument();
-      expect(screen.getByText('backToFullCalculator')).toBeInTheDocument();
-    });
-
-    it('has working navigation to full calculator', () => {
-      // Mock DOM query selector for tab switching
-      const mockClick = vi.fn();
-      const mockElement = { click: mockClick };
-      vi.spyOn(document, 'querySelector').mockReturnValue(mockElement as any);
-      
-      render(<QuickCalculatorPage />);
-      
-      const backButton = screen.getByText('backToFullCalculator');
-      fireEvent.click(backButton);
-      
-      expect(document.querySelector).toHaveBeenCalledWith('[value="calculator"]');
-      expect(mockClick).toHaveBeenCalled();
-    });
-  });
+  // QuickCalculatorPage tests are now integrated into CalculatorPageManager tests
 });
