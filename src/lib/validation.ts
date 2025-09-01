@@ -134,6 +134,7 @@ export const settingsSchema = z.object({
   // UI preferences
   theme: z.enum(['light', 'dark', 'system']).default('system'),
   language: z.enum(['en', 'zh']).default('en'),
+  defaultViewMode: z.enum(['full', 'quick']).default('full'),
   
   // Trailing stop defaults
   defaultTrailingEnabled: z.boolean().default(false),

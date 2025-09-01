@@ -1222,13 +1222,13 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
             </div>
             <CardTitle className="text-xl">{t('calculator')}</CardTitle>
             <Button
-              variant="ghost"
+              variant="default"
               size="sm"
               onClick={onSwitchToQuick}
-              className="flex items-center gap-1 text-xs"
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 text-sm font-medium px-4 py-2"
             >
-              <Zap className="w-3 h-3" />
-              {t('quickMode')}
+              <Zap className="w-4 h-4" />
+              简化界面
             </Button>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1 border rounded-full text-xs ${

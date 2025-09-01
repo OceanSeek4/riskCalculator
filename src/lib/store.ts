@@ -266,6 +266,7 @@ const defaultSettings: SettingsData = {
   rrRatios: [1, 1.5, 2],
   theme: 'system',
   language: 'zh',
+  defaultViewMode: 'full',
   autoFetchATR: true,
   showAdvancedOptions: true,
   // Offline mode settings - 确保项目默认启动为在线模式

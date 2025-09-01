@@ -46,7 +46,12 @@ export function QuickHintsPanel({ currentFeeType, hasStopPriceInput }: QuickHint
             </div>
             <div>
               <span className="text-muted-foreground">{t('contractMode')}:</span>
-              <span className="ml-2 font-medium">{t(settings.defaultContractMode?.toLowerCase() || 'usdtPerp')}</span>
+              <span className="ml-2 font-medium">{
+                settings.defaultContractMode === 'SPOT' ? t('spot') :
+                settings.defaultContractMode === 'USDT_PERP' ? t('usdtPerp') :
+                settings.defaultContractMode === 'INVERSE' ? t('inverse') :
+                t('usdtPerp')
+              }</span>
             </div>
             <div>
               <span className="text-muted-foreground">{t('side')}:</span>
@@ -194,7 +199,7 @@ export function QuickHintsPanel({ currentFeeType, hasStopPriceInput }: QuickHint
             <h4 className="font-medium text-sm text-muted-foreground">{t('takeProfitStopLossSettings')}</h4>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-gray-600">
-                {settings.defaultStopMode?.toLowerCase() || 'price'} / {settings.defaultUseTakeProfit ? 'ON' : 'OFF'}
+                {settings.defaultStopMode?.toLowerCase() || 'price'} / {settings.defaultUseTakeProfit ? t('on') : t('off')}
               </span>
               {showTakeProfitSettings ? (
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />
@@ -224,7 +229,12 @@ export function QuickHintsPanel({ currentFeeType, hasStopPriceInput }: QuickHint
                 <div className="pl-4 space-y-1">
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">{t('takeProfitMode')}:</span>
-                    <span className="font-medium">{t(`${settings.defaultTakeProfitMode?.toLowerCase() || 'price'}TakeProfit`)}</span>
+                    <span className="font-medium">{
+                      settings.defaultTakeProfitMode === 'RR_RATIO' ? t('rrRatioTakeProfit') :
+                      settings.defaultTakeProfitMode === 'PRICE' ? t('priceTakeProfit') :
+                      settings.defaultTakeProfitMode === 'ATR' ? t('atrTakeProfit') :
+                      t('priceTakeProfit')
+                    }</span>
                   </div>
                   
                   {settings.defaultTakeProfitMode === 'RR_RATIO' && (

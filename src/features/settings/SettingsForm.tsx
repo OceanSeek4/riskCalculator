@@ -1002,6 +1002,19 @@ export function SettingsForm() {
                 <option value="zh">{t('chinese')}</option>
               </Select>
             </div>
+            
+            <div>
+              <Label>默认界面模式</Label>
+              <Select
+                value={settings.defaultViewMode}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+                  handleInputChange('defaultViewMode', e.target.value as 'full' | 'quick')
+                }
+              >
+                <option value="full">完整版</option>
+                <option value="quick">简化版</option>
+              </Select>
+            </div>
           </div>
         </div>
 

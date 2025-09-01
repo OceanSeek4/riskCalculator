@@ -718,7 +718,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="flex items-center gap-2 whitespace-nowrap">
             <Calculator className="w-5 h-5 text-blue-600" />
-            快速计算
+            重新计算
           </CardTitle>
           <div className="flex gap-2 flex-wrap">
             {/* 显示/隐藏保存参数切换 */}
@@ -753,7 +753,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
               className="flex items-center gap-2 whitespace-nowrap"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span className="text-xs whitespace-nowrap">返回完整</span>
+              <span className="text-xs whitespace-nowrap">返回</span>
             </Button>
           </div>
         </div>

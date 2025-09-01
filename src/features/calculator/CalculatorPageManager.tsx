@@ -4,13 +4,12 @@ import { CompactCalculatorForm } from './CompactCalculatorForm';
 import { QuickCalculatorForm } from './QuickCalculatorForm';
 import { QuickHintsPanel } from './QuickHintsPanel';
 import { ResultCard } from './ResultCard';
-import { useCalculatorStore } from '@/lib/store';
-import { useTranslation } from 'react-i18next';
+import { useCalculatorStore, useSettingsStore } from '@/lib/store';
 
 type ViewMode = 'full' | 'compact' | 'quick';
 
 export function CalculatorPageManager() {
-  const { t } = useTranslation();
+  const { settings } = useSettingsStore();
   const { 
     result, 
     setResult, 
@@ -33,10 +32,18 @@ export function CalculatorPageManager() {
   const [viewMode, setViewMode] = useState<ViewMode>('full');
   const [currentFeeType, setCurrentFeeType] = useState<'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY'>('MAKER_OPEN_TAKER_CLOSE');
   const [hasStopPriceInput, setHasStopPriceInput] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
 
   // 当有计算结果时，自动切换到简易模式
   useEffect(() => {
     if (result && viewMode === 'full') {
+      setViewMode('compact');
+    }
+  }, [result, viewMode]);
+
+  // 快速模式下有计算结果时，自动跳转到compact模式
+  useEffect(() => {
+    if (result && viewMode === 'quick') {
       setViewMode('compact');
     }
   }, [result, viewMode]);
@@ -70,8 +77,9 @@ export function CalculatorPageManager() {
     setIsFetchingATR(false);
     setIsFetchingMA(false);
     
-    // 切换回完整视图
-    setViewMode('full');
+    // 根据设置决定返回到哪个模式
+    const targetMode = settings.defaultViewMode || 'full';
+    setViewMode(targetMode);
   };
 
   // 从快速模式切换回完整模式
@@ -89,37 +97,39 @@ export function CalculatorPageManager() {
       ) : viewMode === 'quick' ? (
         // 快速模式：简化的4字段界面
         <div className="w-full">
-          {/* 快速模式标题和返回按钮 */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground">{t('quickCalculator')}</h2>
-              <p className="text-sm text-muted-foreground">{t('quickCalculatorDescription')}</p>
-            </div>
-          </div>
           
           {/* 快速模式主要内容 */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* 左侧：快速计算表单 */}
-            <div className="space-y-4">
+          <div className={`transition-all duration-500 ease-in-out ${
+            showSettingsPanel 
+              ? 'grid lg:grid-cols-2 gap-6' 
+              : 'flex justify-center'
+          }`}>
+            {/* 快速计算表单 */}
+            <div className={`space-y-4 transition-all duration-500 ease-in-out ${
+              showSettingsPanel 
+                ? 'w-full' 
+                : 'w-full max-w-2xl'
+            }`}>
               <QuickCalculatorForm 
                 onFeeTypeChange={setCurrentFeeType}
                 onBackToFull={handleQuickToFull}
                 onStopPriceChange={setHasStopPriceInput}
+                showSettingsPanel={showSettingsPanel}
+                onToggleSettingsPanel={() => setShowSettingsPanel(!showSettingsPanel)}
               />
             </div>
             
-            {/* 右侧：参数显示和结果 */}
-            <div className="space-y-4">
-              <QuickHintsPanel 
-                currentFeeType={currentFeeType} 
-                hasStopPriceInput={hasStopPriceInput}
-              />
-              
-              {/* 结果显示 */}
-              {result && (
-                <div className="mt-6">
-                  <ResultCard />
-                </div>
+            {/* 参数显示 */}
+            <div className={`space-y-4 transition-all duration-500 ease-in-out ${
+              showSettingsPanel 
+                ? 'opacity-100 translate-x-0' 
+                : 'opacity-0 translate-x-4 pointer-events-none'
+            } ${!showSettingsPanel ? 'absolute' : 'relative'}`}>
+              {showSettingsPanel && (
+                <QuickHintsPanel 
+                  currentFeeType={currentFeeType} 
+                  hasStopPriceInput={hasStopPriceInput}
+                />
               )}
             </div>
           </div>
