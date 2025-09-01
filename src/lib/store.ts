@@ -21,6 +21,10 @@ interface CalculatorState {
   result: CalcResult | null;
   setResult: (result: CalcResult | null) => void;
   
+  // Last calculation input parameters (actual parameters used in calculation)
+  lastCalculationInput: Partial<CalculatorFormData> | null;
+  setLastCalculationInput: (input: Partial<CalculatorFormData> | null) => void;
+  
   // Market data
   currentATR: string | null;
   setCurrentATR: (atr: string | null) => void;
@@ -149,6 +153,10 @@ const defaultFormData: Partial<CalculatorFormData> = {
   slippage: '0.0005',
   autoLeverage: false,
   maxEquityUsage: '0.8',
+  
+  // Position scaling defaults
+  enablePositionScaling: false,
+  initialPositionPercentage: 100,
 };
 
 // Default trailing configuration
@@ -276,6 +284,10 @@ const defaultSettings: SettingsData = {
   offlineOrderType: 'LIMIT',
   offlineDefaultEntryPrice: '100000',
   offlineTrailingEnabled: false,
+
+  // Position scaling settings
+  defaultEnablePositionScaling: false,
+  defaultPositionScalingPercentages: [20, 50, 100],
 };
 
 // Calculator store
@@ -363,6 +375,10 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   // Calculation result
   result: null,
   setResult: (result) => set({ result }),
+  
+  // Last calculation input parameters
+  lastCalculationInput: null,
+  setLastCalculationInput: (input) => set({ lastCalculationInput: input }),
   
   // Market data
   currentATR: null,

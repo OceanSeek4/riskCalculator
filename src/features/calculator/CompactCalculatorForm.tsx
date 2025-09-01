@@ -28,6 +28,8 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     setFormData,
     result,
     setResult,
+    lastCalculationInput,
+    setLastCalculationInput,
     currentATR,
     setCurrentATR,
     isCalculating,
@@ -69,7 +71,10 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [marketMeta, setMarketMeta] = useState<any>(null);
   const [showSavedParams, setShowSavedParams] = useState(true);
   const [showTrailingPanel, setShowTrailingPanel] = useState(false);
-  const [keepOriginalStopPrice, setKeepOriginalStopPrice] = useState(false);
+  const [initialPositionPercentage, setInitialPositionPercentage] = useState<number>(100);
+  const [isFetchingATR, setIsFetchingATR] = useState(false);
+  const [atrError, setATRError] = useState<string>('');
+  const [isStopPriceLocked, setIsStopPriceLocked] = useState(true);
   const [lockedStopPrice, setLockedStopPrice] = useState<string | null>(null);
   
   // 实时价格显示的独立状态（不受锁定影响）
@@ -79,52 +84,71 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [displayPriceDiff, setDisplayPriceDiff] = useState<number>(0);
   const [displayPreviousPrice, setDisplayPreviousPrice] = useState<number>(0);
 
-  // 保存当前计算时使用的所有参数（除了价格和订单类型）
-  const [baseSavedCalculationParams] = useState(() => ({
-    exchange: formData.exchange,
-    symbol: formData.symbol,
-    contractMode: formData.contractMode,
-    side: formData.side,
-    stopMode: formData.stopMode,
-    atrPeriod: formData.atrPeriod,
-    atrTimeframe: formData.atrTimeframe,
-    atrMultiplier: formData.atrMultiplier,
-    stopPrice: formData.stopPrice,
-    stopPips: formData.stopPips,
-    useTakeProfit: formData.useTakeProfit,
-    takeProfitMode: formData.takeProfitMode,
-    takeProfitPrice: formData.takeProfitPrice,
-    takeProfitATRMultiplier: formData.takeProfitATRMultiplier,
-    takeProfitRRRatio: formData.takeProfitRRRatio,
-    takeProfitPips: formData.takeProfitPips,
-    riskMode: formData.riskMode,
-    riskAmount: formData.riskAmount,
-    accountEquity: formData.accountEquity,
-    riskPercent: formData.riskPercent,
-    leverage: formData.leverage,
-    includeFees: formData.includeFees,
-    feeType: formData.feeType,
-    feeOpenMaker: formData.feeOpenMaker,
-    feeOpenTaker: formData.feeOpenTaker,
-    feeCloseMaker: formData.feeCloseMaker,
-    feeCloseTaker: formData.feeCloseTaker,
-    slippageOpen: formData.slippageOpen,
-    slippageClose: formData.slippageClose,
-    enableRebate: formData.enableRebate,
-    rebatePercent: formData.rebatePercent,
-    feeOpen: formData.feeOpen,
-    feeClose: formData.feeClose,
-    slippage: formData.slippage,
-    autoLeverage: formData.autoLeverage,
-    maxEquityUsage: formData.maxEquityUsage,
-  }));
+  // 保存原始计算时使用的所有参数（来自完整版或快速模式的实际计算输入）
+  const baseSavedCalculationParams = React.useMemo(() => {
+    // 如果有保存的最后计算输入，使用它；否则回退到当前formData
+    const sourceData = lastCalculationInput || formData;
+    
+    return {
+      // 基础市场参数（来自实际计算输入）
+      exchange: sourceData.exchange,
+      symbol: sourceData.symbol,
+      contractMode: sourceData.contractMode,
+      side: sourceData.side,
+      
+      // 止损参数（来自实际计算输入）
+      stopMode: sourceData.stopMode,
+      atrPeriod: sourceData.atrPeriod,
+      atrTimeframe: sourceData.atrTimeframe,
+      atrMultiplier: sourceData.atrMultiplier,
+      stopPrice: sourceData.stopPrice,
+      stopPips: sourceData.stopPips,
+      
+      // 止盈参数（来自实际计算输入）
+      useTakeProfit: sourceData.useTakeProfit,
+      takeProfitMode: sourceData.takeProfitMode,
+      takeProfitPrice: sourceData.takeProfitPrice,
+      takeProfitATRMultiplier: sourceData.takeProfitATRMultiplier,
+      takeProfitRRRatio: sourceData.takeProfitRRRatio,
+      takeProfitPips: sourceData.takeProfitPips,
+      
+      // 风险管理参数（来自实际计算输入）
+      riskMode: sourceData.riskMode,
+      riskAmount: sourceData.riskAmount,
+      accountEquity: sourceData.accountEquity,
+      riskPercent: sourceData.riskPercent,
+      leverage: sourceData.leverage,
+      
+      // 费率参数（来自实际计算输入）
+      includeFees: sourceData.includeFees,
+      feeType: sourceData.feeType,
+      feeOpenMaker: sourceData.feeOpenMaker,
+      feeOpenTaker: sourceData.feeOpenTaker,
+      feeCloseMaker: sourceData.feeCloseMaker,
+      feeCloseTaker: sourceData.feeCloseTaker,
+      slippageOpen: sourceData.slippageOpen,
+      slippageClose: sourceData.slippageClose,
+      enableRebate: sourceData.enableRebate,
+      rebatePercent: sourceData.rebatePercent,
+      feeOpen: sourceData.feeOpen,
+      feeClose: sourceData.feeClose,
+      slippage: sourceData.slippage,
+      
+      // 高级参数（来自实际计算输入）
+      autoLeverage: sourceData.autoLeverage,
+      maxEquityUsage: sourceData.maxEquityUsage,
+      
+      // 加仓参数（来自实际计算输入）
+      enablePositionScaling: sourceData.enablePositionScaling,
+      initialPositionPercentage: sourceData.initialPositionPercentage,
+    };
+  }, [lastCalculationInput, formData]);
 
-  // 动态合并当前表单数据与保存参数，用于显示和计算
+  // 显示参数：显示原始计算参数，包括实际的加仓设置状态
   const savedCalculationParams = React.useMemo(() => ({
     ...baseSavedCalculationParams,
-    // 如果用户选择了新的费率类型，使用新的，否则使用保存的
-    feeType: formData.feeType || baseSavedCalculationParams.feeType,
-  }), [baseSavedCalculationParams, formData.feeType]);
+    // 只在CompactForm计算时才使用当前简易表单的加仓设置，显示时使用原始参数
+  }), [baseSavedCalculationParams]);
 
   // 获取市场元数据
   React.useEffect(() => {
@@ -143,6 +167,23 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     
     fetchMarketMeta();
   }, [savedCalculationParams.exchange, savedCalculationParams.symbol, savedCalculationParams.contractMode]);
+
+  // 初始化时自动锁定止损价格
+  React.useEffect(() => {
+    if (isStopPriceLocked && !lockedStopPrice) {
+      const lastUsedStopPrice = result?.stopPrice || baseSavedCalculationParams.stopPrice;
+      if (lastUsedStopPrice) {
+        setLockedStopPrice(lastUsedStopPrice);
+        // 如果表单数据中没有止损价格，设置为锁定的价格
+        if (!formData.stopPrice) {
+          setFormData({ stopPrice: lastUsedStopPrice });
+        }
+      } else {
+        // 如果没有可锁定的价格，设置为未锁定状态
+        setIsStopPriceLocked(false);
+      }
+    }
+  }, [result, baseSavedCalculationParams.stopPrice, lockedStopPrice, formData.stopPrice, isStopPriceLocked, setFormData]);
 
   // 实时价格更新（市价单模式，未锁定时）
   useEffect(() => {
@@ -327,100 +368,6 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     return '📈 实时跟随';
   };
 
-  // 快速止损设置 - 基于保存的计算参数中的止损模式设置止损
-  const handleQuickStopSet = async () => {
-    if (!formData.entryPrice || !savedCalculationParams.side) {
-      setNotification('请先设置入场价格和方向', 'error');
-      return;
-    }
-
-    const entryPrice = parseFloat(formData.entryPrice);
-    if (isNaN(entryPrice)) {
-      setNotification('请输入有效的入场价格', 'error');
-      return;
-    }
-
-    let stopPrice: number;
-    let notificationMessage = '';
-
-    try {
-      switch (savedCalculationParams.stopMode) {
-        case 'PRICE':
-          // 如果有保存的止损价格，使用它
-          if (savedCalculationParams.stopPrice) {
-            stopPrice = parseFloat(savedCalculationParams.stopPrice);
-            notificationMessage = '已应用保存的止损价格';
-          } else {
-            // 价格止损模式使用0.5%的止损距离
-            const stopDistance = entryPrice * 0.005;
-            const rawStopPrice = savedCalculationParams.side === 'LONG' 
-              ? entryPrice - stopDistance 
-              : entryPrice + stopDistance;
-            // 根据tickSize格式化
-            stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
-            notificationMessage = '已设置0.5%止损距离';
-          }
-          break;
-
-        case 'ATR':
-          // 基于ATR计算止损
-          if (currentATR && savedCalculationParams.atrMultiplier) {
-            const atrValue = parseFloat(currentATR);
-            const multiplier = parseFloat(savedCalculationParams.atrMultiplier);
-            const atrDistance = atrValue * multiplier;
-            
-            const rawStopPrice = savedCalculationParams.side === 'LONG'
-              ? entryPrice - atrDistance
-              : entryPrice + atrDistance;
-            // 根据tickSize格式化
-            stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
-            notificationMessage = `已设置ATR止损 (${multiplier}x ATR)`;
-          } else {
-            setNotification('ATR数据不可用，请先获取ATR数据', 'error');
-            return;
-          }
-          break;
-
-        case 'PIPS':
-          // 基于PIPS计算止损
-          if (savedCalculationParams.stopPips && marketMeta) {
-            const pips = parseFloat(savedCalculationParams.stopPips);
-            const tickSize = parseFloat(marketMeta.tickSize);
-            const pipsDistance = pips * tickSize;
-            
-            const rawStopPrice = savedCalculationParams.side === 'LONG'
-              ? entryPrice - pipsDistance
-              : entryPrice + pipsDistance;
-            // 根据tickSize格式化
-            stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta.tickSize));
-            notificationMessage = `已设置${pips}点止损`;
-          } else {
-            setNotification('PIPS止损参数不完整或市场数据不可用', 'error');
-            return;
-          }
-          break;
-
-        default:
-          // 默认情况：使用2%止损
-          const stopDistance = entryPrice * 0.02;
-          const rawStopPrice = savedCalculationParams.side === 'LONG'
-            ? entryPrice - stopDistance
-            : entryPrice + stopDistance;
-          // 根据tickSize格式化
-          stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
-          notificationMessage = '已设置2%默认止损距离';
-          break;
-      }
-
-      // 更新止损价格
-      setFormData({ stopPrice: stopPrice.toString() });
-      setNotification(notificationMessage, 'success');
-      
-    } catch (error) {
-      console.error('快速止损计算错误:', error);
-      setNotification('止损计算失败，请检查参数', 'error');
-    }
-  };
 
   // 根据指定百分比设置快速止损
   const handleQuickStopWithPercentage = async (percentage: number) => {
@@ -452,6 +399,131 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     } catch (error) {
       console.error('百分比止损计算错误:', error);
       setNotification('止损计算失败，请检查参数', 'error');
+    }
+  };
+
+  // ATR止损设置
+  const handleATRStopSet = async () => {
+    if (!formData.entryPrice || !baseSavedCalculationParams.side) {
+      setNotification('请先设置入场价格和方向', 'error');
+      return;
+    }
+
+    const entryPrice = parseFloat(formData.entryPrice);
+    if (isNaN(entryPrice)) {
+      setNotification('请输入有效的入场价格', 'error');
+      return;
+    }
+
+    setIsFetchingATR(true);
+    setATRError('');
+
+    try {
+      // 从设置中获取ATR参数
+      const atrPeriod = settings.defaultAtrPeriod || 14;
+      const atrTimeframe = settings.defaultAtrTimeframe || '15m';
+      const atrMultiplier = parseFloat(settings.defaultAtrMultiplier?.toString() || '2');
+
+      // 获取市场参数从原始计算参数
+      const exchange = baseSavedCalculationParams.exchange as Exchange;
+      const symbol = baseSavedCalculationParams.symbol!;
+      const contractMode = baseSavedCalculationParams.contractMode;
+      
+      if (!exchange || !symbol || !contractMode) {
+        setNotification('缺少市场数据，无法获取ATR', 'error');
+        return;
+      }
+
+      const instType: InstType = contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+      
+      // 获取ATR值
+      const atrValue = await getATRValue(exchange, symbol, instType, atrTimeframe as any, atrPeriod as any);
+      const atrDistance = atrValue * atrMultiplier;
+      
+      // 计算止损价格
+      const rawStopPrice = baseSavedCalculationParams.side === 'LONG'
+        ? entryPrice - atrDistance
+        : entryPrice + atrDistance;
+        
+      const stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta?.tickSize));
+      
+      // 更新止损价格
+      setFormData({ stopPrice: stopPrice.toString() });
+      setNotification(`已设置ATR止损 (${atrMultiplier}x ATR = ${atrDistance.toFixed(4)})`, 'success');
+      
+    } catch (error: any) {
+      console.error('ATR止损计算错误:', error);
+      setATRError(error.message || 'ATR获取失败');
+      setNotification('ATR止损设置失败', 'error');
+    } finally {
+      setIsFetchingATR(false);
+    }
+  };
+
+  // PIPS止损设置
+  const handlePipsStopSet = async () => {
+    if (!formData.entryPrice || !baseSavedCalculationParams.side) {
+      setNotification('请先设置入场价格和方向', 'error');
+      return;
+    }
+
+    const entryPrice = parseFloat(formData.entryPrice);
+    if (isNaN(entryPrice)) {
+      setNotification('请输入有效的入场价格', 'error');
+      return;
+    }
+
+    try {
+      // 从设置中获取PIPS参数
+      const stopPips = parseFloat(settings.defaultStopPips || '50');
+      
+      if (!marketMeta || !marketMeta.tickSize) {
+        setNotification('缺少市场元数据，无法计算PIPS止损', 'error');
+        return;
+      }
+
+      const tickSize = parseFloat(marketMeta.tickSize);
+      const pipsDistance = stopPips * tickSize;
+      
+      // 计算止损价格
+      const rawStopPrice = baseSavedCalculationParams.side === 'LONG'
+        ? entryPrice - pipsDistance
+        : entryPrice + pipsDistance;
+        
+      const stopPrice = parseFloat(formatPriceWithTickSize(rawStopPrice, marketMeta.tickSize));
+      
+      // 更新止损价格
+      setFormData({ stopPrice: stopPrice.toString() });
+      setNotification(`已设置PIPS止损 (${stopPips} PIPS = ${pipsDistance.toFixed(4)})`, 'success');
+      
+    } catch (error) {
+      console.error('PIPS止损计算错误:', error);
+      setNotification('PIPS止损设置失败', 'error');
+    }
+  };
+
+  // 锁定/解锁止损价格
+  const handleToggleStopPriceLock = () => {
+    if (!isStopPriceLocked) {
+      // 锁定：使用上次计算结果的止损价格，或保存参数中的止损价格
+      const lastUsedStopPrice = result?.stopPrice || baseSavedCalculationParams.stopPrice;
+      
+      if (lastUsedStopPrice) {
+        setLockedStopPrice(lastUsedStopPrice);
+        // 如果当前输入框为空，填入锁定的价格
+        if (!formData.stopPrice) {
+          setFormData({ stopPrice: lastUsedStopPrice });
+        }
+        setIsStopPriceLocked(true);
+        setNotification('已锁定上次计算的止损价格', 'success');
+      } else {
+        setNotification('没有可用的止损价格进行锁定', 'error');
+      }
+    } else {
+      // 解锁：清除锁定状态，但保留输入框中的价格
+      setLockedStopPrice(null);
+      setIsStopPriceLocked(false);
+      setNotification('已解锁止损价格', 'info');
     }
   };
 
@@ -491,21 +563,6 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     }
   };
 
-  // 获取止损模式描述
-  const getStopModeDescription = () => {
-    switch (savedCalculationParams.stopMode) {
-      case 'PRICE':
-        return savedCalculationParams.stopPrice ? '保存止损' : '0.5%止损';
-      case 'ATR':
-        const multiplier = savedCalculationParams.atrMultiplier || '2';
-        return `${multiplier}x ATR`;
-      case 'PIPS':
-        const pips = savedCalculationParams.stopPips || '50';
-        return `${pips}点止损`;
-      default:
-        return '快速止损';
-    }
-  };
 
   // 重新计算（使用保存的参数）
   const handleRecalculate = async () => {
@@ -520,42 +577,15 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     setCalculationError('');
 
     try {
-      // 获取ATR值（如果需要）
-      let atrValue = currentATR;
-      if (savedCalculationParams.stopMode === 'ATR' && !atrValue && !isOfflineMode) {
-        try {
-          const fetchedATR = await getATRValue(
-            savedCalculationParams.exchange as Exchange,
-            savedCalculationParams.symbol!,
-            savedCalculationParams.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP',
-            (savedCalculationParams.atrTimeframe || '15m') as any,
-            (savedCalculationParams.atrPeriod || 14) as any
-          );
-          atrValue = fetchedATR.toString();
-          setCurrentATR(atrValue);
-        } catch (error) {
-          console.warn('Failed to fetch ATR, using fallback calculation');
-        }
-      }
+      // CompactForm 不使用ATR模式，跳过ATR获取
 
-      // 使用保存的参数和当前的价格、订单类型进行计算
+      // CompactForm 强制使用价格止损模式
       // 止损价格处理逻辑：
-      // 1. 如果锁定原止损价格选项开启，直接使用保存的止损设置
-      // 2. 如果用户手动输入了止损价格，则强制使用PRICE模式
-      // 3. 如果止损价格为空，则沿用原本的止损价格不做更改
-      let effectiveStopMode: 'PRICE' | 'ATR' | 'PIPS';
-      let effectiveStopPrice: string | undefined;
-      
-      if (keepOriginalStopPrice && lockedStopPrice) {
-        // 锁定当前结果中的止损价格数值，强制使用PRICE模式
-        effectiveStopMode = 'PRICE';
-        effectiveStopPrice = lockedStopPrice;
-      } else {
-        // 正常逻辑：支持手动输入覆盖
-        const userInputStopPrice = formData.stopPrice;
-        effectiveStopMode = userInputStopPrice ? 'PRICE' : ((savedCalculationParams.stopMode || 'ATR') as 'PRICE' | 'ATR' | 'PIPS');
-        effectiveStopPrice = userInputStopPrice || savedCalculationParams.stopPrice;
-      }
+      // 1. 如果价格被锁定，使用锁定的价格
+      // 2. 否则优先使用用户输入，其次使用保存的参数
+      const effectiveStopPrice = isStopPriceLocked && lockedStopPrice 
+        ? lockedStopPrice 
+        : formData.stopPrice || savedCalculationParams.stopPrice;
       
       // Get effective price - lock market price if MARKET order
       let calculationEntryPrice: number;
@@ -597,10 +627,10 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         side: savedCalculationParams.side!,
         entryPrice: effectivePrice,
         stopPrice: effectiveStopPrice,
-        atr: atrValue || undefined,
-        atrMultiplier: savedCalculationParams.atrMultiplier,
-        stopPips: savedCalculationParams.stopPips,
-        stopMode: effectiveStopMode,
+        atr: undefined, // CompactForm 强制不使用ATR
+        atrMultiplier: undefined, // CompactForm 强制不使用ATR
+        stopPips: undefined, // CompactForm 强制不使用PIPS
+        stopMode: 'PRICE' as const, // CompactForm 强制使用价格模式
         useTakeProfit: savedCalculationParams.useTakeProfit || false,
         takeProfitMode: savedCalculationParams.takeProfitMode,
         takeProfitPrice: savedCalculationParams.takeProfitPrice,
@@ -608,9 +638,17 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         takeProfitRRRatio: savedCalculationParams.takeProfitRRRatio,
         takeProfitPips: savedCalculationParams.takeProfitPips,
         riskMode: savedCalculationParams.riskMode || 'FIXED_USDT',
-        riskUSDT: savedCalculationParams.riskMode === 'FIXED_USDT' ? savedCalculationParams.riskAmount : undefined,
+        riskUSDT: savedCalculationParams.riskMode === 'FIXED_USDT' ? (
+          settings.defaultEnablePositionScaling && initialPositionPercentage !== 100
+            ? String(Number(savedCalculationParams.riskAmount || '100') * initialPositionPercentage / 100)
+            : savedCalculationParams.riskAmount
+        ) : undefined,
         accountEquity: savedCalculationParams.riskMode === 'ACCOUNT_PERCENT' ? savedCalculationParams.accountEquity : undefined,
-        riskPercent: savedCalculationParams.riskMode === 'ACCOUNT_PERCENT' ? savedCalculationParams.riskPercent : undefined,
+        riskPercent: savedCalculationParams.riskMode === 'ACCOUNT_PERCENT' ? (
+          settings.defaultEnablePositionScaling && initialPositionPercentage !== 100
+            ? String(Number(savedCalculationParams.riskPercent || '1') * initialPositionPercentage / 100)
+            : savedCalculationParams.riskPercent
+        ) : undefined,
         includeFees: savedCalculationParams.includeFees || false,
         feeOpenMaker: savedCalculationParams.feeOpenMaker || '0.0002',
         feeOpenTaker: savedCalculationParams.feeOpenTaker || '0.0006',
@@ -629,6 +667,10 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         orderType: formData.orderType || 'MARKET',
         feeType: formData.feeType || savedCalculationParams.feeType || 'MAKER_OPEN_TAKER_CLOSE',
         rrRatios: settings.rrRatios || [1, 1.5, 2],
+        
+        // Position scaling settings from current CompactForm state
+        enablePositionScaling: settings.defaultEnablePositionScaling && initialPositionPercentage !== -1,
+        initialPositionPercentage: initialPositionPercentage === -1 ? 100 : initialPositionPercentage,
       };
 
       const result = calculatePosition(input);
@@ -961,130 +1003,190 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
         </div>
 
         {/* 止损设置 */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="stopPrice">{t('stopPrice')}</Label>
-            <Button
-              type="button"
-              variant={keepOriginalStopPrice ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                if (!keepOriginalStopPrice) {
-                  // 锁定时：使用当前结果中的止损价格
-                  const currentStopPrice = result?.stopPrice || savedCalculationParams.stopPrice || null;
-                  setLockedStopPrice(currentStopPrice);
-                  setKeepOriginalStopPrice(true);
-                } else {
-                  // 解锁时：清除锁定的止损价格
-                  setLockedStopPrice(null);
-                  setKeepOriginalStopPrice(false);
-                }
-              }}
-              className={`flex items-center gap-2 text-xs px-3 ${
-                keepOriginalStopPrice 
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
-                  : 'border-gray-300'
-              }`}
-              title={keepOriginalStopPrice ? '解锁止损价格修改' : '锁定当前结果中的止损价格'}
-              disabled={!result && !savedCalculationParams.stopPrice}
-            >
-              {keepOriginalStopPrice ? (
-                <>
-                  <Lock className="w-3 h-3" />
-                  锁定止损
-                </>
-              ) : (
-                <>
-                  <Unlock className="w-3 h-3" />
-                  可修改止损
-                </>
-              )}
-            </Button>
-          </div>
-          <div className="flex gap-2">
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="stopPrice" className="text-sm font-medium">{t('stopPrice')}</Label>
+              <Button
+                type="button"
+                variant={isStopPriceLocked ? "default" : "outline"}
+                size="sm"
+                onClick={handleToggleStopPriceLock}
+                disabled={!isStopPriceLocked && !result?.stopPrice && !baseSavedCalculationParams.stopPrice}
+                className={`flex items-center gap-2 text-xs px-3 ${
+                  isStopPriceLocked 
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                    : 'border-gray-300'
+                }`}
+                title={isStopPriceLocked ? '解锁止损价格' : '锁定上次计算的止损价格'}
+              >
+                {isStopPriceLocked ? (
+                  <>
+                    <Lock className="w-3 h-3" />
+                    已锁定
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="w-3 h-3" />
+                    锁定止损
+                  </>
+                )}
+              </Button>
+            </div>
             <Input
               id="stopPrice"
               type="text"
               value={formData.stopPrice || ''}
               onChange={(e) => handleInputChange('stopPrice', e.target.value)}
-              placeholder={keepOriginalStopPrice ? "已锁定原止损设置" : "输入止损价格"}
-              className={`flex-1 ${keepOriginalStopPrice ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' : ''}`}
-              disabled={keepOriginalStopPrice}
-              readOnly={keepOriginalStopPrice}
+              placeholder={isStopPriceLocked ? "已锁定上次计算的止损价格" : "输入止损价格或使用下方快速按钮"}
+              className={`w-full text-base ${isStopPriceLocked ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' : ''}`}
+              disabled={isStopPriceLocked}
+              readOnly={isStopPriceLocked}
             />
-            {/* 快速设置按钮 */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleQuickStopSet}
-              disabled={keepOriginalStopPrice}
-              className="flex items-center gap-2 px-4 whitespace-nowrap"
-              title={keepOriginalStopPrice ? "已锁定原止损设置" : `快速设置止损 (${getStopModeDescription()})`}
-            >
-              <Calculator className="w-4 h-4" />
-              <span className="text-xs whitespace-nowrap">
-                {getStopModeDescription()}
-              </span>
-            </Button>
+            
+            {/* 锁定状态提示 */}
+            {isStopPriceLocked && lockedStopPrice && (
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-1">
+                🔒 已锁定止损价格: {lockedStopPrice} - 重新计算时将使用此固定价格
+              </p>
+            )}
           </div>
           
-          {/* 价格止损模式的快速设置按钮组 */}
-          {savedCalculationParams.stopMode === 'PRICE' && !keepOriginalStopPrice && (
-            <div className="flex gap-1 flex-wrap">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickStopWithPercentage(0.5)}
-                className="text-xs px-2 py-1 h-7"
-                title="设置0.5%止损距离"
-              >
-                0.5%
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickStopWithPercentage(1)}
-                className="text-xs px-2 py-1 h-7"
-                title="设置1%止损距离"
-              >
-                1%
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickStopWithPercentage(2)}
-                className="text-xs px-2 py-1 h-7"
-                title="设置2%止损距离"
-              >
-                2%
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickStopWithPercentage(3)}
-                className="text-xs px-2 py-1 h-7"
-                title="设置3%止损距离"
-              >
-                3%
-              </Button>
+          {/* 快速止损按钮组 - 优化显示 */}
+          {!isStopPriceLocked && (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground font-medium">快速止损设置</div>
+            <div className="space-y-3">
+              {/* 百分比止损按钮 */}
+              <div>
+                <div className="text-xs text-gray-500 mb-2">百分比止损</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleQuickStopWithPercentage(0.5)}
+                    className="h-10 text-sm font-medium bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400 transition-all"
+                    title="设置0.5%止损距离"
+                  >
+                    0.5%
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleQuickStopWithPercentage(1)}
+                    className="h-10 text-sm font-medium bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400 transition-all"
+                    title="设置1%止损距离"
+                  >
+                    1%
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleQuickStopWithPercentage(2)}
+                    className="h-10 text-sm font-medium bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400 transition-all"
+                    title="设置2%止损距离"
+                  >
+                    2%
+                  </Button>
+                </div>
+              </div>
+              
+              {/* ATR和PIPS止损按钮 */}
+              <div>
+                <div className="text-xs text-gray-500 mb-2">动态止损</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleATRStopSet}
+                    disabled={isFetchingATR}
+                    className="h-10 text-sm font-medium bg-blue-50 hover:bg-blue-100 border-blue-300 hover:border-blue-400 transition-all"
+                    title="使用ATR动态止损"
+                  >
+                    {isFetchingATR ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                        获取中
+                      </>
+                    ) : (
+                      'ATR止损'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePipsStopSet}
+                    className="h-10 text-sm font-medium bg-green-50 hover:bg-green-100 border-green-300 hover:border-green-400 transition-all"
+                    title="使用点差止损"
+                  >
+                    PIPS止损
+                  </Button>
+                </div>
+              </div>
             </div>
-          )}
-          
-          {/* 锁定状态提示 */}
-          {keepOriginalStopPrice && lockedStopPrice && (
-            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-1">
-              🔒 已锁定结果中的止损价格 ({lockedStopPrice}) - 重新计算时将使用此固定价格
-            </p>
+          </div>
           )}
           
           {formErrors.stopPrice && (
             <p className="text-sm text-red-600">{formErrors.stopPrice}</p>
           )}
         </div>
+
+        {/* 初始建仓比例 - Position Scaling */}
+        {settings.defaultEnablePositionScaling && settings.defaultPositionScalingPercentages && settings.defaultPositionScalingPercentages.length > 0 && (
+          <div className="space-y-3 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">初始建仓比例</Label>
+              <div className="text-xs text-muted-foreground">
+                当前: <span className="font-semibold text-purple-600 dark:text-purple-400">
+                  {initialPositionPercentage}%
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2">
+              {(settings.defaultPositionScalingPercentages || []).map((percentage) => (
+                <div
+                  key={percentage}
+                  onClick={() => setInitialPositionPercentage(percentage)}
+                  className={`p-2 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                    initialPositionPercentage === percentage
+                      ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30 shadow-sm ring-1 ring-purple-300 dark:ring-purple-600'
+                      : 'border-border hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className={`text-sm font-bold ${
+                      initialPositionPercentage === percentage 
+                        ? 'text-purple-700 dark:text-purple-300' 
+                        : 'text-foreground'
+                    }`}>
+                      {percentage}%
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      初始仓
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Risk Preview for Compact */}
+            {initialPositionPercentage < 100 && (
+              <div className="p-2 bg-white dark:bg-gray-900 rounded border border-purple-200 dark:border-purple-700">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">风险分配:</span>
+                  <div className="text-purple-600 dark:text-purple-400 font-medium">
+                    {formData.riskMode === 'FIXED_USDT' 
+                      ? `${((Number(formData.riskAmount || '100') * initialPositionPercentage) / 100).toFixed(0)} USDT`
+                      : `${((Number(formData.riskPercent || '1') * initialPositionPercentage) / 100).toFixed(2)}%`
+                    } (初始)
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 重新计算按钮 */}
         <Button
@@ -1152,10 +1254,10 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="w-5 h-5 text-slate-600" />
-                  保存的计算参数
+                  原始计算参数
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  当前计算使用的所有设置参数
+                  来自完整版或快速模式的计算参数设置
                 </p>
               </CardHeader>
               <CardContent className="pb-6">

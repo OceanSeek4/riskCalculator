@@ -21,12 +21,13 @@ interface QuickCalculatorFormProps {
   onStopPriceChange?: (hasInput: boolean) => void;
   showSettingsPanel?: boolean;
   onToggleSettingsPanel?: () => void;
+  onPositionScalingChange?: (enabled: boolean, percentage: number) => void;
 }
 
-export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPriceChange, showSettingsPanel, onToggleSettingsPanel }: QuickCalculatorFormProps) {
+export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPriceChange, showSettingsPanel, onToggleSettingsPanel, onPositionScalingChange }: QuickCalculatorFormProps) {
   const { t } = useTranslation();
   const { settings, setNotification } = useSettingsStore();
-  const { setResult, setIsCalculating, calculationError, setCalculationError, marketDataError } = useCalculatorStore();
+  const { setResult, setLastCalculationInput, setIsCalculating, calculationError, setCalculationError, marketDataError } = useCalculatorStore();
   const priceLock = usePriceLock();
 
   // Form state - only 4 editable fields
@@ -48,6 +49,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
 
   const [entryPrice, setEntryPrice] = useState<string>(''); // For LIMIT orders only
   const [stopPrice, setStopPrice] = useState<string>('');
+  const [initialPositionPercentage, setInitialPositionPercentage] = useState<number>(100);
 
   // Initialize parent with current fee type
   useEffect(() => {
@@ -65,6 +67,15 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
     onFeeTypeChange?.(getEffectiveFeeType());
   }, [orderType, feeType]);
 
+  // Notify parent about position scaling changes
+  useEffect(() => {
+    // Position scaling is enabled for all percentages except -1 (disabled state)
+    // 100% is enabled because profit can allow moving stop loss and adding positions
+    const enabled = initialPositionPercentage !== -1;
+    const percentage = initialPositionPercentage === -1 ? 100 : initialPositionPercentage;
+    onPositionScalingChange?.(enabled, percentage);
+  }, [initialPositionPercentage, onPositionScalingChange]);
+
   // Market reference price state
   const [marketPrice, setMarketPrice] = useState<string>('');
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
@@ -72,7 +83,6 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
   // Price change tracking for color effects
-  const [previousPrice, setPreviousPrice] = useState<string>('');
   const [priceChange, setPriceChange] = useState<'up' | 'down' | 'neutral'>('neutral');
 
   // Fetch market metadata when settings change
@@ -105,7 +115,6 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
           
           // Track price changes for color effects
           if (marketPrice && marketPrice !== newPrice) {
-            setPreviousPrice(marketPrice);
             const prevNum = Number(marketPrice);
             const newNum = Number(newPrice);
             
@@ -410,11 +419,15 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         takeProfitRRRatio: String(settings.defaultTakeProfitRRRatio || 2),
         takeProfitPips: '',
         
-        // Risk from settings
+        // Risk from settings - apply position scaling (skip if disabled with -1)
         riskMode: settings.defaultRiskMode || 'FIXED_USDT',
-        riskUSDT: settings.defaultRiskAmount || '100',
+        riskUSDT: initialPositionPercentage !== -1 && initialPositionPercentage < 100 
+          ? String(Number(settings.defaultRiskAmount || '100') * initialPositionPercentage / 100)
+          : settings.defaultRiskAmount || '100',
         accountEquity: settings.defaultAccountEquity || '10000',
-        riskPercent: settings.defaultRiskPercent || '1',
+        riskPercent: initialPositionPercentage !== -1 && initialPositionPercentage < 100
+          ? String(Number(settings.defaultRiskPercent || '1') * initialPositionPercentage / 100)
+          : settings.defaultRiskPercent || '1',
         
         // Fees and costs
         includeFees: true,
@@ -445,9 +458,87 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         orderType: orderType,
         feeType: getEffectiveFeeType(),
         rrRatios: settings.rrRatios || [1, 1.5, 2],
+        
+        // Position scaling settings - enabled for all percentages except -1 (disabled)
+        enablePositionScaling: initialPositionPercentage !== -1,
+        initialPositionPercentage: initialPositionPercentage === -1 ? 100 : initialPositionPercentage,
       };
 
       const result = calculatePosition(calcParams);
+      
+      // Save the actual calculation input parameters for CompactForm reference
+      const actualCalculationInput = {
+        // Market settings (from settings)
+        exchange: settings.defaultExchange,
+        symbol: settings.defaultSymbol,
+        contractMode: settings.defaultContractMode,
+        side: 'LONG' as const,
+        
+        // Order settings (from form)
+        orderType: orderType,
+        entryPrice: String(effectiveEntryPrice),
+        
+        // Stop loss settings (from settings + form)
+        stopMode: stopMode,
+        stopPrice: stopPriceValue,
+        atrPeriod: settings.defaultAtrPeriod,
+        atrTimeframe: settings.defaultAtrTimeframe,
+        atrMultiplier: String(settings.defaultAtrMultiplier || 2),
+        stopPips: stopPipsValue,
+        
+        // Take profit settings (from settings)
+        useTakeProfit: settings.defaultUseTakeProfit,
+        takeProfitMode: settings.defaultTakeProfitMode,
+        takeProfitRRRatio: String(settings.defaultTakeProfitRRRatio || 2),
+        takeProfitATRMultiplier: String(settings.defaultTakeProfitATRMultiplier || 3),
+        
+        // Risk settings (from settings + position scaling)
+        riskMode: settings.defaultRiskMode,
+        riskAmount: initialPositionPercentage !== -1 && initialPositionPercentage < 100 
+          ? String(Number(settings.defaultRiskAmount || '100') * initialPositionPercentage / 100)
+          : settings.defaultRiskAmount,
+        accountEquity: settings.defaultAccountEquity,
+        riskPercent: initialPositionPercentage !== -1 && initialPositionPercentage < 100
+          ? String(Number(settings.defaultRiskPercent || '1') * initialPositionPercentage / 100)
+          : settings.defaultRiskPercent,
+        
+        // Fee settings (from form + settings) - Complete fee structure for ResultCard
+        feeType: getEffectiveFeeType(),
+        includeFees: true,
+        feeOpenMaker: settings.defaultFeeOpenMaker || '0.0002',
+        feeOpenTaker: settings.defaultFeeOpenTaker || '0.0006',
+        feeCloseMaker: settings.defaultFeeCloseMaker || '0.0002',
+        feeCloseTaker: settings.defaultFeeCloseTaker || '0.0006',
+        slippageOpen: settings.defaultSlippageOpen || '0.0005',
+        slippageClose: settings.defaultSlippageClose || '0.0005',
+        enableRebate: settings.defaultEnableRebate || false,
+        rebatePercent: settings.defaultEnableRebate ? (
+          settings.defaultExchange === 'BINANCE' ? settings.defaultRebateBinance :
+          settings.defaultExchange === 'BYBIT' ? settings.defaultRebateBybit :
+          settings.defaultExchange === 'BITGET' ? settings.defaultRebateBitget :
+          settings.defaultExchange === 'OKX' ? settings.defaultRebateOkx :
+          '30'
+        ) : '0',
+        
+        // Backward compatibility fields for ResultCard
+        feeOpen: settings.defaultFeeOpen || '0.0004',
+        feeClose: settings.defaultFeeClose || '0.0004',
+        slippage: settings.defaultSlippage || '0.0005',
+        
+        // Advanced settings (from settings)
+        leverage: settings.defaultLeverage || 10,
+        autoLeverage: true,
+        
+        // Additional fields required by ResultCard for proper display
+        rrRatios: settings.rrRatios || [1, 1.5, 2],
+        marketMeta: marketMeta,
+        
+        // Position scaling (from form) - disabled when -1 selected
+        enablePositionScaling: initialPositionPercentage !== -1,
+        initialPositionPercentage: initialPositionPercentage === -1 ? undefined : initialPositionPercentage,
+      };
+      
+      setLastCalculationInput(actualCalculationInput);
       setResult(result);
       setNotification(t('calculationComplete'), 'success');
 
@@ -864,6 +955,168 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
             {formErrors.stopPrice && (
               <p className="text-sm text-destructive">{formErrors.stopPrice}</p>
             )}
+          </div>
+
+          {/* Initial Position Scaling - Always show with default percentages */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">首次建仓比例</Label>
+              <div className="text-xs text-muted-foreground">
+                当前: <span className="font-semibold text-purple-600 dark:text-purple-400">
+                  {initialPositionPercentage === -1 ? '禁用' : `${initialPositionPercentage}%`}
+                </span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2">
+              {/* Disable Position Scaling Option */}
+              <div
+                onClick={() => setInitialPositionPercentage(-1)}
+                className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                  initialPositionPercentage === -1
+                    ? 'border-gray-500 bg-gray-100 dark:bg-gray-800/30 shadow-sm'
+                    : 'border-border hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/20'
+                }`}
+              >
+                <div className="text-center">
+                  <div className={`text-sm font-medium ${
+                    initialPositionPercentage === -1 ? 'text-gray-700 dark:text-gray-300' : 'text-foreground'
+                  }`}>
+                    禁用加仓
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    全仓建仓
+                  </div>
+                </div>
+              </div>
+
+              {/* 100% Option */}
+              <div
+                onClick={() => setInitialPositionPercentage(100)}
+                className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                  initialPositionPercentage === 100
+                    ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30 shadow-sm ring-1 ring-purple-300 dark:ring-purple-600'
+                    : 'border-border hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20'
+                }`}
+              >
+                <div className="text-center">
+                  <div className={`text-sm font-medium ${
+                    initialPositionPercentage === 100 ? 'text-purple-700 dark:text-purple-300' : 'text-foreground'
+                  }`}>
+                    100%
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    全仓建仓
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Position Scaling Percentage Options */}
+            {(settings.defaultPositionScalingPercentages || [20, 50]).length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {(settings.defaultPositionScalingPercentages || [20, 50]).filter(p => p < 100).map((percentage) => (
+                  <div
+                    key={percentage}
+                    onClick={() => setInitialPositionPercentage(percentage)}
+                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                      initialPositionPercentage === percentage
+                        ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30 shadow-sm ring-1 ring-purple-300 dark:ring-purple-600'
+                        : 'border-border hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <div className={`text-sm font-medium ${
+                        initialPositionPercentage === percentage ? 'text-purple-700 dark:text-purple-300' : 'text-foreground'
+                      }`}>
+                        {percentage}%
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        初始建仓
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Enhanced Risk Preview with Detailed Calculations */}
+            {initialPositionPercentage !== -1 && initialPositionPercentage < 100 && (
+              <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-md border border-purple-200 dark:border-purple-800">
+                <div className="space-y-2">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-purple-700 dark:text-purple-300">风险分配预览</span>
+                    <div className="text-xs text-muted-foreground">
+                      {initialPositionPercentage}% 初始建仓
+                    </div>
+                  </div>
+                  
+                  {/* Risk Calculations */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground">总风险金额:</span>
+                      <div className="font-medium">
+                        {settings.defaultRiskMode === 'FIXED_USDT' 
+                          ? `${settings.defaultRiskAmount || '100'} USDT`
+                          : `${settings.defaultRiskPercent || '1'}% × ${settings.defaultAccountEquity || '10000'} = ${((Number(settings.defaultRiskPercent || '1') * Number(settings.defaultAccountEquity || '10000')) / 100).toFixed(0)} USDT`
+                        }
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground">初始仓位风险:</span>
+                      <div className="font-medium text-purple-600 dark:text-purple-400">
+                        {settings.defaultRiskMode === 'FIXED_USDT' 
+                          ? `${((Number(settings.defaultRiskAmount || '100') * initialPositionPercentage) / 100).toFixed(0)} USDT`
+                          : `${((Number(settings.defaultRiskPercent || '1') * initialPositionPercentage) / 100).toFixed(2)}% × ${settings.defaultAccountEquity || '10000'} = ${((Number(settings.defaultRiskPercent || '1') * Number(settings.defaultAccountEquity || '10000') * initialPositionPercentage) / 10000).toFixed(0)} USDT`
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Remaining Risk */}
+                  <div className="pt-2 border-t border-purple-200 dark:border-purple-700">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">剩余可加仓:</span>
+                      <div className="font-medium text-green-600 dark:text-green-400">
+                        {settings.defaultRiskMode === 'FIXED_USDT' 
+                          ? `${((Number(settings.defaultRiskAmount || '100') * (100 - initialPositionPercentage)) / 100).toFixed(0)} USDT`
+                          : `${((Number(settings.defaultRiskPercent || '1') * (100 - initialPositionPercentage)) / 100).toFixed(2)}% × ${settings.defaultAccountEquity || '10000'} = ${((Number(settings.defaultRiskPercent || '1') * Number(settings.defaultAccountEquity || '10000') * (100 - initialPositionPercentage)) / 10000).toFixed(0)} USDT`
+                        }
+                        <span className="text-muted-foreground ml-1">({100 - initialPositionPercentage}%)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Strategy Tips */}
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">
+                {initialPositionPercentage === -1 ? (
+                  "📌 禁用加仓模式：使用全部风险金额进行建仓"
+                ) : initialPositionPercentage === 100 ? (
+                  "📈 全仓建仓：使用全部风险金额，适合高确定性机会"
+                ) : (
+                  `💰 分批建仓：初始使用${initialPositionPercentage}%风险金额，余下${100 - initialPositionPercentage}%可用于加仓`
+                )}
+              </div>
+              
+              {/* 100% Position Additional Tip */}
+              {initialPositionPercentage === 100 && (
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 text-xs">💡</span>
+                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <div className="font-medium mb-1">加仓策略提示：</div>
+                      <div>仓位盈利后可移动止损位至成本价，释放风险空间用于追加仓位，实现风险重置下的仓位扩大</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Calculate Button */}

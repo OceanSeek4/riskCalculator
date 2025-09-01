@@ -1326,6 +1326,99 @@ export function SettingsForm() {
           </div>
         </div>
 
+        {/* Position Scaling Settings */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+            加仓设置 (Position Scaling Settings)
+          </h3>
+          
+          <div className="space-y-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={settings.defaultEnablePositionScaling}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                  handleInputChange('defaultEnablePositionScaling', e.target.checked)
+                }
+                className="rounded border-gray-300"
+              />
+              <span className="text-sm">默认启用加仓功能 (Default enable position scaling)</span>
+            </label>
+            
+            {settings.defaultEnablePositionScaling && (
+              <div className="pl-6 space-y-4 border-l-2 border-purple-200 dark:border-purple-800">
+                <div className="space-y-2">
+                  <Label>初始仓位比例选项 (Initial Position Percentage Options)</Label>
+                  <div className="space-y-2">
+                    {(settings.defaultPositionScalingPercentages || [20, 50, 100]).map((percentage, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={percentage}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const newPercentages = [...(settings.defaultPositionScalingPercentages || [])];
+                            newPercentages[index] = Number(e.target.value);
+                            handleInputChange('defaultPositionScalingPercentages', newPercentages);
+                          }}
+                          className="flex-1"
+                          placeholder="输入百分比"
+                        />
+                        <span className="text-sm text-muted-foreground w-6">%</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newPercentages = [...(settings.defaultPositionScalingPercentages || [])];
+                            newPercentages.splice(index, 1);
+                            handleInputChange('defaultPositionScalingPercentages', newPercentages);
+                          }}
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          disabled={(settings.defaultPositionScalingPercentages || []).length <= 1}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    
+                    {/* Add New Percentage Button */}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newPercentages = [...(settings.defaultPositionScalingPercentages || []), 25];
+                          handleInputChange('defaultPositionScalingPercentages', newPercentages);
+                        }}
+                        className="flex-1 h-10 border-dashed border-2 text-muted-foreground hover:text-foreground hover:border-solid"
+                        disabled={(settings.defaultPositionScalingPercentages || []).length >= 6}
+                      >
+                        + 添加新比例
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md">
+                    <p className="text-xs text-blue-800 dark:text-blue-300 font-medium mb-1">
+                      💡 使用说明：
+                    </p>
+                    <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                      <li>• 默认提供 20%、50%、100% 三个比例选项</li>
+                      <li>• 可以编辑现有比例或添加新的百分比（1-100%）</li>
+                      <li>• 用户在计算时可选择对应比例进行初始建仓</li>
+                      <li>• 最多支持6个比例选项，最少保留1个</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Offline Mode Settings */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">

@@ -33,6 +33,8 @@ export function CalculatorPageManager() {
   const [currentFeeType, setCurrentFeeType] = useState<'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY'>('MAKER_OPEN_TAKER_CLOSE');
   const [hasStopPriceInput, setHasStopPriceInput] = useState(false);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [enablePositionScaling, setEnablePositionScaling] = useState(false);
+  const [initialPositionPercentage, setInitialPositionPercentage] = useState(100);
 
   // 当有计算结果时，自动切换到简易模式
   useEffect(() => {
@@ -116,6 +118,10 @@ export function CalculatorPageManager() {
                 onStopPriceChange={setHasStopPriceInput}
                 showSettingsPanel={showSettingsPanel}
                 onToggleSettingsPanel={() => setShowSettingsPanel(!showSettingsPanel)}
+                onPositionScalingChange={(enabled, percentage) => {
+                  setEnablePositionScaling(enabled);
+                  setInitialPositionPercentage(percentage);
+                }}
               />
             </div>
             
@@ -129,6 +135,8 @@ export function CalculatorPageManager() {
                 <QuickHintsPanel 
                   currentFeeType={currentFeeType} 
                   hasStopPriceInput={hasStopPriceInput}
+                  enablePositionScaling={enablePositionScaling}
+                  initialPositionPercentage={initialPositionPercentage}
                 />
               )}
             </div>

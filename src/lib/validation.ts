@@ -70,6 +70,10 @@ export const calculatorFormSchema = z.object({
   autoLeverage: z.boolean().default(false),
   accountEquity: z.string().optional(),
   maxEquityUsage: z.string().default('0.8'),
+
+  // Position scaling settings
+  enablePositionScaling: z.boolean().default(false),
+  initialPositionPercentage: z.number().min(1).max(100).default(100),
 });
 
 export type CalculatorFormData = z.infer<typeof calculatorFormSchema>;
@@ -163,6 +167,10 @@ export const settingsSchema = z.object({
   offlineOrderType: z.enum(['LIMIT']).default('LIMIT'),
   offlineDefaultEntryPrice: z.string().default('100000'),
   offlineTrailingEnabled: z.boolean().default(false),
+
+  // Position scaling settings
+  defaultEnablePositionScaling: z.boolean().default(false),
+  defaultPositionScalingPercentages: z.array(z.number().min(1).max(100)).default([20, 50, 100]),
 });
 
 export type SettingsData = z.infer<typeof settingsSchema>;

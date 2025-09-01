@@ -28,6 +28,8 @@ interface SavedParametersCardProps {
     enableRebate?: boolean;
     rebatePercent?: string;
     autoLeverage?: boolean;
+    enablePositionScaling?: boolean;
+    initialPositionPercentage?: number;
   };
 }
 
@@ -113,6 +115,44 @@ export function SavedParametersCard({ savedParams }: SavedParametersCardProps) {
             <div className="flex justify-between items-center min-h-[20px]">
               <span className="text-muted-foreground whitespace-nowrap">{t('leverage')}:</span>
               <span className="font-mono font-medium">{savedParams.leverage}x</span>
+            </div>
+            
+            {/* Position Scaling Information */}
+            <div className="pt-2 border-t border-border">
+              <div className="flex justify-between items-center min-h-[20px]">
+                <span className="text-muted-foreground whitespace-nowrap">加仓模式:</span>
+                <span className="font-mono ml-2 whitespace-nowrap">
+                  {savedParams.enablePositionScaling ? '启用' : '禁用'}
+                </span>
+              </div>
+              {savedParams.enablePositionScaling && savedParams.initialPositionPercentage && savedParams.initialPositionPercentage < 100 && (
+                <>
+                  <div className="flex justify-between items-center min-h-[20px]">
+                    <span className="text-muted-foreground whitespace-nowrap">初始建仓比例:</span>
+                    <span className="font-mono ml-2 whitespace-nowrap text-purple-600 dark:text-purple-400 font-medium">
+                      {savedParams.initialPositionPercentage}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center min-h-[20px]">
+                    <span className="text-muted-foreground whitespace-nowrap">初始风险分配:</span>
+                    <span className="font-mono ml-2 whitespace-nowrap text-purple-600 dark:text-purple-400">
+                      {savedParams.riskMode === 'ACCOUNT_PERCENT' 
+                        ? `${((Number(savedParams.riskPercent || '1') * (savedParams.initialPositionPercentage || 100)) / 100).toFixed(2)}%`
+                        : `$${((Number(savedParams.riskAmount || '100') * (savedParams.initialPositionPercentage || 100)) / 100).toFixed(0)}`
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center min-h-[20px]">
+                    <span className="text-muted-foreground whitespace-nowrap">可加仓余量:</span>
+                    <span className="font-mono ml-2 whitespace-nowrap text-green-600 dark:text-green-400">
+                      {savedParams.riskMode === 'ACCOUNT_PERCENT' 
+                        ? `${((Number(savedParams.riskPercent || '1') * (100 - (savedParams.initialPositionPercentage || 100))) / 100).toFixed(2)}%`
+                        : `$${((Number(savedParams.riskAmount || '100') * (100 - (savedParams.initialPositionPercentage || 100))) / 100).toFixed(0)}`
+                      }
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </CardContent>

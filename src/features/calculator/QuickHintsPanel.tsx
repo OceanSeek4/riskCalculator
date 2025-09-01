@@ -7,9 +7,11 @@ import { useSettingsStore } from '@/lib/store';
 interface QuickHintsPanelProps {
   currentFeeType?: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY';
   hasStopPriceInput?: boolean;
+  enablePositionScaling?: boolean;
+  initialPositionPercentage?: number;
 }
 
-export function QuickHintsPanel({ currentFeeType, hasStopPriceInput }: QuickHintsPanelProps) {
+export function QuickHintsPanel({ currentFeeType, hasStopPriceInput, enablePositionScaling, initialPositionPercentage }: QuickHintsPanelProps) {
   const { t } = useTranslation();
   const { settings } = useSettingsStore();
   
@@ -84,6 +86,54 @@ export function QuickHintsPanel({ currentFeeType, hasStopPriceInput }: QuickHint
                   <span className="ml-2 font-medium">{settings.defaultRiskPercent || '1'}%</span>
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* Position Scaling Settings */}
+        <div className="space-y-3">
+          <h4 className="font-medium text-sm text-muted-foreground">加仓设置</h4>
+          <div className="grid grid-cols-1 gap-2 text-sm">
+            <div>
+              <span className="text-muted-foreground">加仓模式:</span>
+              <span className="ml-2 font-medium">
+                {enablePositionScaling ? '启用' : '禁用'}
+              </span>
+            </div>
+            {enablePositionScaling && initialPositionPercentage && initialPositionPercentage < 100 && (
+              <>
+                <div>
+                  <span className="text-muted-foreground">初始建仓比例:</span>
+                  <span className="ml-2 font-medium text-purple-600 dark:text-purple-400">
+                    {initialPositionPercentage}%
+                  </span>
+                </div>
+                <div className="p-2 bg-purple-50 dark:bg-purple-950/30 rounded-md">
+                  <div className="text-xs font-medium text-purple-800 dark:text-purple-300 mb-1">
+                    风险分配预览
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">初始风险:</span>
+                      <span className="font-medium text-purple-700 dark:text-purple-300">
+                        {settings.defaultRiskMode === 'FIXED_USDT'
+                          ? `${((Number(settings.defaultRiskAmount || '100') * initialPositionPercentage) / 100).toFixed(0)} USDT`
+                          : `${((Number(settings.defaultRiskPercent || '1') * initialPositionPercentage) / 100).toFixed(2)}%`
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">可加仓余量:</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {settings.defaultRiskMode === 'FIXED_USDT'
+                          ? `${((Number(settings.defaultRiskAmount || '100') * (100 - initialPositionPercentage)) / 100).toFixed(0)} USDT`
+                          : `${((Number(settings.defaultRiskPercent || '1') * (100 - initialPositionPercentage)) / 100).toFixed(2)}%`
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -58,6 +58,7 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
     setFormData,
     result,
     setResult,
+    setLastCalculationInput,
     syncWithSettings,
     currentATR,
     setCurrentATR,
@@ -1116,9 +1117,17 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
         takeProfitRRRatio: formData.takeProfitMode === 'RR_RATIO' ? formData.takeProfitRRRatio : undefined,
         takeProfitPips: formData.takeProfitMode === 'PIPS' ? formData.takeProfitPips : undefined,
         riskMode: formData.riskMode || 'FIXED_USDT',
-        riskUSDT: formData.riskMode === 'FIXED_USDT' ? formData.riskAmount : undefined,
+        riskUSDT: formData.riskMode === 'FIXED_USDT' ? (
+          formData.enablePositionScaling && formData.initialPositionPercentage !== 100
+            ? String(Number(formData.riskAmount || '0') * (formData.initialPositionPercentage || 100) / 100)
+            : formData.riskAmount
+        ) : undefined,
         accountEquity: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.accountEquity : undefined,
-        riskPercent: formData.riskMode === 'ACCOUNT_PERCENT' ? formData.riskPercent : undefined,
+        riskPercent: formData.riskMode === 'ACCOUNT_PERCENT' ? (
+          formData.enablePositionScaling && formData.initialPositionPercentage !== 100
+            ? String(Number(formData.riskPercent || '0') * (formData.initialPositionPercentage || 100) / 100)
+            : formData.riskPercent
+        ) : undefined,
         includeFees: formData.includeFees || false,
         // Maker/Taker fees
         feeOpenMaker: formData.feeOpenMaker || '0.0002',
@@ -1163,6 +1172,17 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
       
       const result = calculatePosition(input);
       console.log('✅ Calculation Result:', result);
+      
+      // Save the actual calculation input parameters for CompactForm reference
+      setLastCalculationInput({
+        ...formData,
+        // Override with actual values used in calculation
+        entryPrice: lockedEntryPrice,
+        // Ensure position scaling reflects the actual calculation state
+        enablePositionScaling: formData.enablePositionScaling || false,
+        initialPositionPercentage: formData.initialPositionPercentage || 100,
+      });
+      
       setResult(result);
       
       // Scroll to top to show calculation results
@@ -1920,6 +1940,114 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
             </div>
           )}
         </div>
+
+        {/* Position Scaling */}
+        {settings.defaultEnablePositionScaling && (
+          <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">加仓设置</h3>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enablePositionScaling"
+                  checked={formData.enablePositionScaling || false}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                    handleInputChange('enablePositionScaling', e.target.checked)
+                  }
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="enablePositionScaling" className="text-sm font-medium cursor-pointer">
+                  启用加仓功能
+                </label>
+              </div>
+            </div>
+
+            {formData.enablePositionScaling && (
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">初始建仓比例</Label>
+                    <div className="text-xs text-muted-foreground">
+                      当前选择: <span className="font-semibold text-purple-600 dark:text-purple-400">
+                        {formData.initialPositionPercentage || 100}%
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {(settings.defaultPositionScalingPercentages || [20, 50, 100]).map((percentage) => (
+                      <div
+                        key={percentage}
+                        onClick={() => handleInputChange('initialPositionPercentage', percentage)}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                          formData.initialPositionPercentage === percentage
+                            ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30 shadow-sm ring-2 ring-purple-200 dark:ring-purple-700'
+                            : 'border-border hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className={`text-lg font-bold ${
+                            formData.initialPositionPercentage === percentage 
+                              ? 'text-purple-700 dark:text-purple-300' 
+                              : 'text-foreground'
+                          }`}>
+                            {percentage}%
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            初始建仓
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Risk Calculation Preview */}
+                <div className="p-3 bg-white dark:bg-gray-900 rounded-md border border-purple-200 dark:border-purple-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-purple-700 dark:text-purple-300">风险分配预览</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">总风险金额:</span>
+                      <div className="font-medium">
+                        {formData.riskMode === 'FIXED_USDT' 
+                          ? `${formData.riskAmount || '100'} USDT`
+                          : `${formData.riskPercent || '1'}% × ${formData.accountEquity || '10000'}`
+                        }
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">初始仓位风险:</span>
+                      <div className="font-medium text-purple-600 dark:text-purple-400">
+                        {formData.riskMode === 'FIXED_USDT' 
+                          ? `${((Number(formData.riskAmount || '100') * (formData.initialPositionPercentage || 100)) / 100).toFixed(2)} USDT`
+                          : `${((Number(formData.riskPercent || '1') * (formData.initialPositionPercentage || 100)) / 100).toFixed(2)}% × ${formData.accountEquity || '10000'}`
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 计算将基于初始仓位风险进行，剩余资金可用于后续加仓
+                  </p>
+                </div>
+
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-800 dark:text-blue-300 font-medium mb-1">
+                    📈 加仓策略说明：
+                  </p>
+                  <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1">
+                    <li>• <strong>20%</strong>：保守建仓，留80%资金用于后续加仓</li>
+                    <li>• <strong>50%</strong>：平衡建仓，适合分批进入策略</li>
+                    <li>• <strong>100%</strong>：全仓建仓，适合高确定性机会</li>
+                    <li>• 可在设置中自定义更多比例选项</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Leverage (for contracts) */}
         <LeverageSection
