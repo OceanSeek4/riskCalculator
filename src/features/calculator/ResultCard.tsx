@@ -14,6 +14,7 @@ export function ResultCard() {
     result, 
     setResult,
     formData,
+    lastCalculationInput,
     currentATR,
     trailingEnabled,
     trailingConfig,
@@ -159,10 +160,10 @@ export function ResultCard() {
       });
     }
     
-    // Market Settings Section
+    // Market Settings Section - Use actual calculation parameters
     summary += `\n🏦 ${t('orderSummaryMarketSettings').toUpperCase()}\n`;
-    summary += `${t('exchange')}: ${t(formData.exchange?.toLowerCase() || 'binance')}\n`;
-    summary += `${t('symbol')}: ${formData.symbol || symbol}\n`;
+    summary += `${t('exchange')}: ${t((lastCalculationInput?.exchange || formData.exchange)?.toLowerCase() || 'binance')}\n`;
+    summary += `${t('symbol')}: ${lastCalculationInput?.symbol || formData.symbol || symbol}\n`;
     
     // Contract mode translation
     const contractModeMap: Record<string, string> = {
@@ -170,20 +171,21 @@ export function ResultCard() {
       'USDT_PERP': 'usdtPerp',
       'INVERSE': 'inverse'
     };
-    const contractModeKey = contractModeMap[formData.contractMode || 'USDT_PERP'] || 'spot';
+    const contractModeKey = contractModeMap[lastCalculationInput?.contractMode || formData.contractMode || 'USDT_PERP'] || 'spot';
     summary += `${t('contractMode')}: ${t(contractModeKey)}\n`;
     summary += `${t('side')}: ${t(side.toLowerCase())}\n`;
-    summary += `${t('orderType')}: ${formData.orderType === 'MARKET' ? t('marketOrder') : t('limitOrder')}\n`;
+    summary += `${t('orderType')}: ${(lastCalculationInput?.orderType || formData.orderType) === 'MARKET' ? t('marketOrder') : t('limitOrder')}\n`;
     
     // Add fee type for limit orders
-    if (formData.orderType === 'LIMIT' && formData.feeType) {
+    if ((lastCalculationInput?.orderType || formData.orderType) === 'LIMIT' && (lastCalculationInput?.feeType || formData.feeType)) {
       const feeTypeMap = {
         'MAKER': '(全部Maker)',
         'TAKER': '(全部Taker)', 
         'MAKER_OPEN_TAKER_CLOSE': '(开仓Maker,止损Taker)',
         'MAKER_OPEN_ONLY': '(仅开仓Maker)'
       };
-      summary += `费率策略: ${feeTypeMap[formData.feeType] || ''}\n`;
+      const actualFeeTypeForSummary = lastCalculationInput?.feeType || formData.feeType;
+      summary += `费率策略: ${actualFeeTypeForSummary ? feeTypeMap[actualFeeTypeForSummary] || '' : ''}\n`;
     }
     
     // Add fee rates information
@@ -192,29 +194,30 @@ export function ResultCard() {
       return parseFloat(percentage).toString() + '%';
     };
     
-    if (formData.orderType === 'LIMIT' && formData.feeType) {
+    if ((lastCalculationInput?.orderType || formData.orderType) === 'LIMIT' && (lastCalculationInput?.feeType || formData.feeType)) {
       summary += `\n💰 费率详情\n`;
       
-      if (formData.feeType === 'MAKER') {
-        summary += `开仓: ${formatFeeRate(formData.feeOpenMaker || '0.0002')} (Maker)\n`;
-        summary += `止损: ${formatFeeRate(formData.feeCloseMaker || '0.0002')} (Maker)\n`;
-        summary += `止盈: ${formatFeeRate(formData.feeCloseMaker || '0.0002')} (Maker)\n`;
+      const actualFeeType = lastCalculationInput?.feeType || formData.feeType;
+      if (actualFeeType === 'MAKER') {
+        summary += `开仓: ${formatFeeRate(lastCalculationInput?.feeOpenMaker || formData.feeOpenMaker || '0.0002')} (Maker)\n`;
+        summary += `止损: ${formatFeeRate(lastCalculationInput?.feeCloseMaker || formData.feeCloseMaker || '0.0002')} (Maker)\n`;
+        summary += `止盈: ${formatFeeRate(lastCalculationInput?.feeCloseMaker || formData.feeCloseMaker || '0.0002')} (Maker)\n`;
         summary += `滑点: 0% (挂单无滑点)\n`;
-      } else if (formData.feeType === 'TAKER') {
-        summary += `开仓: ${formatFeeRate(formData.feeOpenTaker || '0.0006')} (Taker)\n`;
-        summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
-        summary += `止盈: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
-        summary += `滑点: ${formatFeeRate(formData.slippageOpen || '0.0005')} + ${formatFeeRate(formData.slippageClose || '0.0005')}\n`;
-      } else if (formData.feeType === 'MAKER_OPEN_TAKER_CLOSE') {
-        summary += `开仓: ${formatFeeRate(formData.feeOpenMaker || '0.0002')} (Maker)\n`;
-        summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
-        summary += `止盈: ${formatFeeRate(formData.feeCloseMaker || '0.0002')} (Maker)\n`;
-        summary += `滑点: 0% + ${formatFeeRate(formData.slippageClose || '0.0005')} + 0%\n`;
-      } else if (formData.feeType === 'MAKER_OPEN_ONLY') {
-        summary += `开仓: ${formatFeeRate(formData.feeOpenMaker || '0.0002')} (Maker)\n`;
-        summary += `止损: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
-        summary += `止盈: ${formatFeeRate(formData.feeCloseTaker || '0.0006')} (Taker)\n`;
-        summary += `滑点: 0% + ${formatFeeRate(formData.slippageClose || '0.0005')} + ${formatFeeRate(formData.slippageClose || '0.0005')}\n`;
+      } else if (actualFeeType === 'TAKER') {
+        summary += `开仓: ${formatFeeRate(lastCalculationInput?.feeOpenTaker || formData.feeOpenTaker || '0.0006')} (Taker)\n`;
+        summary += `止损: ${formatFeeRate(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `止盈: ${formatFeeRate(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `滑点: ${formatFeeRate(lastCalculationInput?.slippageOpen || formData.slippageOpen || '0.0005')} + ${formatFeeRate(lastCalculationInput?.slippageClose || formData.slippageClose || '0.0005')}\n`;
+      } else if (actualFeeType === 'MAKER_OPEN_TAKER_CLOSE') {
+        summary += `开仓: ${formatFeeRate(lastCalculationInput?.feeOpenMaker || formData.feeOpenMaker || '0.0002')} (Maker)\n`;
+        summary += `止损: ${formatFeeRate(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `止盈: ${formatFeeRate(lastCalculationInput?.feeCloseMaker || formData.feeCloseMaker || '0.0002')} (Maker)\n`;
+        summary += `滑点: 0% + ${formatFeeRate(lastCalculationInput?.slippageClose || formData.slippageClose || '0.0005')} + 0%\n`;
+      } else if (actualFeeType === 'MAKER_OPEN_ONLY') {
+        summary += `开仓: ${formatFeeRate(lastCalculationInput?.feeOpenMaker || formData.feeOpenMaker || '0.0002')} (Maker)\n`;
+        summary += `止损: ${formatFeeRate(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `止盈: ${formatFeeRate(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')} (Taker)\n`;
+        summary += `滑点: 0% + ${formatFeeRate(lastCalculationInput?.slippageClose || formData.slippageClose || '0.0005')} + ${formatFeeRate(lastCalculationInput?.slippageClose || formData.slippageClose || '0.0005')}\n`;
       }
     }
 
@@ -471,16 +474,16 @@ export function ResultCard() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('orderType')}:</span>
                 <span className="font-medium">
-                  {formData.orderType === 'MARKET' ? t('marketOrder') : t('limitOrder')}
+                  {(lastCalculationInput?.orderType || formData.orderType) === 'MARKET' ? t('marketOrder') : t('limitOrder')}
                 </span>
               </div>
-              {formData.orderType === 'LIMIT' && formData.feeType && (
+              {(lastCalculationInput?.orderType || formData.orderType) === 'LIMIT' && (lastCalculationInput?.feeType || formData.feeType) && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('feeType')}:</span>
                   <span className="font-medium text-xs">
-                    {formData.feeType === 'MAKER' ? t('feeTypeAllMaker') :
-                     formData.feeType === 'TAKER' ? t('feeTypeAllTaker') :
-                     formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' ? t('feeTypeMakerOpenTakerClose') :
+                    {(lastCalculationInput?.feeType || formData.feeType) === 'MAKER' ? t('feeTypeAllMaker') :
+                     (lastCalculationInput?.feeType || formData.feeType) === 'TAKER' ? t('feeTypeAllTaker') :
+                     (lastCalculationInput?.feeType || formData.feeType) === 'MAKER_OPEN_TAKER_CLOSE' ? t('feeTypeMakerOpenTakerClose') :
                      t('feeTypeMakerOpenOnly')}
                   </span>
                 </div>
@@ -489,52 +492,52 @@ export function ResultCard() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('fees')} Calc:</span>
                   <span className="font-medium">
-                    {formData.includeFees ? t('enabled') : 'Disabled'}
+                    {(lastCalculationInput?.includeFees ?? formData.includeFees) ? t('enabled') : 'Disabled'}
                   </span>
                 </div>
                 
-                {formData.includeFees ? (
+                {(lastCalculationInput?.includeFees ?? formData.includeFees) ? (
                   <>
-                    {formData.orderType === 'LIMIT' && formData.feeType && (
+                    {(lastCalculationInput?.orderType || formData.orderType) === 'LIMIT' && (lastCalculationInput?.feeType || formData.feeType) && (
                       <div className="text-xs space-y-1 p-2 bg-muted/30 rounded">
                         <div className="font-medium text-center">费率策略详情</div>
-                        {formData.feeType === 'MAKER' && (
+                        {(lastCalculationInput?.feeType || formData.feeType) === 'MAKER' && (
                           <>
-                            <div>开仓: {((parseFloat(formData.feeOpenMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
-                            <div>止损: {((parseFloat(formData.feeCloseMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
+                            <div>开仓: {((parseFloat(lastCalculationInput?.feeOpenMaker || formData.feeOpenMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
+                            <div>止损: {((parseFloat(lastCalculationInput?.feeCloseMaker || formData.feeCloseMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
                             <div>滑点: 0% (挂单无滑点)</div>
                           </>
                         )}
-                        {formData.feeType === 'TAKER' && (
+                        {(lastCalculationInput?.feeType || formData.feeType) === 'TAKER' && (
                           <>
-                            <div>开仓: {((parseFloat(formData.feeOpenTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
-                            <div>止损: {((parseFloat(formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
-                            <div>滑点: {((parseFloat(formData.slippageOpen || '0.0005')) * 100).toFixed(3)}%</div>
+                            <div>开仓: {((parseFloat(lastCalculationInput?.feeOpenTaker || formData.feeOpenTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                            <div>止损: {((parseFloat(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                            <div>滑点: {((parseFloat(lastCalculationInput?.slippageOpen || formData.slippageOpen || '0.0005')) * 100).toFixed(3)}%</div>
                           </>
                         )}
-                        {formData.feeType === 'MAKER_OPEN_TAKER_CLOSE' && (
+                        {(lastCalculationInput?.feeType || formData.feeType) === 'MAKER_OPEN_TAKER_CLOSE' && (
                           <>
-                            <div>开仓: {((parseFloat(formData.feeOpenMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
-                            <div>止损: {((parseFloat(formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
-                            <div>滑点: 0% + {((parseFloat(formData.slippageClose || '0.0005')) * 100).toFixed(3)}%</div>
+                            <div>开仓: {((parseFloat(lastCalculationInput?.feeOpenMaker || formData.feeOpenMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
+                            <div>止损: {((parseFloat(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                            <div>滑点: 0% + {((parseFloat(lastCalculationInput?.slippageClose || formData.slippageClose || '0.0005')) * 100).toFixed(3)}%</div>
                           </>
                         )}
-                        {formData.feeType === 'MAKER_OPEN_ONLY' && (
+                        {(lastCalculationInput?.feeType || formData.feeType) === 'MAKER_OPEN_ONLY' && (
                           <>
-                            <div>开仓: {((parseFloat(formData.feeOpenMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
-                            <div>止损: {((parseFloat(formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
-                            <div>止盈: {((parseFloat(formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                            <div>开仓: {((parseFloat(lastCalculationInput?.feeOpenMaker || formData.feeOpenMaker || '0.0002')) * 100).toFixed(3)}% (Maker)</div>
+                            <div>止损: {((parseFloat(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                            <div>止盈: {((parseFloat(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
                           </>
                         )}
                       </div>
                     )}
                     
-                    {formData.orderType === 'MARKET' && (
+                    {(lastCalculationInput?.orderType || formData.orderType) === 'MARKET' && (
                       <div className="text-xs space-y-1 p-2 bg-muted/30 rounded">
                         <div className="font-medium text-center">市价单费率</div>
-                        <div>开仓: {((parseFloat(formData.feeOpenTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
-                        <div>止损: {((parseFloat(formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
-                        <div>滑点: {((parseFloat(formData.slippageOpen || '0.0005')) * 100).toFixed(3)}%</div>
+                        <div>开仓: {((parseFloat(lastCalculationInput?.feeOpenTaker || formData.feeOpenTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                        <div>止损: {((parseFloat(lastCalculationInput?.feeCloseTaker || formData.feeCloseTaker || '0.0006')) * 100).toFixed(3)}% (Taker)</div>
+                        <div>滑点: {((parseFloat(lastCalculationInput?.slippageOpen || formData.slippageOpen || '0.0005')) * 100).toFixed(3)}%</div>
                       </div>
                     )}
                     
@@ -571,16 +574,17 @@ export function ResultCard() {
               <div className="text-center p-2 bg-muted/30 rounded">
                 <div className="font-medium">{t('riskRatio')}</div>
                 <div className="text-sm mt-1">
-                  {formData.riskMode === 'ACCOUNT_PERCENT' 
-                    ? `${formData.riskPercent || '0'}%` 
-                    : `$${formData.riskAmount || '0'}`
+                  {/* Use actual calculation parameters when available */}
+                  {(lastCalculationInput?.riskMode || formData.riskMode) === 'ACCOUNT_PERCENT' 
+                    ? `${lastCalculationInput?.riskPercent || formData.riskPercent || '0'}%` 
+                    : `$${lastCalculationInput?.riskAmount || formData.riskAmount || '0'}`
                   }
                 </div>
               </div>
               <div className="text-center p-2 bg-muted/30 rounded">
                 <div className="font-medium">{t('leverageMultiple')}</div>
                 <div className="text-sm mt-1">
-                  {result.leverage ? (typeof result.leverage === 'string' ? parseFloat(result.leverage) : result.leverage) : formData.leverage || '1'}x
+                  {result.leverage ? (typeof result.leverage === 'string' ? parseFloat(result.leverage) : result.leverage) : (lastCalculationInput?.leverage || formData.leverage || '1')}x
                 </div>
               </div>
             </div>
