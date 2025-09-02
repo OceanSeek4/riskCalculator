@@ -419,15 +419,19 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         takeProfitRRRatio: String(settings.defaultTakeProfitRRRatio || 2),
         takeProfitPips: '',
         
-        // Risk from settings - apply position scaling (skip if disabled with -1)
+        // Risk from settings - use same logic as CalculatorForm
         riskMode: settings.defaultRiskMode || 'FIXED_USDT',
-        riskUSDT: initialPositionPercentage !== -1 && initialPositionPercentage < 100 
-          ? String(Number(settings.defaultRiskAmount || '100') * initialPositionPercentage / 100)
-          : settings.defaultRiskAmount || '100',
-        accountEquity: settings.defaultAccountEquity || '10000',
-        riskPercent: initialPositionPercentage !== -1 && initialPositionPercentage < 100
-          ? String(Number(settings.defaultRiskPercent || '1') * initialPositionPercentage / 100)
-          : settings.defaultRiskPercent || '1',
+        riskUSDT: (settings.defaultRiskMode || 'FIXED_USDT') === 'FIXED_USDT' ? (
+          initialPositionPercentage !== -1 && initialPositionPercentage < 100
+            ? String(Number(settings.defaultRiskAmount || '100') * initialPositionPercentage / 100)
+            : settings.defaultRiskAmount || '100'
+        ) : undefined,
+        accountEquity: (settings.defaultRiskMode || 'FIXED_USDT') === 'ACCOUNT_PERCENT' ? settings.defaultAccountEquity || '10000' : undefined,
+        riskPercent: (settings.defaultRiskMode || 'FIXED_USDT') === 'ACCOUNT_PERCENT' ? (
+          initialPositionPercentage !== -1 && initialPositionPercentage < 100
+            ? String(Number(settings.defaultRiskPercent || '1') * initialPositionPercentage / 100)
+            : settings.defaultRiskPercent || '1'
+        ) : undefined,
         
         // Fees and costs
         includeFees: true,
@@ -466,6 +470,27 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
 
       const result = calculatePosition(calcParams);
       
+      // Calculate additional position scaling data when enabled
+      let positionScalingData: any = {};
+      if (initialPositionPercentage !== -1) {
+        // Use ORIGINAL risk settings for display purposes (not adjusted by position percentage)
+        const totalRiskAmount = (settings.defaultRiskMode || 'FIXED_USDT') === 'FIXED_USDT' 
+          ? Number(settings.defaultRiskAmount || '100')
+          : (Number(settings.defaultRiskPercent || '1') * Number(settings.defaultAccountEquity || '10000')) / 100;
+        
+        const currentRiskAmount = (totalRiskAmount * initialPositionPercentage) / 100;
+        const remainingRiskAmount = totalRiskAmount - currentRiskAmount;
+        
+        positionScalingData = {
+          totalRiskAmount: String(totalRiskAmount),
+          currentRiskAmount: String(currentRiskAmount),
+          remainingRiskAmount: String(remainingRiskAmount),
+          currentStopLossRisk: result.stopLossRisk || '0',
+          remainingCapacity: String(remainingRiskAmount),
+          initialPositionPercentage,
+        };
+      }
+
       // Save the actual calculation input parameters for CompactForm reference
       const actualCalculationInput = {
         // Market settings (from settings)
@@ -492,15 +517,11 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         takeProfitRRRatio: String(settings.defaultTakeProfitRRRatio || 2),
         takeProfitATRMultiplier: String(settings.defaultTakeProfitATRMultiplier || 3),
         
-        // Risk settings (from settings + position scaling)
+        // Risk settings (from settings) - Store ORIGINAL values for display
         riskMode: settings.defaultRiskMode,
-        riskAmount: initialPositionPercentage !== -1 && initialPositionPercentage < 100 
-          ? String(Number(settings.defaultRiskAmount || '100') * initialPositionPercentage / 100)
-          : settings.defaultRiskAmount,
+        riskAmount: settings.defaultRiskAmount,  // Keep original for display
         accountEquity: settings.defaultAccountEquity,
-        riskPercent: initialPositionPercentage !== -1 && initialPositionPercentage < 100
-          ? String(Number(settings.defaultRiskPercent || '1') * initialPositionPercentage / 100)
-          : settings.defaultRiskPercent,
+        riskPercent: settings.defaultRiskPercent,  // Keep original for display
         
         // Fee settings (from form + settings) - Complete fee structure for ResultCard
         feeType: getEffectiveFeeType(),
@@ -536,6 +557,9 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         // Position scaling (from form) - disabled when -1 selected
         enablePositionScaling: initialPositionPercentage !== -1,
         initialPositionPercentage: initialPositionPercentage === -1 ? undefined : initialPositionPercentage,
+        
+        // Position scaling data for ResultCard
+        ...positionScalingData,
       };
       
       setLastCalculationInput(actualCalculationInput);

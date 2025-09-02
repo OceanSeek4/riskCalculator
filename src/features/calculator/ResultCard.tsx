@@ -259,7 +259,11 @@ export function ResultCard() {
   return (
     <div className="w-full max-w-[1920px] mx-auto animate-in fade-in duration-300">
       {/* 宽屏横向布局 - 全新架构 */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 gap-6">
+      <div className={`grid gap-6 ${
+        lastCalculationInput?.enablePositionScaling 
+          ? 'grid-cols-1 2xl:grid-cols-5 xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' 
+          : 'grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2'
+      }`}>
         {/* 1. 入场信息卡片 */}
         <Card className="col-span-1 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800 hover:shadow-lg transition-all duration-200">
           <CardHeader className="pb-3">
@@ -464,6 +468,73 @@ export function ResultCard() {
             )}
           </CardContent>
         </Card>
+
+        {/* 5. 加仓信息卡片 - 仅在加仓模式启用时显示 */}
+        {lastCalculationInput?.enablePositionScaling && (
+          <Card className="col-span-1 bg-gradient-to-br from-purple-50 to-indigo-100 dark:from-purple-950 dark:to-indigo-950 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-all duration-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                <TrendingUp className="w-5 h-5" />
+                加仓信息
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* 当前仓位比例 */}
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground mb-1">初始建仓比例</p>
+                <p className="text-2xl font-bold font-mono text-purple-900 dark:text-purple-100">
+                  {lastCalculationInput.initialPositionPercentage || 100}%
+                </p>
+              </div>
+
+              {/* 风险分配详情 */}
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">总风险金额:</span>
+                  <span className="font-medium">${formatUSDT((lastCalculationInput as any).totalRiskAmount || '0')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">当前风险:</span>
+                  <span className="font-medium text-purple-600 dark:text-purple-400">
+                    ${formatUSDT((lastCalculationInput as any).currentRiskAmount || '0')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">实际止损:</span>
+                  <span className="font-medium text-red-600 dark:text-red-400">
+                    -${formatUSDT((lastCalculationInput as any).currentStopLossRisk || '0')}
+                  </span>
+                </div>
+              </div>
+
+              {/* 剩余加仓容量 */}
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">剩余加仓容量</p>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                    ${formatUSDT((lastCalculationInput as any).remainingRiskAmount || '0')}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ({100 - (lastCalculationInput.initialPositionPercentage || 100)}%)
+                  </p>
+                </div>
+              </div>
+
+              {/* 加仓策略提示 */}
+              <div className="text-xs text-muted-foreground bg-purple-50 dark:bg-purple-950/50 p-2 rounded">
+                <div className="flex items-start gap-1">
+                  <span>💡</span>
+                  <div>
+                    {lastCalculationInput.initialPositionPercentage === 100 ? 
+                      '仓位盈利后可移动止损至成本价，释放风险空间用于追加仓位' :
+                      '可在趋势确认后使用剩余风险金额进行加仓操作'
+                    }
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* 第二行 - 详细分析 */}

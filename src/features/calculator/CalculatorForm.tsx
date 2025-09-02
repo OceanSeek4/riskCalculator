@@ -1173,6 +1173,25 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
       const result = calculatePosition(input);
       console.log('✅ Calculation Result:', result);
       
+      // Calculate additional position scaling data when enabled
+      let positionScalingData: any = {};
+      if (formData.enablePositionScaling && formData.initialPositionPercentage && formData.initialPositionPercentage < 100) {
+        const totalRiskAmount = formData.riskMode === 'FIXED_USDT' 
+          ? Number(formData.riskAmount || '100')
+          : (Number(formData.riskPercent || '1') * Number(formData.accountEquity || '10000')) / 100;
+        
+        const currentRiskAmount = (totalRiskAmount * formData.initialPositionPercentage) / 100;
+        const remainingRiskAmount = totalRiskAmount - currentRiskAmount;
+        
+        positionScalingData = {
+          totalRiskAmount: String(totalRiskAmount),
+          currentRiskAmount: String(currentRiskAmount),
+          remainingRiskAmount: String(remainingRiskAmount),
+          currentStopLossRisk: result.stopLossRisk || '0',
+          remainingCapacity: String(remainingRiskAmount),
+        };
+      }
+      
       // Save the actual calculation input parameters for CompactForm reference
       setLastCalculationInput({
         ...formData,
@@ -1181,6 +1200,8 @@ export function CalculatorForm({ onSwitchToQuick }: CalculatorFormProps) {
         // Ensure position scaling reflects the actual calculation state
         enablePositionScaling: formData.enablePositionScaling || false,
         initialPositionPercentage: formData.initialPositionPercentage || 100,
+        // Position scaling data for ResultCard
+        ...positionScalingData,
       });
       
       setResult(result);
