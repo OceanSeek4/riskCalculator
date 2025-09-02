@@ -34,13 +34,17 @@ export function ResultCard() {
   const { t } = useTranslation();
   const { settings } = useSettingsStore();
   
-  // Fetch market meta when form data changes
+  // Fetch market meta when form data changes - prioritize lastCalculationInput
   React.useEffect(() => {
     const fetchMarketMeta = async () => {
-      if (formData.exchange && formData.symbol && formData.contractMode) {
+      const exchange = lastCalculationInput?.exchange || formData.exchange;
+      const symbol = lastCalculationInput?.symbol || formData.symbol;
+      const contractMode = lastCalculationInput?.contractMode || formData.contractMode;
+      
+      if (exchange && symbol && contractMode) {
         try {
-          const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
-          const meta = await getMarketMeta(formData.exchange as Exchange, formData.symbol, instType);
+          const instType: InstType = contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const meta = await getMarketMeta(exchange as Exchange, symbol, instType);
           setMarketMeta(meta);
         } catch (error) {
           console.error('Failed to fetch market meta:', error);
@@ -52,7 +56,7 @@ export function ResultCard() {
     };
 
     fetchMarketMeta();
-  }, [formData.exchange, formData.symbol, formData.contractMode]);
+  }, [formData.exchange, formData.symbol, formData.contractMode, lastCalculationInput?.exchange, lastCalculationInput?.symbol, lastCalculationInput?.contractMode]);
   
   const [copiedItem, setCopiedItem] = React.useState<string>('');
 
@@ -90,13 +94,17 @@ export function ResultCard() {
     return numValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Price Update Effect
+  // Price Update Effect - prioritize lastCalculationInput
   React.useEffect(() => {
     const updatePrice = async () => {
-      if (formData.exchange && formData.symbol) {
+      const exchange = lastCalculationInput?.exchange || formData.exchange;
+      const symbol = lastCalculationInput?.symbol || formData.symbol;
+      const contractMode = lastCalculationInput?.contractMode || formData.contractMode;
+      
+      if (exchange && symbol) {
         try {
-          const instType: InstType = formData.contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
-          const price = await getCurrentPrice(formData.exchange as Exchange, formData.symbol, instType);
+          const instType: InstType = contractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
+          const price = await getCurrentPrice(exchange as Exchange, symbol, instType);
           setCurrentPrice(price);
         } catch (error) {
           console.warn('Failed to fetch current price:', error);
@@ -109,7 +117,7 @@ export function ResultCard() {
     updatePrice();
 
     return () => clearInterval(interval);
-  }, [formData.exchange, formData.symbol, formData.contractMode]);
+  }, [formData.exchange, formData.symbol, formData.contractMode, lastCalculationInput?.exchange, lastCalculationInput?.symbol, lastCalculationInput?.contractMode]);
 
   // Copy to clipboard handler
   const handleCopyValue = async (value: string, label: string) => {
@@ -290,16 +298,16 @@ export function ResultCard() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('exchange')}:</span>
-                <span className="font-medium">{formData.exchange}</span>
+                <span className="font-medium">{lastCalculationInput?.exchange || formData.exchange}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('symbol')}:</span>
-                <span className="font-medium">{formData.symbol}</span>
+                <span className="font-medium">{lastCalculationInput?.symbol || formData.symbol}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t('side')}:</span>
-                <span className={`font-medium ${formData.side === 'LONG' ? 'text-green-600' : 'text-red-600'}`}>
-                  {formData.side === 'LONG' ? `📈 ${t('long')}` : `📉 ${t('short')}`}
+                <span className={`font-medium ${(lastCalculationInput?.side || formData.side) === 'LONG' ? 'text-green-600' : 'text-red-600'}`}>
+                  {(lastCalculationInput?.side || formData.side) === 'LONG' ? `📈 ${t('long')}` : `📉 ${t('short')}`}
                 </span>
               </div>
               <div className="flex justify-between">
