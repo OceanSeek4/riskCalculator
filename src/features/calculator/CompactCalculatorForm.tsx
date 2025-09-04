@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { RefreshCw, Calculator, Lock, Unlock, TrendingUp, ArrowLeft, RotateCcw, Download, Settings, Eye, EyeOff, Activity } from 'lucide-react';
 import { SavedParametersCard } from './components/SavedParametersCard';
 import { QuickCopyCard } from './components/QuickCopyCard';
+import { AddPositionCard } from './components/AddPositionCard';
+import { CombinedPositionResultCard } from './components/CombinedPositionResultCard';
 import { TrailingPanel } from './TrailingPanelWrapper';
 import { useCalculatorStore, useSettingsStore } from '@/lib/store';
 import { useEntryPriceBinding } from './hooks/useEntryPriceBinding';
@@ -17,6 +19,40 @@ import { useTranslation } from 'react-i18next';
 import { getEffectiveEntryPrice } from './utils/effectivePrice';
 import { getEffectiveEntryPrice as getNewEffectiveEntryPrice } from './lib/price';
 import { usePriceLock } from './hooks/usePriceLock';
+
+interface PositionEntry {
+  id: string;
+  entryPrice: string;
+  quantity: string;
+  orderType: 'MARKET' | 'LIMIT';
+  feeType: string;
+  stopPrice: string;
+  timestamp: Date;
+  fees: {
+    openFee: string;
+    closeFee: string;
+    totalFee: string;
+  };
+  riskAmount: string;
+  notionalValue: string;
+}
+
+interface CombinedPositionData {
+  entries: PositionEntry[];
+  totals: {
+    totalQuantity: string;
+    totalNotional: string;
+    totalFees: string;
+    totalRisk: string;
+    averageEntryPrice: string;
+    weightedStopPrice: string;
+  };
+  riskMetrics: {
+    maxDrawdown: string;
+    riskRewardRatio: string;
+    marginUsage: string;
+  };
+}
 
 interface CompactCalculatorFormProps {
   onBackToFull: () => void;
@@ -71,7 +107,13 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [marketMeta, setMarketMeta] = useState<any>(null);
   const [showSavedParams, setShowSavedParams] = useState(true);
   const [showTrailingPanel, setShowTrailingPanel] = useState(false);
+  const [showAddPositionCard, setShowAddPositionCard] = useState(false);
   const [initialPositionPercentage, setInitialPositionPercentage] = useState<number>(100);
+  
+  // 仓位追踪状态
+  const [positionEntries, setPositionEntries] = useState<PositionEntry[]>([]);
+  const [combinedPositionData, setCombinedPositionData] = useState<CombinedPositionData | null>(null);
+  const [initialPositionEntry, setInitialPositionEntry] = useState<PositionEntry | null>(null);
   const [isFetchingATR, setIsFetchingATR] = useState(false);
   const [atrError, setATRError] = useState<string>('');
   const [isStopPriceLocked, setIsStopPriceLocked] = useState(true);
@@ -84,10 +126,13 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [displayPriceDiff, setDisplayPriceDiff] = useState<number>(0);
   const [displayPreviousPrice, setDisplayPreviousPrice] = useState<number>(0);
 
+  // 保存原始计算参数的引用（不受加仓操作影响）
+  const [originalCalculationParams, setOriginalCalculationParams] = React.useState<any>(null);
+  
   // 保存原始计算时使用的所有参数（来自完整版或快速模式的实际计算输入）
   const baseSavedCalculationParams = React.useMemo(() => {
     // 如果有保存的最后计算输入，使用它；否则回退到当前formData
-    const sourceData = lastCalculationInput || formData;
+    const sourceData = originalCalculationParams || lastCalculationInput || formData;
     
     return {
       // 基础市场参数（来自实际计算输入）
@@ -184,6 +229,14 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
       }
     }
   }, [result, baseSavedCalculationParams.stopPrice, lockedStopPrice, formData.stopPrice, isStopPriceLocked, setFormData]);
+
+  // 同步初始建仓比例从保存的计算参数
+  React.useEffect(() => {
+    if (baseSavedCalculationParams.initialPositionPercentage && 
+        baseSavedCalculationParams.initialPositionPercentage !== initialPositionPercentage) {
+      setInitialPositionPercentage(baseSavedCalculationParams.initialPositionPercentage);
+    }
+  }, [baseSavedCalculationParams.initialPositionPercentage, initialPositionPercentage]);
 
   // 实时价格更新（市价单模式，未锁定时）
   useEffect(() => {
@@ -564,6 +617,292 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   };
 
 
+  // 计算组合仓位数据
+  const calculateCombinedPositionData = React.useCallback((entries: PositionEntry[]): CombinedPositionData => {
+    if (entries.length === 0) {
+      return {
+        entries: [],
+        totals: {
+          totalQuantity: '0',
+          totalNotional: '0',
+          totalFees: '0',
+          totalRisk: '0',
+          averageEntryPrice: '0',
+          weightedStopPrice: '0',
+        },
+        riskMetrics: {
+          maxDrawdown: '0',
+          riskRewardRatio: '0',
+          marginUsage: '0',
+        },
+      };
+    }
+
+    // 计算总量和总价值
+    let totalQuantity = 0;
+    let totalNotional = 0;
+    let totalFees = 0;
+    let totalRisk = 0;
+    let weightedPriceSum = 0;
+    let weightedStopPriceSum = 0;
+
+    entries.forEach(entry => {
+      const qty = parseFloat(entry.quantity);
+      const price = parseFloat(entry.entryPrice);
+      const notional = parseFloat(entry.notionalValue);
+      const fees = parseFloat(entry.fees.totalFee);
+      const risk = parseFloat(entry.riskAmount);
+      const stopPrice = parseFloat(entry.stopPrice);
+
+      totalQuantity += qty;
+      totalNotional += notional;
+      totalFees += fees;
+      totalRisk += risk;
+      
+      // 加权平均价格计算
+      weightedPriceSum += price * qty;
+      weightedStopPriceSum += stopPrice * qty;
+    });
+
+    const averageEntryPrice = totalQuantity > 0 ? weightedPriceSum / totalQuantity : 0;
+    const weightedStopPrice = totalQuantity > 0 ? weightedStopPriceSum / totalQuantity : 0;
+
+    // 计算风险指标
+    const maxDrawdown = Math.abs(averageEntryPrice - weightedStopPrice) * totalQuantity;
+    const riskRewardRatio = 1.5; // 简化计算，实际应基于止盈价格
+    const marginUsage = (totalNotional / 10000) * 100; // 假设10000 USDT账户
+
+    return {
+      entries,
+      totals: {
+        totalQuantity: totalQuantity.toString(),
+        totalNotional: totalNotional.toString(),
+        totalFees: totalFees.toString(),
+        totalRisk: totalRisk.toString(),
+        averageEntryPrice: averageEntryPrice.toString(),
+        weightedStopPrice: weightedStopPrice.toString(),
+      },
+      riskMetrics: {
+        maxDrawdown: maxDrawdown.toString(),
+        riskRewardRatio: riskRewardRatio.toString(),
+        marginUsage: marginUsage.toString(),
+      },
+    };
+  }, []);
+
+  // 添加新加仓位到追踪列表（不包括初始仓位）
+  const addPositionEntry = React.useCallback((calcResult: any, formData: any, riskAmountOverride?: string) => {
+    if (!calcResult) return;
+
+    const newEntry: PositionEntry = {
+      id: Date.now().toString(),
+      entryPrice: calcResult.entryPrice,
+      quantity: calcResult.qtyRounded,
+      orderType: formData.orderType || 'MARKET',
+      feeType: formData.feeType || 'TAKER',
+      stopPrice: calcResult.stopPrice,
+      timestamp: new Date(),
+      fees: {
+        openFee: calcResult.openFee?.toString() || '0',
+        closeFee: calcResult.closeFee?.toString() || '0',
+        totalFee: calcResult.totalFees?.toString() || '0',
+      },
+      // 使用用户输入的风险金额，而不是计算出的风险
+      riskAmount: riskAmountOverride || calcResult.actualRiskAmount?.toString() || calcResult.stopLossRisk?.toString() || '0',
+      notionalValue: (parseFloat(calcResult.qtyRounded) * parseFloat(calcResult.entryPrice)).toString(),
+    };
+
+    setPositionEntries(prev => {
+      const updated = [...prev, newEntry];
+      const combinedData = calculateCombinedPositionData(updated);
+      setCombinedPositionData(combinedData);
+      return updated;
+    });
+
+    setNotification('加仓已添加到综合持仓', 'success');
+  }, [calculateCombinedPositionData, setNotification]);
+
+  // 重置到初始仓位（清除所有加仓）
+  const clearAllPositions = React.useCallback(() => {
+    if (initialPositionEntry) {
+      // 重置到初始仓位，清除所有加仓
+      setPositionEntries([initialPositionEntry]);
+      const combinedData = calculateCombinedPositionData([initialPositionEntry]);
+      setCombinedPositionData(combinedData);
+      setNotification('已重置到初始仓位，清除所有加仓', 'info');
+    } else {
+      // 如果没有初始仓位，完全清除
+      setPositionEntries([]);
+      setCombinedPositionData(null);
+      setNotification('已清除所有仓位记录', 'info');
+    }
+  }, [initialPositionEntry, calculateCombinedPositionData, setNotification]);
+
+  // 获取原始风险预算（用于计算剩余风险）
+  const getOriginalRiskBudget = React.useCallback(() => {
+    const sourceData = originalCalculationParams || lastCalculationInput || formData;
+    
+    if (sourceData.riskMode === 'FIXED_USDT') {
+      return parseFloat(sourceData.riskAmount || '100');
+    } else if (sourceData.riskMode === 'ACCOUNT_PERCENT' && sourceData.accountEquity && sourceData.riskPercent) {
+      const accountEquity = parseFloat(sourceData.accountEquity);
+      const riskPercent = parseFloat(sourceData.riskPercent);
+      return (accountEquity * riskPercent) / 100;
+    }
+    return 100; // 默认值
+  }, [originalCalculationParams, lastCalculationInput, formData]);
+
+  // 获取累积总风险（所有仓位的风险叠加）
+  const getCumulativeTotalRisk = React.useCallback(() => {
+    return positionEntries.reduce((total, entry) => {
+      return total + parseFloat(entry.riskAmount || '0');
+    }, 0);
+  }, [positionEntries]);
+
+  // 获取剩余风险（原始预算 - 已使用的累积风险）
+  const getRemainingRisk = React.useCallback(() => {
+    const originalBudget = getOriginalRiskBudget();
+    const usedRisk = getCumulativeTotalRisk();
+    return Math.max(0, originalBudget - usedRisk);
+  }, [getOriginalRiskBudget, getCumulativeTotalRisk]);
+
+  // 初始化综合持仓数据（加仓模式开启时）
+  const initializeCombinedPositionData = React.useCallback(() => {
+    if (result && positionEntries.length === 0) {
+      // 创建初始仓位记录，使用实际的初始风险金额
+      const originalBudget = getOriginalRiskBudget();
+      const initialRiskAmount = (originalBudget * initialPositionPercentage) / 100;
+      
+      // 修改result中的riskAmount为初始风险金额
+      const initialPositionResult = {
+        ...result,
+        riskAmount: initialRiskAmount.toString()
+      };
+      
+      // 创建初始仓位条目
+      const newInitialEntry: PositionEntry = {
+        id: 'initial-position',
+        entryPrice: initialPositionResult.entryPrice,
+        quantity: initialPositionResult.qtyRounded.toString(),
+        orderType: (formData.orderType as 'MARKET' | 'LIMIT') || 'MARKET',
+        feeType: formData.feeType || 'TAKER',
+        stopPrice: initialPositionResult.stopPrice,
+        timestamp: new Date(),
+        fees: {
+          openFee: initialPositionResult.openFee?.toString() || '0',
+          closeFee: initialPositionResult.closeFee?.toString() || '0',
+          totalFee: initialPositionResult.totalFees?.toString() || '0',
+        },
+        riskAmount: initialRiskAmount.toString(),
+        notionalValue: (parseFloat(initialPositionResult.qtyRounded.toString()) * parseFloat(initialPositionResult.entryPrice)).toString(),
+      };
+      
+      // 保存初始仓位数据
+      setInitialPositionEntry(newInitialEntry);
+      
+      // 添加到仓位列表
+      setPositionEntries([newInitialEntry]);
+      const combinedData = calculateCombinedPositionData([newInitialEntry]);
+      setCombinedPositionData(combinedData);
+    }
+  }, [result, positionEntries.length, formData.orderType, formData.feeType, getOriginalRiskBudget, initialPositionPercentage, calculateCombinedPositionData]);
+
+  // 当切换到加仓模式时，保存原始计算参数并初始化综合持仓数据
+  React.useEffect(() => {
+    if (showAddPositionCard && result) {
+      // 保存原始计算参数，确保不受后续加仓操作影响
+      if (!originalCalculationParams) {
+        const currentParams = lastCalculationInput || formData;
+        setOriginalCalculationParams({ ...currentParams });
+      }
+      initializeCombinedPositionData();
+    }
+  }, [showAddPositionCard, result, initializeCombinedPositionData, originalCalculationParams, lastCalculationInput, formData]);
+
+  // 处理加仓计算
+  const handleAddPosition = async (addPositionData: any) => {
+    if (!addPositionData.positionValue || parseFloat(addPositionData.positionValue) <= 0) {
+      setNotification('请输入有效的风险金额', 'error');
+      return;
+    }
+
+    if (!addPositionData.stopPrice) {
+      setNotification('请设置止损价格', 'error');
+      return;
+    }
+
+    const entryPrice = addPositionData.orderType === 'MARKET' 
+      ? addPositionData.entryPrice 
+      : addPositionData.limitPrice;
+      
+    if (!entryPrice) {
+      setNotification('请设置入场价格', 'error');
+      return;
+    }
+
+    setIsCalculating(true);
+    setCalculationError('');
+
+    try {
+      // 使用加仓卡片的数据进行实际计算
+      const input = {
+        side: savedCalculationParams.side!,
+        entryPrice: entryPrice,
+        stopPrice: addPositionData.stopPrice,
+        stopMode: 'PRICE' as const,
+        useTakeProfit: savedCalculationParams.useTakeProfit || false,
+        takeProfitMode: savedCalculationParams.takeProfitMode,
+        takeProfitPrice: savedCalculationParams.takeProfitPrice,
+        takeProfitATRMultiplier: savedCalculationParams.takeProfitATRMultiplier,
+        takeProfitRRRatio: savedCalculationParams.takeProfitRRRatio,
+        takeProfitPips: savedCalculationParams.takeProfitPips,
+        riskMode: 'FIXED_USDT' as const,
+        riskUSDT: addPositionData.positionValue, // 使用加仓卡片输入的风险金额
+        includeFees: savedCalculationParams.includeFees || false,
+        feeOpenMaker: savedCalculationParams.feeOpenMaker || '0.0002',
+        feeOpenTaker: savedCalculationParams.feeOpenTaker || '0.0006',
+        feeCloseMaker: savedCalculationParams.feeCloseMaker || '0.0002',
+        feeCloseTaker: savedCalculationParams.feeCloseTaker || '0.0006',
+        slippageOpen: savedCalculationParams.slippageOpen || '0.0005',
+        slippageClose: savedCalculationParams.slippageClose || '0.0005',
+        enableRebate: savedCalculationParams.enableRebate || false,
+        rebatePercent: savedCalculationParams.rebatePercent || '0',
+        feeOpen: savedCalculationParams.feeOpen || '0.0004',
+        feeClose: savedCalculationParams.feeClose || '0.0004',
+        slippage: savedCalculationParams.slippage || '0.0005',
+        leverage: savedCalculationParams.leverage || 10,
+        contractMode: savedCalculationParams.contractMode || 'USDT_PERP',
+        marketMeta: marketMeta,
+        orderType: addPositionData.orderType || 'MARKET',
+        feeType: addPositionData.feeType || savedCalculationParams.feeType || 'MAKER_OPEN_TAKER_CLOSE',
+        rrRatios: settings.rrRatios || [1, 1.5, 2],
+        enablePositionScaling: false, // 加仓计算不再使用分层
+        initialPositionPercentage: 100, // 加仓计算总是100%
+      };
+
+      const addPositionResult = calculatePosition(input);
+      
+      // 更新主结果，让结果卡片和快速复制卡片显示当前加仓的计算结果
+      setResult(addPositionResult);
+      
+      // 注意：不更新lastCalculationInput，保持原始计算参数不变，以确保总风险预算不变
+      
+      // 添加到仓位追踪列表，传入用户输入的风险金额
+      addPositionEntry(addPositionResult, {
+        orderType: addPositionData.orderType,
+        feeType: addPositionData.feeType
+      }, addPositionData.positionValue); // 传入用户输入的风险金额
+      
+      setNotification('加仓计算完成，结果已更新并添加到综合持仓', 'success');
+      
+    } catch (error: any) {
+      setCalculationError(error.message || '加仓计算失败');
+      setNotification('加仓计算失败', 'error');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   // 重新计算（使用保存的参数）
   const handleRecalculate = async () => {
     // 验证必要字段
@@ -675,6 +1014,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
 
       const result = calculatePosition(input);
       setResult(result);
+      
       setNotification(t('calculationComplete'), 'success');
       
     } catch (error: any) {
@@ -688,11 +1028,22 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   return (
     <div className={`w-full ${showSavedParams ? 'max-w-[1920px]' : 'max-w-5xl'} transition-all duration-300`}>
       <div className="space-y-6">
-        {/* 上方：简易计算器和快速复制 */}
+        {/* 计算器和快速复制 */}
         <div className="w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 左侧：简易计算器 */}
-            <Card className="w-full">
+            {/* 左侧：切换显示加仓计算或重新计算 */}
+            <div className="w-full">
+              {showAddPositionCard ? (
+                <AddPositionCard 
+                  onAddPosition={handleAddPosition}
+                  isVisible={showAddPositionCard}
+                  onSwitchToRecalculate={() => setShowAddPositionCard(false)}
+                  initialPositionPercentage={initialPositionPercentage}
+                  positionEntries={positionEntries}
+                  totalRiskAmount={getOriginalRiskBudget()}
+                />
+              ) : (
+                <Card className="w-full">
       <CardHeader className="pb-4">
         {/* 实时价格显示栏 - 独立显示，不受订单类型限制 */}
         {savedCalculationParams.exchange && savedCalculationParams.symbol && (
@@ -763,6 +1114,17 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
             重新计算
           </CardTitle>
           <div className="flex gap-2 flex-wrap">
+            {/* 切换到加仓计算模式 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddPositionCard(true)}
+              className="flex items-center gap-2 text-xs px-3 py-1 h-8"
+              title="切换到加仓计算模式"
+            >
+              <TrendingUp className="w-3 h-3" />
+              加仓计算
+            </Button>
             {/* 显示/隐藏保存参数切换 */}
             <Button 
               variant="outline" 
@@ -785,6 +1147,24 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
             >
               <Activity className="w-4 h-4" />
               <span className="text-xs whitespace-nowrap">{showTrailingPanel ? '隐藏追踪' : '显示追踪'}</span>
+            </Button>
+            
+            {/* 切换加仓/重新计算模式 */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowAddPositionCard(!showAddPositionCard)}
+              className={`flex items-center gap-2 whitespace-nowrap ${
+                showAddPositionCard 
+                  ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100' 
+                  : 'hover:bg-gray-50'
+              }`}
+              title={showAddPositionCard ? '切换到重新计算模式' : '切换到加仓计算模式'}
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-xs whitespace-nowrap">
+                {showAddPositionCard ? '重新计算' : '加仓计算'}
+              </span>
             </Button>
             
             {/* 返回完整表单 */}
@@ -1237,15 +1617,47 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
           </div>
         )}
       </CardContent>
-            </Card>
+                </Card>
+              )}
+            </div>
 
             {/* 右侧：快速复制 */}
             <QuickCopyCard 
               result={result} 
               marketMeta={marketMeta}
+              isCollapsible={false}
+              defaultCollapsed={false}
             />
           </div>
         </div>
+
+        {/* 加仓模式下显示综合持仓信息卡片 */}
+        {showAddPositionCard && combinedPositionData && (
+          <div className="w-full">
+            <CombinedPositionResultCard 
+              baseResult={result}
+              combinedData={combinedPositionData}
+              isVisible={true}
+              onClearPositions={clearAllPositions}
+              originalRiskBudget={getOriginalRiskBudget()}
+              remainingRisk={getRemainingRisk()}
+              side={savedCalculationParams.side || 'LONG'}
+              rrRatios={settings.rrRatios || [1, 1.5, 2]}
+              feeRates={{
+                openMaker: savedCalculationParams.feeOpenMaker || '0.0002',
+                openTaker: savedCalculationParams.feeOpenTaker || '0.0006',
+                closeMaker: savedCalculationParams.feeCloseMaker || '0.0002',
+                closeTaker: savedCalculationParams.feeCloseTaker || '0.0006',
+                slippageOpen: savedCalculationParams.slippageOpen || '0.0005',
+                slippageClose: savedCalculationParams.slippageClose || '0.0005'
+              }}
+              rebateInfo={savedCalculationParams.enableRebate ? {
+                enabled: true,
+                rebatePercent: savedCalculationParams.rebatePercent || '0'
+              } : undefined}
+            />
+          </div>
+        )}
 
         {/* 下方：保存的参数（条件显示） */}
         {showSavedParams && (

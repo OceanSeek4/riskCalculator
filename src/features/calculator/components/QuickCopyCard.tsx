@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CalcResult } from '@/lib/core';
 import { MarketMeta } from '@/lib/adapters';
@@ -10,11 +10,14 @@ import { useState } from 'react';
 interface QuickCopyCardProps {
   result: CalcResult | null;
   marketMeta?: MarketMeta | null;
+  isCollapsible?: boolean;
+  defaultCollapsed?: boolean;
 }
 
-export function QuickCopyCard({ result, marketMeta }: QuickCopyCardProps) {
+export function QuickCopyCard({ result, marketMeta, isCollapsible = false, defaultCollapsed = false }: QuickCopyCardProps) {
   const { t } = useTranslation();
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   // 复制到剪贴板的函数
   const copyToClipboard = async (text: string, itemKey: string) => {
@@ -126,15 +129,34 @@ export function QuickCopyCard({ result, marketMeta }: QuickCopyCardProps) {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Copy className="w-4 h-4 text-purple-600" />
-          {t('quickCopy')}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">
-          点击任意行快速复制对应的交易信息
-        </p>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Copy className="w-4 h-4 text-purple-600" />
+            {t('quickCopy')}
+          </CardTitle>
+          {isCollapsible && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="h-8 w-8 p-0"
+            >
+              {isCollapsed ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronUp className="w-4 h-4" />
+              )}
+            </Button>
+          )}
+        </div>
+        {!isCollapsed && (
+          <p className="text-xs text-muted-foreground mt-1">
+            点击任意行快速复制对应的交易信息
+          </p>
+        )}
       </CardHeader>
-      <CardContent className="space-y-3">
+      {!isCollapsed && (
+        <CardContent className="space-y-3">
         {/* 入场价格 */}
         <div 
           className="flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all duration-200 hover:shadow-sm group border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
@@ -293,7 +315,8 @@ export function QuickCopyCard({ result, marketMeta }: QuickCopyCardProps) {
             )}
           </Button>
         </div>
-      </CardContent>
+        </CardContent>
+      )}
     </Card>
   );
 }
