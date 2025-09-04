@@ -105,7 +105,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
   const [priceError, setPriceError] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [marketMeta, setMarketMeta] = useState<any>(null);
-  const [showSavedParams, setShowSavedParams] = useState(true);
+  const [showSavedParams, setShowSavedParams] = useState(false);
   const [showTrailingPanel, setShowTrailingPanel] = useState(false);
   const [showAddPositionCard, setShowAddPositionCard] = useState(false);
   const [initialPositionPercentage, setInitialPositionPercentage] = useState<number>(100);
@@ -738,6 +738,57 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
     }
   }, [initialPositionEntry, calculateCombinedPositionData, setNotification]);
 
+  // 更新所有仓位的止损价格
+  const updateAllStopLoss = React.useCallback((newStopPrice: string) => {
+    const newStopPriceNum = parseFloat(newStopPrice);
+    if (isNaN(newStopPriceNum)) {
+      setNotification('无效的止损价格', 'error');
+      return;
+    }
+
+    try {
+      // 为每个仓位重新计算风险金额
+      const updatedEntries = positionEntries.map((entry) => {
+          const quantity = parseFloat(entry.quantity);
+          const entryPrice = parseFloat(entry.entryPrice);
+          const side = savedCalculationParams.side || 'LONG';
+          
+          // 计算新止损下的实际风险（仅包含价格风险和平仓手续费）
+          // 价格风险：止损触发时的价格损失
+          const priceLoss = side === 'LONG' 
+            ? Math.max(0, entryPrice - newStopPriceNum)  // 多单：入场价 > 止损价 才有损失
+            : Math.max(0, newStopPriceNum - entryPrice); // 空单：止损价 > 入场价 才有损失
+          
+          const priceRisk = priceLoss * quantity;
+          
+          // 平仓手续费 (只计算平仓，开仓是沉没成本)
+          const closeFeeRate = parseFloat(savedCalculationParams.feeCloseTaker || '0.0006');
+          const closeFee = newStopPriceNum * quantity * closeFeeRate;
+          
+          // 总风险计算：
+          // 如果没有价格损失（止损在盈利区域），风险为0
+          // 如果有价格损失，风险 = 价格损失 + 平仓手续费
+          const newRiskAmount = priceRisk > 0 ? priceRisk + closeFee : 0;
+          
+          return {
+            ...entry,
+            stopPrice: newStopPrice,
+            riskAmount: newRiskAmount.toString()
+          };
+        });
+
+      // 更新仓位数据
+      setPositionEntries(updatedEntries);
+      const combinedData = calculateCombinedPositionData(updatedEntries);
+      setCombinedPositionData(combinedData);
+
+      setNotification(`已调整所有仓位止损价格至 ${newStopPrice}，风险已重新计算`, 'success');
+    } catch (error) {
+      console.error('止损调整失败:', error);
+      setNotification('止损调整失败', 'error');
+    }
+  }, [positionEntries, calculateCombinedPositionData, setNotification, savedCalculationParams]);
+
   // 获取原始风险预算（用于计算剩余风险）
   const getOriginalRiskBudget = React.useCallback(() => {
     const sourceData = originalCalculationParams || lastCalculationInput || formData;
@@ -1114,17 +1165,6 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
             重新计算
           </CardTitle>
           <div className="flex gap-2 flex-wrap">
-            {/* 切换到加仓计算模式 */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAddPositionCard(true)}
-              className="flex items-center gap-2 text-xs px-3 py-1 h-8"
-              title="切换到加仓计算模式"
-            >
-              <TrendingUp className="w-3 h-3" />
-              加仓计算
-            </Button>
             {/* 显示/隐藏保存参数切换 */}
             <Button 
               variant="outline" 
@@ -1639,6 +1679,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
               combinedData={combinedPositionData}
               isVisible={true}
               onClearPositions={clearAllPositions}
+              onUpdateStopLoss={updateAllStopLoss}
               originalRiskBudget={getOriginalRiskBudget()}
               remainingRisk={getRemainingRisk()}
               side={savedCalculationParams.side || 'LONG'}
