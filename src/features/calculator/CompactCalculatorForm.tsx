@@ -877,8 +877,17 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
       return;
     }
 
-    if (!addPositionData.stopPrice) {
-      setNotification('请设置止损价格', 'error');
+    // 如果止损价格为空，使用前一个仓位的止损价格
+    let stopPrice = addPositionData.stopPrice;
+    if (!stopPrice && positionEntries.length > 0) {
+      // 获取最近一个仓位的止损价格
+      const lastPosition = positionEntries[positionEntries.length - 1];
+      stopPrice = lastPosition.stopPrice;
+      setNotification('使用前一个仓位的止损价格: ' + stopPrice, 'success');
+    }
+
+    if (!stopPrice) {
+      setNotification('请设置止损价格或确保有前一个仓位的止损价格', 'error');
       return;
     }
 
@@ -899,7 +908,7 @@ export function CompactCalculatorForm({ onBackToFull }: CompactCalculatorFormPro
       const input = {
         side: savedCalculationParams.side!,
         entryPrice: entryPrice,
-        stopPrice: addPositionData.stopPrice,
+        stopPrice: stopPrice,
         stopMode: 'PRICE' as const,
         useTakeProfit: savedCalculationParams.useTakeProfit || false,
         takeProfitMode: savedCalculationParams.takeProfitMode,

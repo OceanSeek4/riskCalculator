@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, TrendingUp, Download, Activity, Plus } from 'lucide-react';
+import { RefreshCw, TrendingUp, Download, Activity, Plus, Lock, Unlock } from 'lucide-react';
 import { useCalculatorStore, useSettingsStore } from '@/lib/store';
 import { getCurrentPrice } from '@/lib/market-service';
 import type { Exchange, InstType } from '@/lib/adapters';
@@ -65,6 +65,8 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
   const [priceError, setPriceError] = useState<string>('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [remainingPositionValue, setRemainingPositionValue] = useState<number>(0);
+  const [isStopLocked, setIsStopLocked] = useState<boolean>(false);
+  const [lockedStopPrice, setLockedStopPrice] = useState<string>('');
 
   // 实时价格显示
   const [displayPrice, setDisplayPrice] = useState<string>('');
@@ -137,6 +139,12 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
 
   // 处理输入变化
   const handleInputChange = (field: keyof typeof addPositionData, value: string) => {
+    // 如果止损价格被锁定，阻止手动修改
+    if (field === 'stopPrice' && isStopLocked) {
+      setNotification('止损价格已锁定，请先解锁再修改', 'warning');
+      return;
+    }
+
     if (field === 'entryPrice' || field === 'limitPrice' || field === 'stopPrice' || field === 'positionValue') {
       const validationResult = validateNumberString(value, field as any);
       if (validationResult) {
@@ -191,17 +199,47 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
     }
   };
 
-  // 锁定上次计算的止损价格
-  const handleLockPreviousStopPrice = () => {
-    if (result?.stopPrice) {
-      const stopPrice = result.stopPrice;
-      setAddPositionData(prev => ({ ...prev, stopPrice }));
-      setNotification('已锁定上次计算的止损价格', 'success');
+  // 锁定/解锁止损价格
+  const handleToggleStopLock = () => {
+    if (isStopLocked) {
+      // 解锁止损
+      setIsStopLocked(false);
+      setLockedStopPrice('');
+      setAddPositionData(prev => ({ ...prev, stopPrice: '' }));
+      setNotification('已解锁止损价格，可以手动输入', 'info');
+    } else {
+      // 锁定止损
+      let lockStopPrice = '';
+      
+      // 优先使用最近一个仓位的止损价格
+      if (positionEntries.length > 0) {
+        const lastPosition = positionEntries[positionEntries.length - 1];
+        lockStopPrice = lastPosition.stopPrice;
+      } 
+      // 其次使用当前计算结果的止损价格
+      else if (result?.stopPrice) {
+        lockStopPrice = result.stopPrice;
+      }
+      
+      if (lockStopPrice) {
+        setIsStopLocked(true);
+        setLockedStopPrice(lockStopPrice);
+        setAddPositionData(prev => ({ ...prev, stopPrice: lockStopPrice }));
+        setNotification('已锁定止损价格: ' + lockStopPrice, 'success');
+      } else {
+        setNotification('没有可用的止损价格进行锁定', 'error');
+      }
     }
   };
 
   // 根据百分比设置止损价格
   const handleQuickStopWithPercentage = (percentage: number) => {
+    // 如果止损价格被锁定，阻止设置
+    if (isStopLocked) {
+      setNotification('止损价格已锁定，请先解锁再设置', 'warning');
+      return;
+    }
+
     const entryPrice = parseFloat(
       addPositionData.orderType === 'MARKET' 
         ? addPositionData.entryPrice 
@@ -423,33 +461,68 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
 
         {/* 止损价格 */}
         <div className="space-y-3">
-          <Label htmlFor="addStopPrice">{t('stopPrice')}</Label>
-          <Input
-            id="addStopPrice"
-            type="text"
-            value={addPositionData.stopPrice}
-            onChange={(e) => handleInputChange('stopPrice', e.target.value)}
-            placeholder="输入加仓止损价格"
-            className="w-full"
-          />
+          <Label htmlFor="addStopPrice" className="flex items-center gap-2">
+            {t('stopPrice')}
+            {isStopLocked && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-xs rounded-full">
+                <Lock className="w-3 h-3" />
+                已锁定
+              </span>
+            )}
+          </Label>
+          <div className={`relative ${isStopLocked ? 'opacity-75' : ''}`}>
+            <Input
+              id="addStopPrice"
+              type="text"
+              value={addPositionData.stopPrice}
+              onChange={(e) => handleInputChange('stopPrice', e.target.value)}
+              placeholder={isStopLocked ? `锁定价格: ${lockedStopPrice}` : "输入加仓止损价格（可留空使用前一个仓位止损价格）"}
+              className={`w-full ${isStopLocked ? 'bg-orange-50 dark:bg-orange-950/20 border-orange-300 dark:border-orange-700 cursor-not-allowed' : ''}`}
+              disabled={isStopLocked}
+            />
+            {isStopLocked && (
+              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                <Lock className="w-4 h-4 text-orange-500" />
+              </div>
+            )}
+          </div>
           {formErrors.stopPrice && (
             <p className="text-sm text-red-600">{formErrors.stopPrice}</p>
+          )}
+          {isStopLocked && (
+            <p className="text-sm text-orange-600 dark:text-orange-400">
+              止损价格已锁定为 {lockedStopPrice}，点击"解锁止损"按钮可解除锁定
+            </p>
           )}
           
           {/* 快速止损按钮 */}
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground">快速止损设置</div>
             <div className="grid grid-cols-3 gap-2">
-              {/* 锁定上次计算的止损价格 */}
+              {/* 锁定/解锁止损价格 */}
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleLockPreviousStopPrice}
-                disabled={!result?.stopPrice}
-                className="h-10 text-sm font-medium bg-orange-50 hover:bg-orange-100 border-orange-300 hover:border-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                title="锁定上次计算的止损价格"
+                onClick={handleToggleStopLock}
+                disabled={!result?.stopPrice && positionEntries.length === 0}
+                className={`h-10 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isStopLocked 
+                    ? 'bg-orange-100 hover:bg-orange-150 border-orange-400 text-orange-700 dark:bg-orange-900/40 dark:border-orange-600 dark:text-orange-300' 
+                    : 'bg-orange-50 hover:bg-orange-100 border-orange-300 hover:border-orange-400'
+                }`}
+                title={isStopLocked ? "解锁止损价格" : "锁定止损价格"}
               >
-                锁定止损
+                {isStopLocked ? (
+                  <>
+                    <Unlock className="w-3 h-3 mr-1" />
+                    解锁止损
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3 h-3 mr-1" />
+                    锁定止损
+                  </>
+                )}
               </Button>
               
               {/* 0.5%止损距离 */}
@@ -457,8 +530,13 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
                 type="button"
                 variant="outline"
                 onClick={() => handleQuickStopWithPercentage(0.5)}
-                className="h-10 text-sm font-medium bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400 transition-all"
-                title="设置0.5%止损距离"
+                disabled={isStopLocked}
+                className={`h-10 text-sm font-medium transition-all ${
+                  isStopLocked 
+                    ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' 
+                    : 'bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400'
+                }`}
+                title={isStopLocked ? "止损已锁定，无法设置" : "设置0.5%止损距离"}
               >
                 0.5%
               </Button>
@@ -468,8 +546,13 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
                 type="button"
                 variant="outline"
                 onClick={() => handleQuickStopWithPercentage(1.0)}
-                className="h-10 text-sm font-medium bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400 transition-all"
-                title="设置1.0%止损距离"
+                disabled={isStopLocked}
+                className={`h-10 text-sm font-medium transition-all ${
+                  isStopLocked 
+                    ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800' 
+                    : 'bg-gray-50 hover:bg-gray-100 border-gray-300 hover:border-gray-400'
+                }`}
+                title={isStopLocked ? "止损已锁定，无法设置" : "设置1.0%止损距离"}
               >
                 1.0%
               </Button>
