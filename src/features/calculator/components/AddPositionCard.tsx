@@ -141,7 +141,7 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
   const handleInputChange = (field: keyof typeof addPositionData, value: string) => {
     // 如果止损价格被锁定，阻止手动修改
     if (field === 'stopPrice' && isStopLocked) {
-      setNotification('止损价格已锁定，请先解锁再修改', 'warning');
+      setNotification('止损价格已锁定，请先解锁再修改', 'info');
       return;
     }
 
@@ -236,7 +236,7 @@ export function AddPositionCard({ onAddPosition, isVisible, onSwitchToRecalculat
   const handleQuickStopWithPercentage = (percentage: number) => {
     // 如果止损价格被锁定，阻止设置
     if (isStopLocked) {
-      setNotification('止损价格已锁定，请先解锁再设置', 'warning');
+      setNotification('止损价格已锁定，请先解锁再设置', 'info');
       return;
     }
 
