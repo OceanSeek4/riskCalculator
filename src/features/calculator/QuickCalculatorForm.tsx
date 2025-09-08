@@ -30,11 +30,12 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
   const { setResult, setLastCalculationInput, setIsCalculating, calculationError, setCalculationError, marketDataError } = useCalculatorStore();
   const priceLock = usePriceLock();
 
-  // Form state - only 4 editable fields
+  // Form state - core editable fields  
   const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>(settings.defaultOrderType || 'LIMIT');
   const [feeType, setFeeType] = useState<'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY'>(
     settings.defaultFeeType || 'MAKER_OPEN_TAKER_CLOSE'
   );
+  const [side, setSide] = useState<'LONG' | 'SHORT'>('LONG');
 
   // Handle fee type change with callback to parent
   const handleFeeTypeChange = (newFeeType: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY') => {
@@ -159,7 +160,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
     if (calculationError) {
       setCalculationError(null);
     }
-  }, [orderType, feeType, entryPrice, stopPrice, calculationError, setCalculationError]);
+  }, [orderType, feeType, side, entryPrice, stopPrice, calculationError, setCalculationError]);
 
   // Handle "Get Current Price" button for LIMIT orders
   const handleGetCurrentPrice = async () => {
@@ -224,8 +225,6 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
     // Calculate stop price based on percentage distance
     // For LONG: stop = entry * (1 - percentage/100)
     // For SHORT: stop = entry * (1 + percentage/100)
-    // Default to LONG since settings doesn't have defaultSide
-    const side = 'LONG';
     let stopPriceValue: number;
     
     if (side === 'LONG') {
@@ -267,7 +266,6 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
       const atrDecimal = SafeDecimal.from(atr);
       const multiplierDecimal = SafeDecimal.from(settings.defaultAtrMultiplier || '2');
       
-      const side = 'LONG'; // Default to LONG
       const stopPriceDecimal = calculateATRStopPrice(entryPriceDecimal, atrDecimal, multiplierDecimal, side);
       
       // Format price with tickSize precision
@@ -298,7 +296,6 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
       const pipsDecimal = SafeDecimal.from(settings.defaultStopPips || '50');
       const tickSizeDecimal = SafeDecimal.from(marketMeta.tickSize || '0.01');
       
-      const side = 'LONG'; // Default to LONG
       const stopPriceDecimal = calculatePipsStopPrice(entryPriceDecimal, pipsDecimal, tickSizeDecimal, side);
       
       // Format price with tickSize precision
@@ -403,7 +400,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
 
       // Build calculation parameters from settings + form data
       const calcParams = {
-        side: 'LONG' as const, // Default to LONG since settings doesn't have defaultSide
+        side: side,
         entryPrice: String(effectiveEntryPrice),
         stopPrice: stopPriceValue,
         stopMode: stopMode,
@@ -497,7 +494,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         exchange: settings.defaultExchange,
         symbol: settings.defaultSymbol,
         contractMode: settings.defaultContractMode,
-        side: 'LONG' as const,
+        side: side,
         
         // Order settings (from form)
         orderType: orderType,
@@ -610,7 +607,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
           
           {/* Quick Mode Description */}
           <div className="text-sm text-muted-foreground font-normal">
-            简化界面，4个核心字段 - 其余参数来自设置页
+            简化界面，5个核心字段 - 其余参数来自设置页
           </div>
         </CardTitle>
       </CardHeader>
@@ -749,6 +746,54 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
 点击获取当前价格
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Side Selection - Toggle Cards */}
+          <div className="space-y-2">
+            <Label>{t('side')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Long Side Card */}
+              <div
+                onClick={() => setSide('LONG')}
+                className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                  side === 'LONG'
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950/30 shadow-sm'
+                    : 'border-border hover:border-green-400 hover:bg-green-50/50 dark:hover:bg-green-950/20'
+                }`}
+              >
+                <div className="text-center">
+                  <div className={`text-sm font-medium ${
+                    side === 'LONG' ? 'text-green-700 dark:text-green-300' : 'text-foreground'
+                  }`}>
+                    📈 {t('long')}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    做多买涨
+                  </div>
+                </div>
+              </div>
+
+              {/* Short Side Card */}
+              <div
+                onClick={() => setSide('SHORT')}
+                className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                  side === 'SHORT'
+                    ? 'border-red-500 bg-red-50 dark:bg-red-950/30 shadow-sm'
+                    : 'border-border hover:border-red-400 hover:bg-red-50/50 dark:hover:bg-red-950/20'
+                }`}
+              >
+                <div className="text-center">
+                  <div className={`text-sm font-medium ${
+                    side === 'SHORT' ? 'text-red-700 dark:text-red-300' : 'text-foreground'
+                  }`}>
+                    📉 {t('short')}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    做空买跌
+                  </div>
+                </div>
               </div>
             </div>
           </div>
