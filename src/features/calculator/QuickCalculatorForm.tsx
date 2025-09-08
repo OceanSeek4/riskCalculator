@@ -36,6 +36,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
     settings.defaultFeeType || 'MAKER_OPEN_TAKER_CLOSE'
   );
   const [side, setSide] = useState<'LONG' | 'SHORT'>('LONG');
+  const [currentSymbol, setCurrentSymbol] = useState<string>(settings.defaultSymbol || 'BTCUSDT');
 
   // Handle fee type change with callback to parent
   const handleFeeTypeChange = (newFeeType: 'MAKER' | 'TAKER' | 'MAKER_OPEN_TAKER_CLOSE' | 'MAKER_OPEN_ONLY') => {
@@ -46,6 +47,18 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
   // Get effective fee type (TAKER for MARKET orders, user selection for LIMIT)
   const getEffectiveFeeType = () => {
     return orderType === 'MARKET' ? 'TAKER' : feeType;
+  };
+
+  // Handle symbol switching
+  const handleSymbolSwitch = (newSymbol: string) => {
+    setCurrentSymbol(newSymbol);
+    // Clear current prices and data when switching symbols
+    setMarketPrice('');
+    setMarketMeta(null);
+    setEntryPrice(''); // Clear entry price for limit orders
+    setStopPrice(''); // Clear stop price
+    priceLock.unlock(); // Unlock any locked prices
+    setNotification(`已切换到 ${newSymbol}`, 'success');
   };
 
   const [entryPrice, setEntryPrice] = useState<string>(''); // For LIMIT orders only
@@ -86,13 +99,13 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
   // Price change tracking for color effects
   const [priceChange, setPriceChange] = useState<'up' | 'down' | 'neutral'>('neutral');
 
-  // Fetch market metadata when settings change
+  // Fetch market metadata when settings or symbol change
   useEffect(() => {
     const fetchMarketMeta = async () => {
-      if (settings.defaultExchange && settings.defaultSymbol && settings.defaultContractMode) {
+      if (settings.defaultExchange && currentSymbol && settings.defaultContractMode) {
         try {
           const instType: InstType = settings.defaultContractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
-          const meta = await getMarketMeta(settings.defaultExchange as Exchange, settings.defaultSymbol, instType);
+          const meta = await getMarketMeta(settings.defaultExchange as Exchange, currentSymbol, instType);
           setMarketMeta(meta);
         } catch (error) {
           console.error('Failed to fetch market meta:', error);
@@ -102,16 +115,16 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
     };
 
     fetchMarketMeta();
-  }, [settings.defaultExchange, settings.defaultSymbol, settings.defaultContractMode]);
+  }, [settings.defaultExchange, currentSymbol, settings.defaultContractMode]);
 
   // Fetch current market price for display and reference
   useEffect(() => {
     const fetchPrice = async () => {
-      if (settings.defaultExchange && settings.defaultSymbol && settings.defaultContractMode) {
+      if (settings.defaultExchange && currentSymbol && settings.defaultContractMode) {
         try {
           setIsFetchingPrice(true);
           const instType: InstType = settings.defaultContractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
-          const currentPrice = await getCurrentPrice(settings.defaultExchange as Exchange, settings.defaultSymbol, instType);
+          const currentPrice = await getCurrentPrice(settings.defaultExchange as Exchange, currentSymbol, instType);
           const newPrice = String(currentPrice);
           
           // Track price changes for color effects
@@ -146,7 +159,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
     // Set up interval for real-time updates (every 5 seconds)
     const interval = setInterval(fetchPrice, 5000);
     return () => clearInterval(interval);
-  }, [settings.defaultExchange, settings.defaultSymbol, settings.defaultContractMode, marketPrice]);
+  }, [settings.defaultExchange, currentSymbol, settings.defaultContractMode, marketPrice]);
 
   // Clear price lock when order type changes
   useEffect(() => {
@@ -247,7 +260,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
       return;
     }
 
-    if (!settings.defaultExchange || !settings.defaultSymbol || !settings.defaultContractMode) {
+    if (!settings.defaultExchange || !currentSymbol || !settings.defaultContractMode) {
       setNotification('Market settings not configured', 'error');
       return;
     }
@@ -256,7 +269,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
       const instType: InstType = settings.defaultContractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
       const atr = await getATRValue(
         settings.defaultExchange as Exchange,
-        settings.defaultSymbol,
+        currentSymbol,
         settings.defaultAtrTimeframe || '15m',
         settings.defaultAtrPeriod || 14,
         instType
@@ -373,14 +386,14 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
         // For ATR mode, we need to fetch ATR value
         if (stopMode === 'ATR') {
           try {
-            if (!settings.defaultExchange || !settings.defaultSymbol || !settings.defaultContractMode) {
+            if (!settings.defaultExchange || !currentSymbol || !settings.defaultContractMode) {
               throw new Error('Market settings not configured for ATR calculation');
             }
             
             const instType: InstType = settings.defaultContractMode === 'SPOT' ? 'SPOT' : 'USDT_PERP';
             const atr = await getATRValue(
               settings.defaultExchange as Exchange,
-              settings.defaultSymbol,
+              currentSymbol,
               settings.defaultAtrTimeframe || '15m',
               settings.defaultAtrPeriod || 14,
               instType
@@ -492,7 +505,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
       const actualCalculationInput = {
         // Market settings (from settings)
         exchange: settings.defaultExchange,
-        symbol: settings.defaultSymbol,
+        symbol: currentSymbol,
         contractMode: settings.defaultContractMode,
         side: side,
         
@@ -678,7 +691,7 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="font-medium">{settings.defaultExchange || 'BINANCE'}</span>
                 <span>•</span>
-                <span>{settings.defaultSymbol || 'BTCUSDT'}</span>
+                <span>{currentSymbol}</span>
                 <span>•</span>
                 <span>{settings.defaultContractMode === 'SPOT' ? '现货' : settings.defaultContractMode === 'USDT_PERP' ? 'USDT永续' : '反向永续'}</span>
               </div>
@@ -747,6 +760,35 @@ export function QuickCalculatorForm({ onFeeTypeChange, onBackToFull, onStopPrice
                   </>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Quick Symbol Switching */}
+          <div className="space-y-2">
+            <Label>快速切换交易对</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(settings.quickCalculatorSymbols || ['BTCUSDT', 'ETHUSDT', 'SUIUSDT']).map((symbol) => (
+                <div
+                  key={symbol}
+                  onClick={() => handleSymbolSwitch(symbol)}
+                  className={`p-2 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                    currentSymbol === symbol
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm'
+                      : 'border-border hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className={`text-sm font-medium ${
+                      currentSymbol === symbol ? 'text-blue-700 dark:text-blue-300' : 'text-foreground'
+                    }`}>
+                      {symbol}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {symbol.replace('USDT', '/USDT')}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

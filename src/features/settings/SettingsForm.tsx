@@ -27,6 +27,12 @@ export function SettingsForm() {
 
   // Loading state for save operation
   const [isSaving, setIsSaving] = useState(false);
+  
+  // State for inline add inputs
+  const [showSymbolAddInput, setShowSymbolAddInput] = useState(false);
+  const [showQuickSymbolAddInput, setShowQuickSymbolAddInput] = useState(false);
+  const [newSymbolInput, setNewSymbolInput] = useState('');
+  const [newQuickSymbolInput, setNewQuickSymbolInput] = useState('');
 
   // Format percentage display by removing trailing zeros
   const formatPercentageDisplay = (decimalValue: string) => {
@@ -52,6 +58,40 @@ export function SettingsForm() {
     // Handle language change
     if (field === 'language') {
       i18n.changeLanguage(value);
+    }
+  };
+
+  // Handle adding new symbol to symbol list
+  const handleAddSymbol = () => {
+    if (newSymbolInput.trim()) {
+      const trimmedSymbol = newSymbolInput.trim().toUpperCase();
+      const currentList = settings.symbolList || [];
+      if (!currentList.includes(trimmedSymbol)) {
+        handleInputChange('symbolList', [...currentList, trimmedSymbol]);
+        setNotification(`${t('symbolAdded')}: ${trimmedSymbol}`, 'success');
+      } else {
+        setNotification(t('symbolAlreadyExists'), 'info');
+      }
+      setNewSymbolInput('');
+      setShowSymbolAddInput(false);
+    }
+  };
+
+  // Handle adding new symbol to quick calculator symbols
+  const handleAddQuickSymbol = () => {
+    if (newQuickSymbolInput.trim()) {
+      const trimmedSymbol = newQuickSymbolInput.trim().toUpperCase();
+      const currentList = settings.quickCalculatorSymbols || [];
+      if (!currentList.includes(trimmedSymbol) && currentList.length < 5) {
+        handleInputChange('quickCalculatorSymbols', [...currentList, trimmedSymbol]);
+        setNotification(`已添加 ${trimmedSymbol}`, 'success');
+      } else if (currentList.length >= 5) {
+        setNotification('最多支持5个快速交易对', 'info');
+      } else {
+        setNotification('该交易对已存在', 'info');
+      }
+      setNewQuickSymbolInput('');
+      setShowQuickSymbolAddInput(false);
     }
   };
 
@@ -1056,16 +1096,7 @@ export function SettingsForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const newSymbol = prompt(t('enterSymbolPrompt'));
-                    if (newSymbol && newSymbol.trim()) {
-                      const trimmedSymbol = newSymbol.trim().toUpperCase();
-                      const currentList = settings.symbolList || [];
-                      if (!currentList.includes(trimmedSymbol)) {
-                        handleInputChange('symbolList', [...currentList, trimmedSymbol]);
-                      }
-                    }
-                  }}
+                  onClick={() => setShowSymbolAddInput(!showSymbolAddInput)}
                   className="flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" />
@@ -1073,6 +1104,52 @@ export function SettingsForm() {
                 </Button>
               </div>
             </div>
+            
+            {/* Inline Add Symbol Input */}
+            {showSymbolAddInput && (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={newSymbolInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSymbolInput(e.target.value)}
+                    placeholder={t('enterSymbolPrompt') || "输入交易对 (例如: BTCUSDT)"}
+                    className="text-center"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddSymbol();
+                      } else if (e.key === 'Escape') {
+                        setShowSymbolAddInput(false);
+                        setNewSymbolInput('');
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddSymbol}
+                  className="flex items-center gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                >
+                  <Check className="w-3 h-3" />
+                  {t('add') || '添加'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowSymbolAddInput(false);
+                    setNewSymbolInput('');
+                  }}
+                  className="px-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
             
             <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded border border-blue-200 dark:border-blue-800">
               <p className="flex items-center gap-1 mb-1">
@@ -1141,6 +1218,164 @@ export function SettingsForm() {
                 >
                   <Plus className="w-3 h-3" />
                   {t('loadDefaultSymbols')}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Calculator Symbol Shortcuts */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+            快速计算交易对
+          </h3>
+          
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>快速切换交易对</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const defaultSymbols = ['BTCUSDT', 'ETHUSDT', 'SUIUSDT'];
+                    handleInputChange('quickCalculatorSymbols', defaultSymbols);
+                    setNotification('已恢复默认快速交易对', 'success');
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  恢复默认
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowQuickSymbolAddInput(!showQuickSymbolAddInput)}
+                  className="flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  添加交易对
+                </Button>
+              </div>
+            </div>
+            
+            {/* Inline Add Quick Symbol Input */}
+            {showQuickSymbolAddInput && (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={newQuickSymbolInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewQuickSymbolInput(e.target.value)}
+                    placeholder="输入交易对 (例如: BTCUSDT)"
+                    className="text-center"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddQuickSymbol();
+                      } else if (e.key === 'Escape') {
+                        setShowQuickSymbolAddInput(false);
+                        setNewQuickSymbolInput('');
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddQuickSymbol}
+                  className="flex items-center gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                >
+                  <Check className="w-3 h-3" />
+                  添加
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowQuickSymbolAddInput(false);
+                    setNewQuickSymbolInput('');
+                  }}
+                  className="px-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+            
+            <div className="text-xs text-muted-foreground bg-indigo-50 dark:bg-indigo-950 p-2 rounded border border-indigo-200 dark:border-indigo-800">
+              <p className="flex items-center gap-1 mb-1">
+                <span className="text-indigo-600 dark:text-indigo-400">⚡</span>
+                <strong>快速计算器交易对切换:</strong>
+              </p>
+              <p className="ml-5 text-indigo-700 dark:text-indigo-300">
+                在快速计算器中显示的交易对切换按钮，最多支持5个交易对
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              {(settings.quickCalculatorSymbols || ['BTCUSDT', 'ETHUSDT', 'SUIUSDT']).map((symbol, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <Input
+                      type="text"
+                      value={symbol}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const newList = [...(settings.quickCalculatorSymbols || [])];
+                        newList[index] = e.target.value.toUpperCase();
+                        handleInputChange('quickCalculatorSymbols', newList);
+                      }}
+                      placeholder="BTCUSDT"
+                      className="text-center"
+                    />
+                  </div>
+                  {(settings.quickCalculatorSymbols || []).length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newList = (settings.quickCalculatorSymbols || []).filter((_, i) => i !== index);
+                        handleInputChange('quickCalculatorSymbols', newList);
+                        setNotification(`已删除 ${symbol}`, 'success');
+                      }}
+                      className="px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              配置在快速计算器中显示的交易对快速切换按钮。建议配置常用的主流交易对。
+            </p>
+            
+            {(!settings.quickCalculatorSymbols || settings.quickCalculatorSymbols.length === 0) && (
+              <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                  <span className="inline-block mr-1">⚠️</span>
+                  未配置快速计算交易对，将使用默认配置
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const defaultSymbols = ['BTCUSDT', 'ETHUSDT', 'SUIUSDT'];
+                    handleInputChange('quickCalculatorSymbols', defaultSymbols);
+                    setNotification('已加载默认快速交易对', 'success');
+                  }}
+                  className="flex items-center gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-100 dark:border-yellow-700 dark:text-yellow-300 dark:hover:bg-yellow-900"
+                >
+                  <Plus className="w-3 h-3" />
+                  加载默认配置
                 </Button>
               </div>
             )}

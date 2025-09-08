@@ -271,6 +271,8 @@ const defaultSettings: SettingsData = {
   defaultTrailingOnCloseOnly: true,
   // Symbol list for dropdown
   symbolList: ['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT'],
+  // Quick calculator symbol shortcuts
+  quickCalculatorSymbols: ['BTCUSDT', 'ETHUSDT', 'SUIUSDT'],
   rrRatios: [1, 1.5, 2],
   theme: 'system',
   language: 'zh',

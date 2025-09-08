@@ -155,6 +155,9 @@ export const settingsSchema = z.object({
 
   // Symbol list for dropdown
   symbolList: z.array(z.string()).default(['BTCUSDT', 'ETHUSDT', 'SUIUSDT', 'ADAUSDT', 'XRPUSDT']),
+  
+  // Quick calculator symbol shortcuts
+  quickCalculatorSymbols: z.array(z.string()).min(1).max(5).default(['BTCUSDT', 'ETHUSDT', 'SUIUSDT']),
 
   // Advanced
   autoFetchATR: z.boolean().default(true),
